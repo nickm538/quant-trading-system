@@ -28,4 +28,7 @@ cmds = [
 ]
 
 [start]
-cmd = "export LD_LIBRARY_PATH=/nix/store/*-gcc-*-lib/lib:/nix/store/*-openblas-*/lib:$LD_LIBRARY_PATH && node dist/index.js"
+cmd = "node dist/index.js"
+
+[variables]
+LD_LIBRARY_PATH = "/nix/store/*-gcc-*-lib/lib:/nix/store/*-openblas-*/lib:$LD_LIBRARY_PATH"
