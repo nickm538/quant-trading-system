@@ -113,6 +113,18 @@ export const appRouter = router({
       try {
         const pythonPath = 'python3.11';
         const scriptPath = path.join(process.cwd(), 'python_system/ml/backtest_and_train.py');
+        
+        // Construct DATABASE_URL from Railway's MySQL variables if not already set
+        let databaseUrl = process.env.DATABASE_URL;
+        if (!databaseUrl && process.env.MYSQLHOST) {
+          const host = process.env.MYSQLHOST;
+          const port = process.env.MYSQLPORT || '3306';
+          const user = process.env.MYSQLUSER || 'root';
+          const password = process.env.MYSQLPASSWORD || '';
+          const database = process.env.MYSQLDATABASE || 'railway';
+          databaseUrl = `mysql://${user}:${password}@${host}:${port}/${database}`;
+        }
+        
         const { stdout, stderr } = await execAsync(
           `${pythonPath} ${scriptPath}`,
           { 
@@ -120,6 +132,7 @@ export const appRouter = router({
             timeout: 300000, // 5min timeout
             env: {
               ...process.env,
+              DATABASE_URL: databaseUrl || '',
               PYTHONPATH: '',
               PYTHONHOME: '',
               LD_LIBRARY_PATH: process.env.LD_LIBRARY_PATH || '',
