@@ -1,5 +1,5 @@
 [phases.setup]
-nixPkgs = ["nodejs-18_x", "nodePackages.pnpm", "python311", "python311Packages.pip", "gcc", "stdenv.cc.cc.lib", "wget"]
+nixPkgs = ["nodejs-18_x", "nodePackages.pnpm", "python311", "python311Packages.pip", "gcc", "gcc-unwrapped.lib", "wget"]
 
 [phases.install]
 cmds = [
@@ -11,4 +11,4 @@ cmds = [
 cmds = ["pnpm build"]
 
 [start]
-cmd = "node dist/index.js"
+cmd = "export LD_LIBRARY_PATH=/nix/store/*-gcc-*-lib/lib:$LD_LIBRARY_PATH && node dist/index.js"
