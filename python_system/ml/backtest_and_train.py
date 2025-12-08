@@ -152,8 +152,8 @@ def calculate_technical_features(df: pd.DataFrame) -> pd.DataFrame:
     
     return df
 
-def prepare_features_and_target(df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.Series]:
-    """Prepare features (X) and target (y)"""
+def prepare_features_and_target(df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.Series, List[str]]:
+    """Prepare features (X) and target (y) and return feature names"""
     # Feature columns (exclude date, price columns, and target)
     exclude_cols = ['Date', 'open', 'high', 'low', 'close', 'adj_close', 'volume', 'target']
     feature_cols = [col for col in df.columns if col not in exclude_cols]
@@ -161,7 +161,7 @@ def prepare_features_and_target(df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.Seri
     X = df[feature_cols]
     y = df['target']
     
-    return X, y
+    return X, y, feature_cols
 
 def train_xgboost_model(X_train, y_train, X_val, y_val):
     """Train XGBoost model"""
@@ -272,36 +272,45 @@ def calculate_backtest_metrics(predictions: np.ndarray, actuals: np.ndarray, ret
         'profit_factor': profit_factor
     }
 
-def save_model_to_db(conn, symbol: str, model_type: str, metrics: Dict, hyperparams: Dict) -> int:
-    """Save trained model metadata to database"""
+def save_model_to_db(conn, symbol: str, model_type: str, model_obj, metrics: Dict, hyperparams: Dict, feature_importance: Dict = None) -> int:
+    """Save trained model and metadata to database"""
+    import pickle
+    import base64
+    
     cursor = conn.cursor()
+    
+    # Serialize model to base64 for database storage
+    model_bytes = pickle.dumps(model_obj)
+    model_b64 = base64.b64encode(model_bytes).decode('utf-8')
     
     # Convert metrics to database format (multiply by 10000 for precision)
     insert_query = """
     INSERT INTO trained_models (
-        stock_symbol, model_type, version, model_path,
+        stock_symbol, model_type, version, model_path, model_data,
         training_start_date, training_end_date, training_data_points,
         training_accuracy, validation_accuracy, test_accuracy,
         mse, mae, r2_score,
-        hyperparameters, is_active
-    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        hyperparameters, feature_importance, is_active
+    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     """
     
     values = (
         symbol,
         model_type,
         datetime.now().strftime('%Y%m%d_%H%M%S'),
-        f's3://models/{symbol}_{model_type}_{datetime.now().strftime("%Y%m%d")}.pkl',  # Placeholder
-        datetime.now() - timedelta(days=365*2),  # 2 years ago
+        f'db://models/{symbol}_{model_type}_{datetime.now().strftime("%Y%m%d")}.pkl',
+        model_b64,  # Serialized model
+        datetime.now() - timedelta(days=365*5),  # 5 years ago (training data start)
         datetime.now(),
         metrics['total_trades'],
         int(metrics['direction_accuracy'] * 10000),
         int(metrics['direction_accuracy'] * 10000),  # Same as training for now
         int(metrics['direction_accuracy'] * 10000),
-        int(metrics['mse'] * 10000),
-        int(metrics['mae'] * 10000),
-        int(metrics['r2_score'] * 10000),
+        int(metrics.get('mse', 0) * 10000),
+        int(metrics.get('mae', 0) * 10000),
+        int(metrics.get('r2_score', 0) * 10000),
         json.dumps(hyperparams),
+        json.dumps(feature_importance) if feature_importance else None,
         'active'
     )
     
@@ -378,7 +387,7 @@ def process_stock(symbol: str, conn) -> Dict:
     print(f"  ✓ Calculated {len([c for c in df.columns if c not in ['Date', 'open', 'high', 'low', 'close', 'adj_close', 'volume', 'target']])} features")
     
     # Prepare features and target
-    X, y = prepare_features_and_target(df)
+    X, y, feature_names = prepare_features_and_target(df)
     
     # Walk-forward split (80% train, 20% test)
     split_idx = int(len(X) * 0.8)
@@ -409,7 +418,8 @@ def process_stock(symbol: str, conn) -> Dict:
         'subsample': 0.8,
         'colsample_bytree': 0.8
     }
-    xgb_model_id = save_model_to_db(conn, symbol, 'xgboost', xgb_metrics, xgb_hyperparams)
+    xgb_feature_importance = dict(zip(feature_names[:len(xgb_model.feature_importances_)], xgb_model.feature_importances_.tolist()))
+    xgb_model_id = save_model_to_db(conn, symbol, 'xgboost', xgb_model, xgb_metrics, xgb_hyperparams, xgb_feature_importance)
     save_backtest_results_to_db(
         conn, xgb_model_id, symbol, xgb_metrics,
         df.iloc[split_idx]['Date'], df.iloc[-1]['Date']
@@ -431,7 +441,8 @@ def process_stock(symbol: str, conn) -> Dict:
         'subsample': 0.8,
         'colsample_bytree': 0.8
     }
-    lgb_model_id = save_model_to_db(conn, symbol, 'lightgbm', lgb_metrics, lgb_hyperparams)
+    lgb_feature_importance = dict(zip(feature_names[:len(lgb_model.feature_importances_)], lgb_model.feature_importances_.tolist()))
+    lgb_model_id = save_model_to_db(conn, symbol, 'lightgbm', lgb_model, lgb_metrics, lgb_hyperparams, lgb_feature_importance)
     save_backtest_results_to_db(
         conn, lgb_model_id, symbol, lgb_metrics,
         df.iloc[split_idx]['Date'], df.iloc[-1]['Date']
@@ -446,7 +457,9 @@ def process_stock(symbol: str, conn) -> Dict:
     
     # Save Ensemble to DB
     ensemble_hyperparams = {'models': ['xgboost', 'lightgbm'], 'weights': [0.5, 0.5]}
-    ensemble_model_id = save_model_to_db(conn, symbol, 'ensemble', ensemble_metrics, ensemble_hyperparams)
+    # Create ensemble model object (dict with both models)
+    ensemble_model = {'xgb': xgb_model, 'lgb': lgb_model, 'weights': [0.5, 0.5]}
+    ensemble_model_id = save_model_to_db(conn, symbol, 'ensemble', ensemble_model, ensemble_metrics, ensemble_hyperparams)
     save_backtest_results_to_db(
         conn, ensemble_model_id, symbol, ensemble_metrics,
         df.iloc[split_idx]['Date'], df.iloc[-1]['Date']

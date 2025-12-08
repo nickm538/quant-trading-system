@@ -1,4 +1,4 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
+import { int, mediumtext, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow.
@@ -37,6 +37,7 @@ export const trainedModels = mysqlTable("trained_models", {
   
   // Model storage
   modelPath: text("model_path").notNull(), // S3 path to serialized model
+  modelData: mediumtext("model_data"), // Base64 encoded serialized model (for direct DB storage)
   
   // Training metadata
   trainedAt: timestamp("trained_at").defaultNow().notNull(),
