@@ -81,6 +81,8 @@ export async function analyzeStock(params: StockAnalysisParams): Promise<StockAn
         ...process.env,
         PYTHONPATH: '',
         PYTHONHOME: '',
+        // Add library path for numpy/scipy C extensions in Nix
+        LD_LIBRARY_PATH: process.env.LD_LIBRARY_PATH || '',
       },
     });
 
@@ -117,6 +119,7 @@ export async function getGreeksHeatmap(params: {
         ...process.env,
         PYTHONPATH: '',
         PYTHONHOME: '',
+        LD_LIBRARY_PATH: process.env.LD_LIBRARY_PATH || '',
       },
     });
 
@@ -153,6 +156,7 @@ export async function analyzeOptions(params: {
         ...process.env,
         PYTHONPATH: '',
         PYTHONHOME: '',
+        LD_LIBRARY_PATH: process.env.LD_LIBRARY_PATH || '',
       },
     });
 
@@ -190,6 +194,7 @@ export async function scanMarket(params: {
         ...process.env,
         PYTHONPATH: '',
         PYTHONHOME: '',
+        LD_LIBRARY_PATH: process.env.LD_LIBRARY_PATH || '',
       },
     });
 
@@ -230,6 +235,7 @@ export async function checkPythonSystem(): Promise<boolean> {
         ...process.env,
         PYTHONPATH: '',
         PYTHONHOME: '',
+        LD_LIBRARY_PATH: process.env.LD_LIBRARY_PATH || '',
       },
     });
     return stdout.trim() === 'OK';
