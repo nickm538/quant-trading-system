@@ -29,7 +29,7 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('/home/ubuntu/quant_trading_system/logs/trading_system.log'),
+        # logging.FileHandler('/home/ubuntu/quant_trading_system/logs/trading_system.log'),  # Disabled for production
         logging.StreamHandler()
     ]
 )
@@ -724,7 +724,7 @@ def main():
     )
     
     # Save results
-    output_file = f'/home/ubuntu/quant_trading_system/logs/analysis_{test_symbol}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.json'
+    # output_file = f'/home/ubuntu/quant_trading_system/logs/analysis_{test_symbol}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.json'  # Disabled for production
     
     # Convert DataFrames to dict for JSON serialization
     analysis_copy = analysis.copy()
@@ -733,10 +733,10 @@ def main():
         df_tail['timestamp'] = df_tail['timestamp'].astype(str)
         analysis_copy['price_data'] = df_tail.to_dict(orient='records')
     
-    with open(output_file, 'w') as f:
-        json.dump(analysis_copy, f, indent=2, default=str)
+    # with open(output_file, 'w') as f:  # Disabled for production
+    #     json.dump(analysis_copy, f, indent=2, default=str)
     
-    print(f"\n✓ Analysis saved to: {output_file}")
+    # print(f"\n✓ Analysis saved to: {output_file}")  # Disabled for production
     
     print("\n" + "=" * 80)
     print("SYSTEM TEST COMPLETE")

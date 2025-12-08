@@ -452,15 +452,15 @@ if __name__ == "__main__":
     scanner = MarketScanner()
     results = scanner.scan_market(top_n=20)
     
-    # Save results
-    output_file = f"/home/ubuntu/quant_trading_system/logs/market_scan_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-    with open(output_file, 'w') as f:
-        # Remove full_analysis for file size
-        simplified = results.copy()
-        simplified['opportunities'] = [
-            {k: v for k, v in opp.items() if k != 'full_analysis'}
-            for opp in results['opportunities']
-        ]
-        json.dump(simplified, f, indent=2, default=str)
-    
-    print(f"\n✓ Results saved to: {output_file}")
+    # Save results (disabled for production)
+    # output_file = f"/home/ubuntu/quant_trading_system/logs/market_scan_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+    # with open(output_file, 'w') as f:
+    #     # Remove full_analysis for file size
+    #     simplified = results.copy()
+    #     simplified['opportunities'] = [
+    #         {k: v for k, v in opp.items() if k != 'full_analysis'}
+    #         for opp in results['opportunities']
+    #     ]
+    #     json.dump(simplified, f, indent=2, default=str)
+    # 
+    # print(f"\n✓ Results saved to: {output_file}")
