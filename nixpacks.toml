@@ -2,21 +2,15 @@
 nixPkgs = [
     "nodejs-18_x",
     "nodePackages.pnpm",
-    "python311",
-    "python311Packages.pip",
-    "python311Packages.numpy",
-    "python311Packages.pandas",
+    "python311Full",
     "gcc",
-    "stdenv.cc.cc.lib",
-    "zlib",
-    "wget"
+    "glibc",
+    "zlib"
 ]
 
 [phases.install]
 cmds = [
-    # Install Python packages with proper flags
-    "pip install --no-cache-dir yfinance scipy scikit-learn xgboost lightgbm arch TA-Lib requests fastdtw --break-system-packages",
-    # Install Node.js dependencies
+    "pip install --no-cache-dir numpy pandas yfinance scipy scikit-learn xgboost lightgbm arch TA-Lib requests fastdtw --break-system-packages",
     "pnpm install --frozen-lockfile"
 ]
 
