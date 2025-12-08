@@ -5,7 +5,11 @@ import * as path from 'path';
 const execAsync = promisify(exec);
 
 const PYTHON_SYSTEM_PATH = path.join(process.cwd(), 'python_system');
-const PYTHON_BIN = '/usr/bin/python3.11';
+
+// Detect Python binary - Railway uses different paths
+const PYTHON_BIN = process.env.RAILWAY_ENVIRONMENT 
+  ? 'python3' // Railway/Nix uses python3 in PATH
+  : '/usr/bin/python3.11'; // Local development
 const WRAPPER_SCRIPT = path.join(PYTHON_SYSTEM_PATH, 'run_analysis.py');
 const PRODUCTION_ANALYZER = path.join(PYTHON_SYSTEM_PATH, 'run_perfect_analysis.py');
 
