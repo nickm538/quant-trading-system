@@ -6,7 +6,12 @@ nixPkgs = [
     "python311Packages.pip",
     "gcc",
     "stdenv.cc.cc.lib",
+    "glibc",
     "zlib",
+    "blas",
+    "lapack",
+    "openblas",
+    "libgfortran5",
     "wget"
 ]
 
@@ -23,7 +28,4 @@ cmds = [
 ]
 
 [start]
-cmd = "node dist/index.js"
-
-[variables]
-LD_LIBRARY_PATH = "/nix/store/*-gcc-*-lib/lib:$LD_LIBRARY_PATH"
+cmd = "export LD_LIBRARY_PATH=/nix/store/*-gcc-*-lib/lib:/nix/store/*-openblas-*/lib:$LD_LIBRARY_PATH && node dist/index.js"
