@@ -1,0 +1,19 @@
+name = "quant-trading-system"
+compatibility_date = "2024-12-08"
+pages_build_output_dir = "dist/public"
+
+[build]
+command = "pnpm build"
+
+[build.upload]
+format = "service-worker"
+
+# D1 Database binding (to be created manually)
+[[d1_databases]]
+binding = "DB"
+database_name = "quant-trading-db"
+database_id = "6dc0a645-2d17-4f4d-bf51-9040b9c8ab0f"
+
+# Environment variables
+[vars]
+NODE_ENV = "production"
