@@ -143,24 +143,24 @@ const OptionCard = ({ option }: { option: OptionRecommendation }) => {
             </div>
           </div>
           <div className="space-y-1">
-            <div className="text-gray-600">Delta</div>
+            <div className="text-gray-600" title="Sensitivity to $1 stock price move">Delta</div>
             <div className="font-semibold">{option.key_metrics.delta.toFixed(3)}</div>
-            <div className="text-xs text-gray-500">
+            <div className="text-xs text-gray-500" title="Rate of delta change">
               Gamma: {option.key_metrics.gamma.toFixed(3)}
             </div>
           </div>
           <div className="space-y-1">
-            <div className="text-gray-600">IV</div>
+            <div className="text-gray-600" title="Implied Volatility - market's expectation of future volatility">IV</div>
             <div className="font-semibold">{option.key_metrics.iv.toFixed(1)}%</div>
-            <div className="text-xs text-gray-500">
+            <div className="text-xs text-gray-500" title="Sensitivity to 1% IV change">
               Vega: {option.key_metrics.vega.toFixed(3)}
             </div>
           </div>
           <div className="space-y-1">
-            <div className="text-gray-600">Theta</div>
-            <div className="font-semibold">{option.key_metrics.theta.toFixed(3)}</div>
+            <div className="text-gray-600" title="Time decay per day (negative = losing value)">Theta</div>
+            <div className="font-semibold text-red-500">{option.key_metrics.theta.toFixed(3)}</div>
             <div className="text-xs text-gray-500">
-              Decay/day
+              $ per day
             </div>
           </div>
           <div className="space-y-1">
@@ -386,6 +386,42 @@ export const InstitutionalOptionsAnalysis: React.FC<InstitutionalOptionsAnalysis
           All recommendations are for informational purposes only.
         </AlertDescription>
       </Alert>
+
+      {/* Greeks Explanation */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Understanding the Greeks</CardTitle>
+          <CardDescription>Key metrics explained in plain English</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm">
+          <div className="grid md:grid-cols-2 gap-4">
+            <div>
+              <div className="font-semibold text-blue-600">Delta (0-1 for calls, 0 to -1 for puts)</div>
+              <div className="text-gray-600">How much the option price changes per $1 stock move. Delta of 0.50 means the option gains $0.50 when stock rises $1.</div>
+            </div>
+            <div>
+              <div className="font-semibold text-purple-600">Gamma (typically 0-0.1)</div>
+              <div className="text-gray-600">How much delta changes per $1 stock move. Higher gamma = delta changes faster = more risk and reward.</div>
+            </div>
+            <div>
+              <div className="font-semibold text-green-600">Vega (per 1% IV change)</div>
+              <div className="text-gray-600">How much the option price changes per 1% change in implied volatility. Vega of 0.36 means option gains $0.36 if IV rises 1%.</div>
+            </div>
+            <div>
+              <div className="font-semibold text-red-600">Theta (per day, negative for long options)</div>
+              <div className="text-gray-600">Daily time decay. Theta of -0.09 means the option loses $0.09 per day, all else equal. Time is your enemy.</div>
+            </div>
+            <div>
+              <div className="font-semibold text-orange-600">IV (Implied Volatility %)</div>
+              <div className="text-gray-600">Market's expectation of future volatility. Higher IV = more expensive options. 20-30% is typical for large-cap stocks.</div>
+            </div>
+            <div>
+              <div className="font-semibold text-teal-600">Kelly % (Position Sizing)</div>
+              <div className="text-gray-600">Optimal position size as % of capital. Conservative Kelly (50% of full) is recommended for real trading to reduce variance.</div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };
