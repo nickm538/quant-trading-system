@@ -9,3 +9,4 @@ arch
 TA-Lib
 requests
 fastdtw
+mysql-connector-python

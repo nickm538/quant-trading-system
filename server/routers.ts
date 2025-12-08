@@ -6,6 +6,7 @@ import { z } from "zod";
 import { analyzeStock, analyzeOptions, scanMarket, checkPythonSystem, getGreeksHeatmap } from "./python_executor";
 import { exec } from "child_process";
 import { promisify } from "util";
+import * as path from "path";
 import { getAllModelsSummary } from "./db_ml";
 import { getCachedAnalysis, setCachedAnalysis } from "./db";
 
@@ -108,11 +109,22 @@ export const appRouter = router({
     }),
     
     // Train models on the 15 selected stocks
-    trainModels: protectedProcedure.mutation(async () => {
+    trainModels: publicProcedure.mutation(async () => {
       try {
+        const pythonPath = 'python3.11';
+        const scriptPath = path.join(process.cwd(), 'python_system/ml/backtest_and_train.py');
         const { stdout, stderr } = await execAsync(
-          '/usr/bin/python3.11 /home/ubuntu/quant-trading-web/python_system/ml/backtest_and_train.py',
-          { maxBuffer: 10 * 1024 * 1024, timeout: 300000 } // 10MB buffer, 5min timeout
+          `${pythonPath} ${scriptPath}`,
+          { 
+            maxBuffer: 10 * 1024 * 1024, 
+            timeout: 300000, // 5min timeout
+            env: {
+              ...process.env,
+              PYTHONPATH: '',
+              PYTHONHOME: '',
+              LD_LIBRARY_PATH: process.env.LD_LIBRARY_PATH || '',
+            },
+          }
         );
         
         return {

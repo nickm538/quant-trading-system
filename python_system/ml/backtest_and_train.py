@@ -61,14 +61,21 @@ def get_db_connection():
         ssl_disabled=False
     )
 
-def load_csv_data(csv_path: str) -> pd.DataFrame:
-    """Load and prepare CSV data"""
-    df = pd.read_csv(csv_path)
+def load_stock_data(symbol: str, years: int = 5) -> pd.DataFrame:
+    """Download and prepare stock data from yfinance"""
+    import yfinance as yf
+    from datetime import datetime, timedelta
     
-    # Parse date
-    df['Date'] = pd.to_datetime(df['Date'])
-    df = df.sort_values('Date')
-    df = df.reset_index(drop=True)
+    # Download data
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=years*365)
+    
+    ticker = yf.Ticker(symbol)
+    df = ticker.history(start=start_date, end=end_date)
+    
+    # Reset index to make Date a column
+    df = df.reset_index()
+    df = df.rename(columns={'index': 'Date'})
     
     # Rename columns to lowercase
     df = df.rename(columns={
@@ -76,9 +83,20 @@ def load_csv_data(csv_path: str) -> pd.DataFrame:
         'High': 'high',
         'Low': 'low',
         'Close': 'close',
-        'Adj Close': 'adj_close',
         'Volume': 'volume'
     })
+    
+    # Add adj_close (same as close for yfinance history)
+    df['adj_close'] = df['close']
+    
+    # Ensure Date column exists
+    if 'Date' not in df.columns:
+        df['Date'] = df.index
+    
+    # Parse date
+    df['Date'] = pd.to_datetime(df['Date'])
+    df = df.sort_values('Date')
+    df = df.reset_index(drop=True)
     
     # Convert to float64 for TA-Lib
     for col in ['open', 'high', 'low', 'close', 'adj_close', 'volume']:
@@ -343,20 +361,19 @@ def save_backtest_results_to_db(conn, model_id: int, symbol: str, metrics: Dict,
     conn.commit()
     cursor.close()
 
-def process_stock(csv_path: str, symbol: str, conn) -> Dict:
+def process_stock(symbol: str, conn) -> Dict:
     """Process single stock: load data, train models, backtest, save results"""
     print(f"\n{'='*80}")
     print(f"Processing {symbol}")
     print(f"{'='*80}")
     
     # Load data
-    print(f"[1/6] Loading CSV data...")
-    df = pd.read_csv(csv_path)
-    print(f"  ✓ Loaded {len(df)} rows from {df['Date'].min()} to {df['Date'].max()}")
+    print(f"[1/6] Downloading stock data from yfinance...")
+    df = load_stock_data(symbol, years=5)
+    print(f"  ✓ Downloaded {len(df)} rows from {df['Date'].min()} to {df['Date'].max()}")
     
     # Calculate features
     print(f"[2/6] Calculating technical features...")
-    df = load_csv_data(csv_path)
     df = calculate_technical_features(df)
     print(f"  ✓ Calculated {len([c for c in df.columns if c not in ['Date', 'open', 'high', 'low', 'close', 'adj_close', 'volume', 'target']])} features")
     
@@ -447,27 +464,27 @@ def main():
     print("COMPREHENSIVE BACKTESTING AND TRAINING SYSTEM")
     print("="*80)
     
-    # Stock CSV mapping
-    stocks = {
-        'AAPL': '/home/ubuntu/upload/AAPL(Apple).csv',
-        'AMZN': '/home/ubuntu/upload/AMZN(Amazon).csv',
-        'F': '/home/ubuntu/upload/F(FordMotorCompany).csv',
-        'GOOG': '/home/ubuntu/upload/GOOG(Google).csv',
-        'INTC': '/home/ubuntu/upload/INTC(IntelCorporation).csv',
-        'JPM': '/home/ubuntu/upload/JPM(JPMorganChaseandCo).csv',
-        'KO': '/home/ubuntu/upload/KO(CocoColaCompany).csv',
-        'MCD': '/home/ubuntu/upload/MCD(Mcdonald).csv',
-        'MSFT': '/home/ubuntu/upload/MSFT(Microsoft).csv',
-        'NFLX': '/home/ubuntu/upload/NFLX(Netflix).csv',
-        'NVDA': '/home/ubuntu/upload/NVDA(Nvidia).csv',
-        'PFE': '/home/ubuntu/upload/PFE(PfizerInc).csv',
-        'TSLA': '/home/ubuntu/upload/TSLA(Tesla).csv',
-        'WMT': '/home/ubuntu/upload/WMT(Wallmart).csv',
-        'ZG': '/home/ubuntu/upload/ZG(ZillowGroup).csv'
-    }
+    # Stock symbols to train on
+    stocks = [
+        'AAPL',  # Apple
+        'AMZN',  # Amazon
+        'F',     # Ford Motor Company
+        'GOOG',  # Google
+        'INTC',  # Intel Corporation
+        'JPM',   # JPMorgan Chase
+        'KO',    # Coca-Cola Company
+        'MCD',   # McDonald's
+        'MSFT',  # Microsoft
+        'NFLX',  # Netflix
+        'NVDA',  # Nvidia
+        'PFE',   # Pfizer Inc
+        'TSLA',  # Tesla
+        'WMT',   # Walmart
+        'ZG'     # Zillow Group
+    ]
     
     print(f"\nTraining on {len(stocks)} stocks:")
-    for symbol in stocks.keys():
+    for symbol in stocks:
         print(f"  - {symbol}")
     
     # Connect to database
@@ -481,9 +498,9 @@ def main():
     
     # Process each stock
     all_results = {}
-    for symbol, csv_path in stocks.items():
+    for symbol in stocks:
         try:
-            results = process_stock(csv_path, symbol, conn)
+            results = process_stock(symbol, conn)
             all_results[symbol] = results
         except Exception as e:
             print(f"  ✗ Error processing {symbol}: {e}")
