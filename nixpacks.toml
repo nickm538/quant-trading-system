@@ -1,10 +1,9 @@
 [phases.setup]
-nixPkgs = ["nodejs-18_x", "python311", "python311Packages.pip", "gcc", "wget", "ta-lib"]
+nixPkgs = ["nodejs-18_x", "python311", "python311Packages.pip", "gcc", "wget"]
 
 [phases.install]
 cmds = [
-    "pip install --upgrade pip",
-    "pip install numpy pandas yfinance scipy scikit-learn xgboost lightgbm arch TA-Lib requests fastdtw",
+    "pip install numpy pandas yfinance scipy scikit-learn xgboost lightgbm arch TA-Lib requests fastdtw --break-system-packages",
     "pnpm install"
 ]
 
