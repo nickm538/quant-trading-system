@@ -7,7 +7,6 @@ nixPkgs = [
     "python311Packages.numpy",
     "python311Packages.pandas",
     "gcc",
-    "gfortran",
     "stdenv.cc.cc.lib",
     "zlib",
     "wget"
