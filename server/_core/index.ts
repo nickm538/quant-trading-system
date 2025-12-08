@@ -61,9 +61,12 @@ async function startServer() {
   // Initialize WebSocket for real-time price streaming
   initializePriceStream(server);
 
-  server.listen(port, () => {
-    console.log(`Server running on http://localhost:${port}/`);
-    console.log(`WebSocket available at ws://localhost:${port}/api/socket.io`);
+  const host = process.env.RAILWAY_ENVIRONMENT ? '0.0.0.0' : 'localhost';
+  
+  server.listen(port, host, () => {
+    console.log(`Server running on http://${host}:${port}/`);
+    console.log(`WebSocket available at ws://${host}:${port}/api/socket.io`);
+    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
   });
 }
 
