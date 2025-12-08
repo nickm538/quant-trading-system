@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, TrendingUp, BarChart3, Search, AlertCircle, Brain } from "lucide-react";
+import { Loader2, TrendingUp, BarChart3, Search, AlertCircle, Brain, Zap } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { APP_TITLE } from "@/const";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -13,20 +13,32 @@ import { TechnicalChart } from "@/components/TechnicalChart";
 import { RiskDistributionChart } from "@/components/RiskDistributionChart";
 import { RawDataDisplay } from "@/components/RawDataDisplay";
 import { ExpertReasoningDisplay } from "@/components/ExpertReasoningDisplay";
+import { QuantMLAnalysis } from "@/components/QuantMLAnalysis";
 import { GreeksHeatmap } from "@/components/GreeksHeatmap";
+import { InstitutionalOptionsAnalysis } from "@/components/InstitutionalOptionsAnalysis";
 
 export default function Home() {
   const [symbol, setSymbol] = useState("");
   const [bankroll, setBankroll] = useState(1000);
   const [analysis, setAnalysis] = useState<any>(null);
   const [optionsAnalysis, setOptionsAnalysis] = useState<any>(null);
+  const [institutionalOptions, setInstitutionalOptions] = useState<any>(null);
   const [greeksHeatmapData, setGreeksHeatmapData] = useState<any>(null);
   const [marketScan, setMarketScan] = useState<any>(null);
   const [trainingOutput, setTrainingOutput] = useState<string>("");
+  const [mlPrediction, setMlPrediction] = useState<any>(null);
 
   const analyzeMutation = trpc.trading.analyzeStock.useMutation({
     onSuccess: (data) => {
       setAnalysis(data);
+      // Also fetch ML prediction for this stock
+      mlPredictionMutation.mutate({ symbol: data.symbol, horizon_days: 30 });
+    },
+  });
+
+  const mlPredictionMutation = trpc.trading.getMLPrediction.useMutation({
+    onSuccess: (data) => {
+      setMlPrediction(data);
     },
   });
 
@@ -41,6 +53,12 @@ export default function Home() {
   const optionsMutation = trpc.trading.analyzeOptions.useMutation({
     onSuccess: (data) => {
       setOptionsAnalysis(data);
+    },
+  });
+
+  const institutionalOptionsMutation = trpc.trading.analyzeInstitutionalOptions.useMutation({
+    onSuccess: (data) => {
+      setInstitutionalOptions(data);
     },
   });
 
@@ -75,6 +93,14 @@ export default function Home() {
       min_delta: 0.3,
       max_delta: 0.6,
       min_days: 7,
+    });
+  };
+
+  const handleAnalyzeInstitutionalOptions = () => {
+    if (!symbol) return;
+    setInstitutionalOptions(null);
+    institutionalOptionsMutation.mutate({
+      symbol: symbol.toUpperCase(),
     });
   };
 
@@ -126,7 +152,7 @@ export default function Home() {
       {/* Main Content */}
       <div className="container py-8">
         <Tabs defaultValue="stock" className="w-full">
-          <TabsList className="grid w-full grid-cols-4 mb-8">
+          <TabsList className="grid w-full grid-cols-5 mb-8">
             <TabsTrigger value="stock" className="flex items-center gap-2">
               <TrendingUp className="h-4 w-4" />
               Stock Analysis
@@ -134,6 +160,10 @@ export default function Home() {
             <TabsTrigger value="options" className="flex items-center gap-2">
               <BarChart3 className="h-4 w-4" />
               Options Analyzer
+            </TabsTrigger>
+            <TabsTrigger value="institutional" className="flex items-center gap-2">
+              <Zap className="h-4 w-4" />
+              Institutional Options
             </TabsTrigger>
             <TabsTrigger value="scanner" className="flex items-center gap-2">
               <Search className="h-4 w-4" />
@@ -578,6 +608,69 @@ export default function Home() {
                   )}
                 </div>
               </div>
+            )}
+          </TabsContent>
+
+          {/* Institutional Options Tab */}
+          <TabsContent value="institutional" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Zap className="h-5 w-5 text-yellow-500" />
+                  Institutional-Grade Options Analysis
+                </CardTitle>
+                <CardDescription>
+                  Advanced 8-factor scoring with Black-Scholes Greeks (including Vanna, Charm), Kelly Criterion position sizing, and AI pattern recognition
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    <strong>Precision over quantity:</strong> This system analyzes 500-1000 options but only returns those scoring ≥60/100.
+                    Typical pass rate: 2-5%. Expected analysis time: 10-15 seconds.
+                  </AlertDescription>
+                </Alert>
+                <div className="flex gap-4">
+                  <Input
+                    placeholder="Enter symbol (e.g., AAPL, TSLA)"
+                    value={symbol}
+                    onChange={(e) => setSymbol(e.target.value.toUpperCase())}
+                    onKeyDown={(e) => e.key === 'Enter' && handleAnalyzeInstitutionalOptions()}
+                  />
+                  <Button 
+                    onClick={handleAnalyzeInstitutionalOptions} 
+                    disabled={!symbol || institutionalOptionsMutation.isPending}
+                    size="lg"
+                    className="whitespace-nowrap"
+                  >
+                    {institutionalOptionsMutation.isPending ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Analyzing...
+                      </>
+                    ) : (
+                      <>
+                        <Zap className="mr-2 h-4 w-4" />
+                        Analyze Options
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {institutionalOptionsMutation.isError && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  {institutionalOptionsMutation.error.message}
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {institutionalOptions && (
+              <InstitutionalOptionsAnalysis data={institutionalOptions} />
             )}
           </TabsContent>
 
