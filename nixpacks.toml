@@ -5,30 +5,24 @@ nixPkgs = [
     "python311",
     "python311Packages.pip",
     "gcc",
-    "stdenv.cc.cc.lib",
-    "glibc",
-    "zlib",
+    "gfortran",
     "blas",
     "lapack",
     "openblas",
-    "libgfortran5",
+    "zlib",
+    "stdenv.cc.cc.lib",
     "wget"
 ]
 
 [phases.install]
 cmds = [
-    "pnpm install --frozen-lockfile"
+    "pnpm install --frozen-lockfile",
+    "python -m pip install --upgrade pip",
+    "python -m pip install -r requirements.txt"
 ]
 
 [phases.build]
-cmds = [
-    "pip install numpy pandas --force-reinstall --no-cache-dir --break-system-packages",
-    "pip install yfinance scipy scikit-learn xgboost lightgbm arch TA-Lib requests fastdtw --no-cache-dir --break-system-packages",
-    "pnpm build"
-]
+cmds = ["pnpm build"]
 
 [start]
 cmd = "node dist/index.js"
-
-[variables]
-LD_LIBRARY_PATH = "/nix/store/*-gcc-*-lib/lib:/nix/store/*-openblas-*/lib:$LD_LIBRARY_PATH"
