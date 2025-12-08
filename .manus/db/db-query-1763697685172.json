@@ -1,0 +1,9 @@
+{
+  "query": "DELETE FROM trained_models",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2eU7e7Pj3HUsFUn.root --database 973zSFHnAfFbUsorknoKFE --execute DELETE FROM trained_models",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 59
+}

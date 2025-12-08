@@ -1,0 +1,110 @@
+{
+  "query": "SELECT id, stock_symbol, model_type, version, training_accuracy, validation_accuracy, test_accuracy, trained_at FROM trained_models ORDER BY id LIMIT 10",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2eU7e7Pj3HUsFUn.root --database 973zSFHnAfFbUsorknoKFE --execute SELECT id, stock_symbol, model_type, version, training_accuracy, validation_accuracy, test_accuracy, trained_at FROM trained_models ORDER BY id LIMIT 10",
+  "rows": [
+    {
+      "id": "1",
+      "stock_symbol": "BAC",
+      "model_type": "xgboost",
+      "version": "20251120_211412",
+      "training_accuracy": "9588",
+      "validation_accuracy": "3676",
+      "test_accuracy": "4705",
+      "trained_at": "2025-11-21 02:14:12"
+    },
+    {
+      "id": "2",
+      "stock_symbol": "BAC",
+      "model_type": "lightgbm",
+      "version": "20251120_211412",
+      "training_accuracy": "8575",
+      "validation_accuracy": "4411",
+      "test_accuracy": "3823",
+      "trained_at": "2025-11-21 02:14:12"
+    },
+    {
+      "id": "3",
+      "stock_symbol": "INTC",
+      "model_type": "xgboost",
+      "version": "20251120_211412",
+      "training_accuracy": "9303",
+      "validation_accuracy": "6323",
+      "test_accuracy": "4705",
+      "trained_at": "2025-11-21 02:14:12"
+    },
+    {
+      "id": "4",
+      "stock_symbol": "INTC",
+      "model_type": "lightgbm",
+      "version": "20251120_211412",
+      "training_accuracy": "8101",
+      "validation_accuracy": "6470",
+      "test_accuracy": "5735",
+      "trained_at": "2025-11-21 02:14:12"
+    },
+    {
+      "id": "5",
+      "stock_symbol": "AAPL",
+      "model_type": "xgboost",
+      "version": "20251120_211412",
+      "training_accuracy": "9335",
+      "validation_accuracy": "5735",
+      "test_accuracy": "5147",
+      "trained_at": "2025-11-21 02:14:12"
+    },
+    {
+      "id": "6",
+      "stock_symbol": "AAPL",
+      "model_type": "lightgbm",
+      "version": "20251120_211412",
+      "training_accuracy": "8481",
+      "validation_accuracy": "5147",
+      "test_accuracy": "4411",
+      "trained_at": "2025-11-21 02:14:12"
+    },
+    {
+      "id": "7",
+      "stock_symbol": "AMZN",
+      "model_type": "xgboost",
+      "version": "20251120_211413",
+      "training_accuracy": "9493",
+      "validation_accuracy": "5000",
+      "test_accuracy": "4264",
+      "trained_at": "2025-11-21 02:14:13"
+    },
+    {
+      "id": "8",
+      "stock_symbol": "AMZN",
+      "model_type": "lightgbm",
+      "version": "20251120_211413",
+      "training_accuracy": "8196",
+      "validation_accuracy": "5000",
+      "test_accuracy": "4117",
+      "trained_at": "2025-11-21 02:14:13"
+    },
+    {
+      "id": "9",
+      "stock_symbol": "GOOG",
+      "model_type": "xgboost",
+      "version": "20251120_211413",
+      "training_accuracy": "9493",
+      "validation_accuracy": "6176",
+      "test_accuracy": "4264",
+      "trained_at": "2025-11-21 02:14:13"
+    },
+    {
+      "id": "10",
+      "stock_symbol": "GOOG",
+      "model_type": "lightgbm",
+      "version": "20251120_211413",
+      "training_accuracy": "8797",
+      "validation_accuracy": "6029",
+      "test_accuracy": "4852",
+      "trained_at": "2025-11-21 02:14:13"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tstock_symbol\tmodel_type\tversion\ttraining_accuracy\tvalidation_accuracy\ttest_accuracy\ttrained_at\n1\tBAC\txgboost\t20251120_211412\t9588\t3676\t4705\t2025-11-21 02:14:12\n2\tBAC\tlightgbm\t20251120_211412\t8575\t4411\t3823\t2025-11-21 02:14:12\n3\tINTC\txgboost\t20251120_211412\t9303\t6323\t4705\t2025-11-21 02:14:12\n4\tINTC\tlightgbm\t20251120_211412\t8101\t6470\t5735\t2025-11-21 02:14:12\n5\tAAPL\txgboost\t20251120_211412\t9335\t5735\t5147\t2025-11-21 02:14:12\n6\tAAPL\tlightgbm\t20251120_211412\t8481\t5147\t4411\t2025-11-21 02:14:12\n7\tAMZN\txgboost\t20251120_211413\t9493\t5000\t4264\t2025-11-21 02:14:13\n8\tAMZN\tlightgbm\t20251120_211413\t8196\t5000\t4117\t2025-11-21 02:14:13\n9\tGOOG\txgboost\t20251120_211413\t9493\t6176\t4264\t2025-11-21 02:14:13\n10\tGOOG\tlightgbm\t20251120_211413\t8797\t6029\t4852\t2025-11-21 02:14:13\n",
+  "stderr": "",
+  "execution_time_ms": 64
+}

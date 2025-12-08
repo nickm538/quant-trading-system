@@ -1,0 +1,80 @@
+{
+  "query": "SELECT stock_symbol, model_type, training_accuracy/100 as accuracy_pct, test_accuracy/100 as test_acc_pct, created_at FROM trained_models ORDER BY created_at DESC LIMIT 10",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2eU7e7Pj3HUsFUn.root --database 973zSFHnAfFbUsorknoKFE --execute SELECT stock_symbol, model_type, training_accuracy/100 as accuracy_pct, test_accuracy/100 as test_acc_pct, created_at FROM trained_models ORDER BY created_at DESC LIMIT 10",
+  "rows": [
+    {
+      "stock_symbol": "ZG",
+      "model_type": "lightgbm",
+      "accuracy_pct": "53.4400",
+      "test_acc_pct": "53.4400",
+      "created_at": "2025-11-30 06:03:38"
+    },
+    {
+      "stock_symbol": "ZG",
+      "model_type": "ensemble",
+      "accuracy_pct": "54.5200",
+      "test_acc_pct": "54.5200",
+      "created_at": "2025-11-30 06:03:38"
+    },
+    {
+      "stock_symbol": "ZG",
+      "model_type": "xgboost",
+      "accuracy_pct": "54.3100",
+      "test_acc_pct": "54.3100",
+      "created_at": "2025-11-30 06:03:38"
+    },
+    {
+      "stock_symbol": "WMT",
+      "model_type": "lightgbm",
+      "accuracy_pct": "48.0600",
+      "test_acc_pct": "48.0600",
+      "created_at": "2025-11-30 06:03:37"
+    },
+    {
+      "stock_symbol": "TSLA",
+      "model_type": "ensemble",
+      "accuracy_pct": "49.7800",
+      "test_acc_pct": "49.7800",
+      "created_at": "2025-11-30 06:03:37"
+    },
+    {
+      "stock_symbol": "WMT",
+      "model_type": "ensemble",
+      "accuracy_pct": "48.2700",
+      "test_acc_pct": "48.2700",
+      "created_at": "2025-11-30 06:03:37"
+    },
+    {
+      "stock_symbol": "TSLA",
+      "model_type": "xgboost",
+      "accuracy_pct": "49.1300",
+      "test_acc_pct": "49.1300",
+      "created_at": "2025-11-30 06:03:37"
+    },
+    {
+      "stock_symbol": "TSLA",
+      "model_type": "lightgbm",
+      "accuracy_pct": "49.3500",
+      "test_acc_pct": "49.3500",
+      "created_at": "2025-11-30 06:03:37"
+    },
+    {
+      "stock_symbol": "WMT",
+      "model_type": "xgboost",
+      "accuracy_pct": "50.0000",
+      "test_acc_pct": "50.0000",
+      "created_at": "2025-11-30 06:03:37"
+    },
+    {
+      "stock_symbol": "PFE",
+      "model_type": "lightgbm",
+      "accuracy_pct": "49.7800",
+      "test_acc_pct": "49.7800",
+      "created_at": "2025-11-30 06:03:37"
+    }
+  ],
+  "messages": [],
+  "stdout": "stock_symbol\tmodel_type\taccuracy_pct\ttest_acc_pct\tcreated_at\nZG\tlightgbm\t53.4400\t53.4400\t2025-11-30 06:03:38\nZG\tensemble\t54.5200\t54.5200\t2025-11-30 06:03:38\nZG\txgboost\t54.3100\t54.3100\t2025-11-30 06:03:38\nWMT\tlightgbm\t48.0600\t48.0600\t2025-11-30 06:03:37\nTSLA\tensemble\t49.7800\t49.7800\t2025-11-30 06:03:37\nWMT\tensemble\t48.2700\t48.2700\t2025-11-30 06:03:37\nTSLA\txgboost\t49.1300\t49.1300\t2025-11-30 06:03:37\nTSLA\tlightgbm\t49.3500\t49.3500\t2025-11-30 06:03:37\nWMT\txgboost\t50.0000\t50.0000\t2025-11-30 06:03:37\nPFE\tlightgbm\t49.7800\t49.7800\t2025-11-30 06:03:37\n",
+  "stderr": "",
+  "execution_time_ms": 287
+}

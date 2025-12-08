@@ -1,0 +1,130 @@
+{
+  "query": "SELECT stock_symbol, model_type, test_accuracy, created_at FROM trained_models ORDER BY created_at DESC LIMIT 20",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2eU7e7Pj3HUsFUn.root --database 973zSFHnAfFbUsorknoKFE --execute SELECT stock_symbol, model_type, test_accuracy, created_at FROM trained_models ORDER BY created_at DESC LIMIT 20",
+  "rows": [
+    {
+      "stock_symbol": "PFE",
+      "model_type": "xgboost",
+      "test_accuracy": "6617",
+      "created_at": "2025-11-21 03:57:42"
+    },
+    {
+      "stock_symbol": "PFE",
+      "model_type": "lightgbm",
+      "test_accuracy": "6176",
+      "created_at": "2025-11-21 03:57:42"
+    },
+    {
+      "stock_symbol": "F",
+      "model_type": "lightgbm",
+      "test_accuracy": "4852",
+      "created_at": "2025-11-21 03:57:41"
+    },
+    {
+      "stock_symbol": "XOM",
+      "model_type": "lightgbm",
+      "test_accuracy": "5588",
+      "created_at": "2025-11-21 03:57:39"
+    },
+    {
+      "stock_symbol": "JPM",
+      "model_type": "xgboost",
+      "test_accuracy": "4411",
+      "created_at": "2025-11-21 03:57:39"
+    },
+    {
+      "stock_symbol": "PFE",
+      "model_type": "lightgbm",
+      "test_accuracy": "5882",
+      "created_at": "2025-11-21 02:14:17"
+    },
+    {
+      "stock_symbol": "PFE",
+      "model_type": "xgboost",
+      "test_accuracy": "6029",
+      "created_at": "2025-11-21 02:14:16"
+    },
+    {
+      "stock_symbol": "F",
+      "model_type": "xgboost",
+      "test_accuracy": "5000",
+      "created_at": "2025-11-21 02:14:16"
+    },
+    {
+      "stock_symbol": "CRM",
+      "model_type": "lightgbm",
+      "test_accuracy": "5735",
+      "created_at": "2025-11-21 02:14:16"
+    },
+    {
+      "stock_symbol": "CRM",
+      "model_type": "xgboost",
+      "test_accuracy": "5147",
+      "created_at": "2025-11-21 02:14:16"
+    },
+    {
+      "stock_symbol": "F",
+      "model_type": "lightgbm",
+      "test_accuracy": "4705",
+      "created_at": "2025-11-21 02:14:16"
+    },
+    {
+      "stock_symbol": "EA",
+      "model_type": "xgboost",
+      "test_accuracy": "6176",
+      "created_at": "2025-11-21 02:14:15"
+    },
+    {
+      "stock_symbol": "CSCO",
+      "model_type": "xgboost",
+      "test_accuracy": "4558",
+      "created_at": "2025-11-21 02:14:15"
+    },
+    {
+      "stock_symbol": "EA",
+      "model_type": "lightgbm",
+      "test_accuracy": "5735",
+      "created_at": "2025-11-21 02:14:15"
+    },
+    {
+      "stock_symbol": "CSCO",
+      "model_type": "lightgbm",
+      "test_accuracy": "4705",
+      "created_at": "2025-11-21 02:14:15"
+    },
+    {
+      "stock_symbol": "JPM",
+      "model_type": "lightgbm",
+      "test_accuracy": "4264",
+      "created_at": "2025-11-21 02:14:14"
+    },
+    {
+      "stock_symbol": "DIS",
+      "model_type": "lightgbm",
+      "test_accuracy": "5588",
+      "created_at": "2025-11-21 02:14:14"
+    },
+    {
+      "stock_symbol": "XOM",
+      "model_type": "lightgbm",
+      "test_accuracy": "5000",
+      "created_at": "2025-11-21 02:14:14"
+    },
+    {
+      "stock_symbol": "XOM",
+      "model_type": "xgboost",
+      "test_accuracy": "5441",
+      "created_at": "2025-11-21 02:14:14"
+    },
+    {
+      "stock_symbol": "DIS",
+      "model_type": "xgboost",
+      "test_accuracy": "5882",
+      "created_at": "2025-11-21 02:14:14"
+    }
+  ],
+  "messages": [],
+  "stdout": "stock_symbol\tmodel_type\ttest_accuracy\tcreated_at\nPFE\txgboost\t6617\t2025-11-21 03:57:42\nPFE\tlightgbm\t6176\t2025-11-21 03:57:42\nF\tlightgbm\t4852\t2025-11-21 03:57:41\nXOM\tlightgbm\t5588\t2025-11-21 03:57:39\nJPM\txgboost\t4411\t2025-11-21 03:57:39\nPFE\tlightgbm\t5882\t2025-11-21 02:14:17\nPFE\txgboost\t6029\t2025-11-21 02:14:16\nF\txgboost\t5000\t2025-11-21 02:14:16\nCRM\tlightgbm\t5735\t2025-11-21 02:14:16\nCRM\txgboost\t5147\t2025-11-21 02:14:16\nF\tlightgbm\t4705\t2025-11-21 02:14:16\nEA\txgboost\t6176\t2025-11-21 02:14:15\nCSCO\txgboost\t4558\t2025-11-21 02:14:15\nEA\tlightgbm\t5735\t2025-11-21 02:14:15\nCSCO\tlightgbm\t4705\t2025-11-21 02:14:15\nJPM\tlightgbm\t4264\t2025-11-21 02:14:14\nDIS\tlightgbm\t5588\t2025-11-21 02:14:14\nXOM\tlightgbm\t5000\t2025-11-21 02:14:14\nXOM\txgboost\t5441\t2025-11-21 02:14:14\nDIS\txgboost\t5882\t2025-11-21 02:14:14\n",
+  "stderr": "",
+  "execution_time_ms": 50
+}

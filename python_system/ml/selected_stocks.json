@@ -1,0 +1,29 @@
+{
+  "selected_stocks": [
+    "BAC",
+    "INTC",
+    "AAPL",
+    "AMZN",
+    "GOOG",
+    "MSFT",
+    "XOM",
+    "JPM",
+    "DIS",
+    "ATVI",
+    "F",
+    "PFE",
+    "T",
+    "WMT",
+    "MCD"
+  ],
+  "selection_date": "2025-11-20T12:08:02.536403",
+  "total_analyzed": 30,
+  "selection_criteria": {
+    "data_quality_weight": 0.3,
+    "liquidity_weight": 0.25,
+    "volatility_weight": 0.2,
+    "price_stability_weight": 0.15,
+    "data_length_weight": 0.1,
+    "max_per_sector": 5
+  }
+}

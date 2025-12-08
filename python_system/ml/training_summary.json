@@ -1,0 +1,97 @@
+{
+  "timestamp": "2025-11-30T00:58:25.716635",
+  "stocks_trained": 13,
+  "results": [
+    {
+      "symbol": "BAC",
+      "xgboost_test_accuracy": 0.47058823529411764,
+      "lightgbm_test_accuracy": 0.39705882352941174,
+      "training_points": 316,
+      "test_points": 68
+    },
+    {
+      "symbol": "INTC",
+      "xgboost_test_accuracy": 0.4264705882352941,
+      "lightgbm_test_accuracy": 0.5294117647058824,
+      "training_points": 316,
+      "test_points": 68
+    },
+    {
+      "symbol": "AAPL",
+      "xgboost_test_accuracy": 0.4264705882352941,
+      "lightgbm_test_accuracy": 0.47058823529411764,
+      "training_points": 316,
+      "test_points": 68
+    },
+    {
+      "symbol": "AMZN",
+      "xgboost_test_accuracy": 0.39705882352941174,
+      "lightgbm_test_accuracy": 0.4852941176470588,
+      "training_points": 316,
+      "test_points": 68
+    },
+    {
+      "symbol": "GOOG",
+      "xgboost_test_accuracy": 0.4264705882352941,
+      "lightgbm_test_accuracy": 0.5147058823529411,
+      "training_points": 316,
+      "test_points": 68
+    },
+    {
+      "symbol": "MSFT",
+      "xgboost_test_accuracy": 0.4411764705882353,
+      "lightgbm_test_accuracy": 0.45588235294117646,
+      "training_points": 316,
+      "test_points": 68
+    },
+    {
+      "symbol": "XOM",
+      "xgboost_test_accuracy": 0.6029411764705882,
+      "lightgbm_test_accuracy": 0.5882352941176471,
+      "training_points": 316,
+      "test_points": 68
+    },
+    {
+      "symbol": "DIS",
+      "xgboost_test_accuracy": 0.5882352941176471,
+      "lightgbm_test_accuracy": 0.5147058823529411,
+      "training_points": 316,
+      "test_points": 68
+    },
+    {
+      "symbol": "EA",
+      "xgboost_test_accuracy": 0.5588235294117647,
+      "lightgbm_test_accuracy": 0.5441176470588235,
+      "training_points": 316,
+      "test_points": 68
+    },
+    {
+      "symbol": "CSCO",
+      "xgboost_test_accuracy": 0.4411764705882353,
+      "lightgbm_test_accuracy": 0.47058823529411764,
+      "training_points": 316,
+      "test_points": 68
+    },
+    {
+      "symbol": "F",
+      "xgboost_test_accuracy": 0.5147058823529411,
+      "lightgbm_test_accuracy": 0.45588235294117646,
+      "training_points": 316,
+      "test_points": 68
+    },
+    {
+      "symbol": "CRM",
+      "xgboost_test_accuracy": 0.5,
+      "lightgbm_test_accuracy": 0.5735294117647058,
+      "training_points": 316,
+      "test_points": 68
+    },
+    {
+      "symbol": "PFE",
+      "xgboost_test_accuracy": 0.5588235294117647,
+      "lightgbm_test_accuracy": 0.5882352941176471,
+      "training_points": 316,
+      "test_points": 68
+    }
+  ]
+}

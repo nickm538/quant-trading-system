@@ -1,0 +1,50 @@
+{
+  "query": "SELECT stock_symbol, model_type, test_accuracy, mse, mae, r2_score FROM trained_models ORDER BY id DESC LIMIT 5",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2eU7e7Pj3HUsFUn.root --database 973zSFHnAfFbUsorknoKFE --execute SELECT stock_symbol, model_type, test_accuracy, mse, mae, r2_score FROM trained_models ORDER BY id DESC LIMIT 5",
+  "rows": [
+    {
+      "stock_symbol": "PFE",
+      "model_type": "lightgbm",
+      "test_accuracy": "5882",
+      "mse": "0",
+      "mae": "0",
+      "r2_score": "0"
+    },
+    {
+      "stock_symbol": "PFE",
+      "model_type": "xgboost",
+      "test_accuracy": "6029",
+      "mse": "0",
+      "mae": "0",
+      "r2_score": "0"
+    },
+    {
+      "stock_symbol": "CRM",
+      "model_type": "lightgbm",
+      "test_accuracy": "5735",
+      "mse": "0",
+      "mae": "0",
+      "r2_score": "0"
+    },
+    {
+      "stock_symbol": "CRM",
+      "model_type": "xgboost",
+      "test_accuracy": "5147",
+      "mse": "0",
+      "mae": "0",
+      "r2_score": "0"
+    },
+    {
+      "stock_symbol": "F",
+      "model_type": "lightgbm",
+      "test_accuracy": "4705",
+      "mse": "0",
+      "mae": "0",
+      "r2_score": "0"
+    }
+  ],
+  "messages": [],
+  "stdout": "stock_symbol\tmodel_type\ttest_accuracy\tmse\tmae\tr2_score\nPFE\tlightgbm\t5882\t0\t0\t0\nPFE\txgboost\t6029\t0\t0\t0\nCRM\tlightgbm\t5735\t0\t0\t0\nCRM\txgboost\t5147\t0\t0\t0\nF\tlightgbm\t4705\t0\t0\t0\n",
+  "stderr": "",
+  "execution_time_ms": 823
+}
