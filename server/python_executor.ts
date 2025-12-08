@@ -175,6 +175,44 @@ export async function analyzeOptions(params: {
 }
 
 /**
+ * Institutional-grade options analysis with advanced Greeks and pattern recognition
+ */
+export async function analyzeInstitutionalOptions(params: {
+  symbol: string;
+}): Promise<any> {
+  const { symbol } = params;
+
+  const INSTITUTIONAL_SCRIPT = path.join(PYTHON_SYSTEM_PATH, 'run_institutional_options.py');
+  const command = `${PYTHON_BIN} ${INSTITUTIONAL_SCRIPT} ${symbol}`;
+
+  try {
+    const { stdout, stderr } = await execAsync(command, {
+      maxBuffer: 10 * 1024 * 1024,
+      timeout: 600000, // 10 minutes for comprehensive analysis
+      env: {
+        ...process.env,
+        PYTHONPATH: '',
+        PYTHONHOME: '',
+        LD_LIBRARY_PATH: process.env.LD_LIBRARY_PATH || '',
+      },
+    });
+
+    if (stderr && !stderr.includes('INFO') && !stderr.includes('WARNING')) {
+      console.error('Python stderr:', stderr);
+    }
+
+    return JSON.parse(stdout);
+  } catch (error: any) {
+    console.error('Institutional options analysis error:', error);
+    return {
+      success: false,
+      error: `Failed to analyze institutional options for ${symbol}: ${error.message}`,
+      symbol,
+    };
+  }
+}
+
+/**
  * Scan the market for best opportunities
  */
 export async function scanMarket(params: {

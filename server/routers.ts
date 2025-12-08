@@ -3,7 +3,7 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router, protectedProcedure } from "./_core/trpc";
 import { z } from "zod";
-import { analyzeStock, analyzeOptions, scanMarket, checkPythonSystem, getGreeksHeatmap } from "./python_executor";
+import { analyzeStock, analyzeOptions, scanMarket, checkPythonSystem, getGreeksHeatmap, analyzeInstitutionalOptions } from "./python_executor";
 import { exec } from "child_process";
 import { promisify } from "util";
 import * as path from "path";
@@ -58,7 +58,7 @@ export const appRouter = router({
         return { ...result, fromCache: false };
       }),
     
-    // Options analysis endpoint
+    // Options analysis endpoint (legacy)
     analyzeOptions: publicProcedure
       .input(
         z.object({
@@ -70,6 +70,17 @@ export const appRouter = router({
       )
       .mutation(async ({ input }) => {
         return await analyzeOptions(input);
+      }),
+    
+    // Institutional-grade options analysis endpoint (NEW)
+    analyzeInstitutionalOptions: publicProcedure
+      .input(
+        z.object({
+          symbol: z.string().min(1).max(10),
+        })
+      )
+      .mutation(async ({ input }) => {
+        return await analyzeInstitutionalOptions(input);
       }),
     
     // Greeks heatmap endpoint
@@ -107,6 +118,58 @@ export const appRouter = router({
     getModels: publicProcedure.query(async () => {
       return await getAllModelsSummary();
     }),
+    
+    // Get ML prediction for a stock
+    getMLPrediction: publicProcedure
+      .input(
+        z.object({
+          symbol: z.string().min(1).max(10),
+          horizon_days: z.number().int().min(1).max(90).optional().default(30),
+        })
+      )
+      .mutation(async ({ input }) => {
+        try {
+          const pythonPath = 'python3.11';
+          const scriptPath = path.join(process.cwd(), 'python_system/ml/prediction_engine.py');
+          
+          // Construct DATABASE_URL
+          let databaseUrl = process.env.DATABASE_URL;
+          if (!databaseUrl && process.env.MYSQLHOST) {
+            const host = process.env.MYSQLHOST;
+            const port = process.env.MYSQLPORT || '3306';
+            const user = process.env.MYSQLUSER || 'root';
+            const password = process.env.MYSQLPASSWORD || '';
+            const database = process.env.MYSQLDATABASE || 'railway';
+            databaseUrl = `mysql://${user}:${password}@${host}:${port}/${database}`;
+          }
+          
+          const { stdout, stderr } = await execAsync(
+            `${pythonPath} ${scriptPath} ${input.symbol.toUpperCase()} ${input.horizon_days}`,
+            { 
+              maxBuffer: 10 * 1024 * 1024, 
+              timeout: 60000, // 1min timeout
+              env: {
+                ...process.env,
+                DATABASE_URL: databaseUrl || '',
+                PYTHONPATH: '',
+                PYTHONHOME: '',
+                LD_LIBRARY_PATH: process.env.LD_LIBRARY_PATH || '',
+              },
+            }
+          );
+          
+          // Parse JSON output from Python
+          const result = JSON.parse(stdout);
+          return result;
+        } catch (error: any) {
+          console.error('ML Prediction error:', error);
+          return {
+            success: false,
+            error: error.message,
+            symbol: input.symbol,
+          };
+        }
+      }),
     
     // Train models on the 15 selected stocks
     trainModels: publicProcedure.mutation(async () => {
