@@ -464,24 +464,34 @@ def main():
     print("COMPREHENSIVE BACKTESTING AND TRAINING SYSTEM")
     print("="*80)
     
-    # Stock symbols to train on
-    stocks = [
-        'AAPL',  # Apple
-        'AMZN',  # Amazon
-        'F',     # Ford Motor Company
-        'GOOG',  # Google
-        'INTC',  # Intel Corporation
-        'JPM',   # JPMorgan Chase
-        'KO',    # Coca-Cola Company
-        'MCD',   # McDonald's
-        'MSFT',  # Microsoft
-        'NFLX',  # Netflix
-        'NVDA',  # Nvidia
-        'PFE',   # Pfizer Inc
-        'TSLA',  # Tesla
-        'WMT',   # Walmart
-        'ZG'     # Zillow Group
+    # Large pool of diverse stocks across sectors
+    stock_pool = [
+        # Technology
+        'AAPL', 'MSFT', 'GOOGL', 'META', 'NVDA', 'AMD', 'INTC', 'CSCO', 'ORCL', 'CRM',
+        # Consumer
+        'AMZN', 'TSLA', 'WMT', 'HD', 'NKE', 'SBUX', 'MCD', 'DIS', 'NFLX', 'COST',
+        # Finance
+        'JPM', 'BAC', 'WFC', 'GS', 'MS', 'C', 'BLK', 'AXP', 'V', 'MA',
+        # Healthcare
+        'JNJ', 'UNH', 'PFE', 'ABBV', 'TMO', 'ABT', 'MRK', 'LLY', 'BMY', 'AMGN',
+        # Energy
+        'XOM', 'CVX', 'COP', 'SLB', 'EOG', 'MPC', 'PSX', 'VLO', 'OXY', 'HAL',
+        # Industrial
+        'BA', 'CAT', 'GE', 'HON', 'UPS', 'LMT', 'MMM', 'DE', 'RTX', 'EMR',
+        # Communication
+        'T', 'VZ', 'TMUS', 'CMCSA', 'CHTR',
+        # Consumer Staples
+        'PG', 'KO', 'PEP', 'PM', 'MDLZ', 'CL', 'KMB', 'GIS',
+        # Real Estate
+        'AMT', 'PLD', 'CCI', 'EQIX', 'PSA', 'SPG', 'O', 'WELL',
+        # Materials
+        'LIN', 'APD', 'SHW', 'ECL', 'DD', 'NEM', 'FCX',
     ]
+    
+    # Randomly select 15 stocks for this training session
+    import random
+    random.seed()  # Use current time as seed for true randomness
+    stocks = random.sample(stock_pool, 15)
     
     print(f"\nTraining on {len(stocks)} stocks:")
     for symbol in stocks:
