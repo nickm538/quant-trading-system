@@ -46,8 +46,11 @@ COPY requirements.txt ./
 RUN pip3 install --no-cache-dir --upgrade pip && \
     pip3 install --no-cache-dir -r requirements.txt
 
-# Copy package files and install Node dependencies
+# Copy package files and patches directory
 COPY package.json pnpm-lock.yaml ./
+COPY patches ./patches
+
+# Install Node dependencies
 RUN pnpm install --frozen-lockfile
 
 # Copy application files
