@@ -58,16 +58,16 @@ class InstitutionalOptionsEngine:
         self.filters = {
             'min_dte': 7,
             'max_dte': 90,
-            'min_delta': 0.30,  # Relaxed from 0.35 to include more opportunities
-            'max_delta': 0.70,  # Relaxed from 0.65 to include more opportunities
+            'min_delta': 0.25,  # Widened to match scanner
+            'max_delta': 0.75,  # Widened to match scanner
             'max_spread_pct': 20.0,  # Increased from 15% for less liquid stocks
-            'min_open_interest': 50,  # Reduced from 100 for smaller stocks
-            'min_volume': 10,  # Reduced from 20 for less active options
+            'min_open_interest': 20,  # Reduced to match scanner
+            'min_volume': 5,  # Reduced to match scanner
             'min_days_to_earnings': 3
         }
         
         # Minimum score thresholds
-        self.min_score = 50.0  # Balanced: strict but not too strict (was 60, then 40)
+        self.min_score = 40.0  # Lowered for more results (was 60, then 50, now 40)
         
     def analyze_single_option(
         self,
