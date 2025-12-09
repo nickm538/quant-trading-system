@@ -120,16 +120,59 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
           </TabsContent>
 
           <TabsContent value="montecarlo" className="space-y-4">
+            <div className="mb-4 p-4 bg-purple-50 dark:bg-purple-950 rounded-lg border border-purple-200 dark:border-purple-800">
+              <h4 className="font-semibold mb-2 text-purple-900 dark:text-purple-100">🎲 What is Monte Carlo?</h4>
+              <p className="text-sm text-purple-800 dark:text-purple-200">
+                Monte Carlo simulation runs 20,000 possible future price paths using GARCH volatility and fat-tail distributions. 
+                This shows the range of outcomes and helps quantify risk better than simple predictions.
+              </p>
+            </div>
+            
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              <DataItem label="Simulations" value="20,000" />
-              <DataItem label="Time Steps" value="30 days" />
-              <DataItem label="Expected Price" value={`$${stochastic.expected_price?.toFixed(2) || 'N/A'}`} />
-              <DataItem label="Expected Return" value={`${(stochastic.expected_return * 100)?.toFixed(2) || 'N/A'}%`} />
-              <DataItem label="VaR (95%)" value={`${(stochastic.var_95 * 100)?.toFixed(2) || 'N/A'}%`} />
-              <DataItem label="CVaR (95%)" value={`${(stochastic.cvar_95 * 100)?.toFixed(2) || 'N/A'}%`} />
-              <DataItem label="Max Drawdown" value={`${(stochastic.max_drawdown * 100)?.toFixed(2) || 'N/A'}%`} />
-              <DataItem label="95% CI Lower" value={`$${stochastic.confidence_interval_lower?.toFixed(2) || 'N/A'}`} />
-              <DataItem label="95% CI Upper" value={`$${stochastic.confidence_interval_upper?.toFixed(2) || 'N/A'}`} />
+              <div className="space-y-1">
+                <DataItem label="Simulations" value="20,000" />
+                <p className="text-xs text-muted-foreground">Number of price paths simulated for statistical confidence</p>
+              </div>
+              
+              <div className="space-y-1">
+                <DataItem label="Time Steps" value="30 days" />
+                <p className="text-xs text-muted-foreground">Forecast horizon (1 month ahead)</p>
+              </div>
+              
+              <div className="space-y-1">
+                <DataItem label="Expected Price" value={`$${stochastic.expected_price?.toFixed(2) || 'N/A'}`} />
+                <p className="text-xs text-muted-foreground">Average price across all 20,000 simulations</p>
+              </div>
+              
+              <div className="space-y-1">
+                <DataItem label="Expected Return" value={`${(stochastic.expected_return * 100)?.toFixed(2) || 'N/A'}%`} />
+                <p className="text-xs text-muted-foreground">Average return over 30 days (annualized)</p>
+              </div>
+              
+              <div className="space-y-1">
+                <DataItem label="VaR (95%)" value={`${(stochastic.var_95 * 100)?.toFixed(2) || 'N/A'}%`} />
+                <p className="text-xs text-muted-foreground">Worst-case loss in 95% of scenarios (5% chance worse)</p>
+              </div>
+              
+              <div className="space-y-1">
+                <DataItem label="CVaR (95%)" value={`${(stochastic.cvar_95 * 100)?.toFixed(2) || 'N/A'}%`} />
+                <p className="text-xs text-muted-foreground">Average loss when VaR is exceeded (tail risk)</p>
+              </div>
+              
+              <div className="space-y-1">
+                <DataItem label="Max Drawdown" value={`${(stochastic.max_drawdown * 100)?.toFixed(2) || 'N/A'}%`} />
+                <p className="text-xs text-muted-foreground">Largest peak-to-trough decline across simulations</p>
+              </div>
+              
+              <div className="space-y-1">
+                <DataItem label="95% CI Lower" value={`$${stochastic.confidence_interval_lower?.toFixed(2) || 'N/A'}`} />
+                <p className="text-xs text-muted-foreground">Lower bound: 95% chance price stays above this</p>
+              </div>
+              
+              <div className="space-y-1">
+                <DataItem label="95% CI Upper" value={`$${stochastic.confidence_interval_upper?.toFixed(2) || 'N/A'}`} />
+                <p className="text-xs text-muted-foreground">Upper bound: 95% chance price stays below this</p>
+              </div>
             </div>
             
             <div className="mt-4 p-4 bg-muted/20 rounded-lg">
@@ -148,6 +191,17 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
                 CVaR(95%) = Mean of returns below VaR<br/>
                 Max Drawdown = max((Running Max - Price) / Running Max)
               </code>
+            </div>
+            
+            <div className="mt-4 p-4 bg-orange-50 dark:bg-orange-950 rounded-lg border border-orange-200 dark:border-orange-800">
+              <h4 className="font-semibold mb-2 text-orange-900 dark:text-orange-100">🎯 How to Use Monte Carlo</h4>
+              <ul className="text-sm text-orange-800 dark:text-orange-200 space-y-2">
+                <li><strong>Expected Price:</strong> Your best estimate for 30 days out. Don't treat as guaranteed - it's an average.</li>
+                <li><strong>VaR (95%):</strong> Your downside risk. If VaR is -15%, you have 5% chance of losing more than 15%.</li>
+                <li><strong>CVaR (95%):</strong> Tail risk - how bad it gets when VaR is breached. Critical for position sizing.</li>
+                <li><strong>95% CI Range:</strong> Price likely stays within this range. Wider range = more uncertainty = higher risk.</li>
+                <li><strong>Max Drawdown:</strong> Worst decline you might see. Use this to set stop losses and manage emotions.</li>
+              </ul>
             </div>
           </TabsContent>
 
