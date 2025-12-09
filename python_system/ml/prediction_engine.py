@@ -260,7 +260,7 @@ def predict_stock_price(symbol: str, horizon_days: int = 30) -> Dict:
         df = calculate_technical_features(df)
         
         # Prepare features (use last row for prediction)
-        X, _ = prepare_features_and_target(df)
+        X, _, feature_cols = prepare_features_and_target(df)
         latest_features = X[-1:, :]  # Last row
         
         # Generate ensemble prediction
@@ -342,10 +342,11 @@ def predict_stock_price(symbol: str, horizon_days: int = 30) -> Dict:
         
     except Exception as e:
         import traceback
-        logger.error(f"Error in direct prediction: {e}")
+        print(f"❌ Error in direct prediction: {e}")
+        traceback.print_exc()
         
         # Try transfer learning as fallback
-        logger.info(f"Attempting transfer learning for {symbol}...")
+        print(f"🔄 Attempting transfer learning for {symbol}...")
         try:
             from ml.transfer_learning import make_transfer_learning_prediction
             
