@@ -329,28 +329,20 @@ class InstitutionalOptionsEngine:
                 exp_date = expiration
             dte = (exp_date - datetime.now()).days
             
-            # Calculate Greeks using Black-Scholes if not provided
-            delta = option.get('delta', 0)
-            gamma = option.get('gamma', 0)
-            theta = option.get('theta', 0)
-            vega = option.get('vega', 0)
-            rho = option.get('rho', 0)
-            
-            # If Greeks are missing or zero, calculate them
-            if delta == 0 or gamma == 0:
-                logger.debug(f"Calculating Greeks for {option_type} strike {strike}")
-                greeks = self._calculate_greeks_for_option(
-                    current_price=current_price,
-                    strike=strike,
-                    time_to_expiry=dte / 365.0,
-                    volatility=iv,
-                    option_type=option_type
-                )
-                delta = greeks.get('delta', 0)
-                gamma = greeks.get('gamma', 0)
-                theta = greeks.get('theta', 0)
-                vega = greeks.get('vega', 0)
-                rho = greeks.get('rho', 0)
+            # ALWAYS calculate Greeks using Black-Scholes (yfinance doesn't provide them)
+            logger.debug(f"Calculating Greeks for {option_type} strike {strike}")
+            greeks = self._calculate_greeks_for_option(
+                current_price=current_price,
+                strike=strike,
+                time_to_expiry=dte / 365.0,
+                volatility=iv,
+                option_type=option_type
+            )
+            delta = greeks.get('delta', 0)
+            gamma = greeks.get('gamma', 0)
+            theta = greeks.get('theta', 0)
+            vega = greeks.get('vega', 0)
+            rho = greeks.get('rho', 0)
             
             # HARD FILTERS - Immediate rejection
             if not self._passes_hard_filters(

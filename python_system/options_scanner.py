@@ -411,14 +411,20 @@ class OptionsScanner:
     
     def tier3_deep_analysis(self, candidates: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
-        Tier 3: Full institutional analysis on top candidates
+        Tier 3: Full institutional analysis on top candidates (limit to 15 to prevent timeouts)
         Run complete 8-factor scoring with Greeks, IV crush, Kelly sizing
         """
         logger.info(f"\n{'='*80}")
         logger.info(f"TIER 3: Deep Analysis - Full institutional scoring")
         logger.info(f"{'='*80}")
         
+        # Limit to top 15 to prevent API rate limits and timeouts
+        if len(candidates) > 15:
+            logger.info(f"Limiting Tier 3 analysis to top 15 of {len(candidates)} candidates")
+            candidates = candidates[:15]
+        
         results = []
+        errors = 0
         
         for i, candidate in enumerate(candidates, 1):
             try:
@@ -510,12 +516,18 @@ class OptionsScanner:
                 
             except Exception as e:
                 logger.error(f"  ✗ Error in deep analysis for {candidate['symbol']}: {str(e)}")
+                errors += 1
+                if errors > 5:
+                    logger.warning(f"Too many errors ({errors}), stopping Tier 3 early")
+                    break
                 continue
         
-        # Sort by total score
-        results.sort(key=lambda x: x['total_score'], reverse=True)
-        
         logger.info(f"\nTier 3 Complete: {len(results)} high-quality opportunities found")
+        logger.info(f"Errors encountered: {errors}")
+        
+        # Sort by total score descending
+        results.sort(key=lambda x: x.get('total_score', 0), reverse=True)
+        
         return results
     
     def scan(self, max_results: int = 10) -> List[Dict[str, Any]]:
