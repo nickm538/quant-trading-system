@@ -52,13 +52,44 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
           </TabsContent>
 
           <TabsContent value="garch" className="space-y-4">
+            <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
+              <h4 className="font-semibold mb-2 text-blue-900 dark:text-blue-100">📊 What is GARCH?</h4>
+              <p className="text-sm text-blue-800 dark:text-blue-200">
+                GARCH (Generalized AutoRegressive Conditional Heteroskedasticity) models time-varying volatility. 
+                Unlike simple historical volatility, GARCH adapts to market conditions - volatility clusters during turbulent periods and calms during stable periods.
+              </p>
+            </div>
+            
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              <DataItem label="Model" value="GARCH(1,1)" />
-              <DataItem label="Distribution" value="Student-t" />
-              <DataItem label="Fat-Tail DF" value={garch.fat_tail_df?.toFixed(2) || 'N/A'} />
-              <DataItem label="AIC" value={garch.aic?.toFixed(2) || 'N/A'} />
-              <DataItem label="BIC" value={garch.bic?.toFixed(2) || 'N/A'} />
-              <DataItem label="Current Vol" value={`${(garch.current_volatility * 100)?.toFixed(2) || 'N/A'}%`} />
+              <div className="space-y-1">
+                <DataItem label="Model" value="GARCH(1,1)" />
+                <p className="text-xs text-muted-foreground">Standard model: 1 lag for shocks, 1 lag for volatility</p>
+              </div>
+              
+              <div className="space-y-1">
+                <DataItem label="Distribution" value="Student-t" />
+                <p className="text-xs text-muted-foreground">Captures extreme moves better than normal distribution</p>
+              </div>
+              
+              <div className="space-y-1">
+                <DataItem label="Fat-Tail DF" value={garch.fat_tail_df?.toFixed(2) || 'N/A'} />
+                <p className="text-xs text-muted-foreground">Lower = fatter tails (more extreme events). Typical: 3-10</p>
+              </div>
+              
+              <div className="space-y-1">
+                <DataItem label="AIC" value={garch.aic?.toFixed(2) || 'N/A'} />
+                <p className="text-xs text-muted-foreground">Model quality: Lower is better. Compare across stocks</p>
+              </div>
+              
+              <div className="space-y-1">
+                <DataItem label="BIC" value={garch.bic?.toFixed(2) || 'N/A'} />
+                <p className="text-xs text-muted-foreground">Similar to AIC but penalizes complexity more</p>
+              </div>
+              
+              <div className="space-y-1">
+                <DataItem label="Current Vol" value={`${(garch.current_volatility * 100)?.toFixed(2) || 'N/A'}%`} />
+                <p className="text-xs text-muted-foreground">Annualized volatility forecast for next period</p>
+              </div>
             </div>
             
             <div className="mt-4 p-4 bg-muted/20 rounded-lg">
@@ -75,6 +106,16 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
                 Fitted using Maximum Likelihood Estimation (MLE)<br/>
                 Student-t distribution captures fat tails (df={garch.fat_tail_df?.toFixed(2) || 'N/A'})
               </code>
+            </div>
+            
+            <div className="mt-4 p-4 bg-green-50 dark:bg-green-950 rounded-lg border border-green-200 dark:border-green-800">
+              <h4 className="font-semibold mb-2 text-green-900 dark:text-green-100">💡 How to Use GARCH</h4>
+              <ul className="text-sm text-green-800 dark:text-green-200 space-y-2">
+                <li><strong>Current Vol:</strong> Use this for options pricing and risk assessment. Higher vol = higher option premiums.</li>
+                <li><strong>Fat-Tail DF:</strong> Lower values (3-5) mean more extreme moves are likely. Be cautious with leverage.</li>
+                <li><strong>AIC/BIC:</strong> Compare these across different stocks. Lower scores = model fits better = more reliable forecasts.</li>
+                <li><strong>Volatility Clustering:</strong> If recent volatility is high, GARCH predicts it will stay high short-term (and vice versa).</li>
+              </ul>
             </div>
           </TabsContent>
 
