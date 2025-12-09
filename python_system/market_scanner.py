@@ -318,11 +318,11 @@ class MarketScanner:
                 logger.info(f"\n[{i+1}/{len(candidates)}] Deep analysis: {symbol}")
                 
                 # Full comprehensive analysis
-                # Reduced Monte Carlo sims to 5000 for stability in parallel processing
+                # Reduced Monte Carlo sims to 2000 for speed (was 5000)
                 logger.info(f"  Starting comprehensive analysis for {symbol}...")
                 analysis = self.trading_system.analyze_stock_comprehensive(
                     symbol=symbol,
-                    monte_carlo_sims=5000,
+                    monte_carlo_sims=2000,
                     forecast_days=30,
                     bankroll=1000.0
                 )
@@ -360,6 +360,11 @@ class MarketScanner:
                     (1 + kelly_score/100) * # Kelly optimal sizing bonus
                     100
                 )
+                
+                # Only include stocks with positive opportunity scores
+                if opportunity_score <= 0:
+                    logger.info(f"  {symbol}: Skipped (score={opportunity_score:.1f} <= 0)")
+                    continue
                 
                 results.append({
                     'symbol': symbol,
