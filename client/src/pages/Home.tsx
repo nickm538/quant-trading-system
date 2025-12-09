@@ -152,7 +152,7 @@ export default function Home() {
       {/* Main Content */}
       <div className="container py-8">
         <Tabs defaultValue="stock" className="w-full">
-          <TabsList className="grid w-full grid-cols-5 mb-8">
+          <TabsList className="grid w-full grid-cols-6 mb-8">
             <TabsTrigger value="stock" className="flex items-center gap-2">
               <TrendingUp className="h-4 w-4" />
               Stock Analysis
@@ -168,6 +168,10 @@ export default function Home() {
             <TabsTrigger value="scanner" className="flex items-center gap-2">
               <Search className="h-4 w-4" />
               Market Scanner
+            </TabsTrigger>
+            <TabsTrigger value="ml" className="flex items-center gap-2">
+              <Brain className="h-4 w-4" />
+              ML/Quantum
             </TabsTrigger>
             <TabsTrigger value="train" className="flex items-center gap-2">
               <Brain className="h-4 w-4" />
@@ -360,12 +364,6 @@ export default function Home() {
                     </CardContent>
                   </Card>
                 )}
-
-                {/* ML/Quantum Predictions */}
-                <QuantMLAnalysis 
-                  mlPrediction={mlPrediction} 
-                  loading={mlPredictionMutation.isPending}
-                />
 
                 {/* Raw Data Display */}
                 <RawDataDisplay analysis={analysis} />
@@ -801,6 +799,54 @@ export default function Home() {
                 </Card>
               </div>
             )}
+          </TabsContent>
+
+          {/* ML/Quantum Predictions Tab */}
+          <TabsContent value="ml" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>ML/Quantum Price Predictions</CardTitle>
+                <CardDescription>
+                  Advanced machine learning predictions using XGBoost and LightGBM ensemble models trained on 50+ technical indicators,
+                  stochastic analysis, and historical patterns. Enter a symbol to get AI-powered price forecasts.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex gap-4">
+                    <Input
+                      placeholder="Enter stock symbol (e.g., AAPL, TSLA, MSFT)"
+                      value={symbol}
+                      onChange={(e) => setSymbol(e.target.value.toUpperCase())}
+                      onKeyPress={(e) => e.key === 'Enter' && handleMLPredict()}
+                      className="flex-1"
+                    />
+                    <Button 
+                      onClick={handleMLPredict}
+                      disabled={mlPredictionMutation.isPending || !symbol}
+                    >
+                      {mlPredictionMutation.isPending ? (
+                        <>
+                          <span className="animate-spin mr-2">⏳</span>
+                          Predicting...
+                        </>
+                      ) : (
+                        <>
+                          <Brain className="mr-2 h-4 w-4" />
+                          Get ML Prediction
+                        </>
+                      )}
+                    </Button>
+                  </div>
+
+                  {/* ML Prediction Results */}
+                  <QuantMLAnalysis 
+                    mlPrediction={mlPrediction} 
+                    loading={mlPredictionMutation.isPending}
+                  />
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* Train Models Tab */}
