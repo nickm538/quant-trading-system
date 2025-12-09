@@ -17,8 +17,10 @@ Philosophy: Precision over quantity - returns NOTHING rather than low-confidence
 """
 
 import logging
+import os
 import numpy as np
 import pandas as pd
+import requests
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional, Tuple
 from scipy.stats import norm
@@ -1286,7 +1288,91 @@ class InstitutionalOptionsEngine:
         return {'next_earnings_date': None, 'days_to_earnings': None}
     
     def _get_sentiment_data(self, symbol: str) -> Dict[str, Any]:
-        """Get sentiment data from yfinance (analyst recommendations + news)."""
+        """Get sentiment data from Finnhub API (primary) with yfinance fallback."""
+        # Try Finnhub first (real-time sentiment)
+        finnhub_key = os.getenv('FINNHUB_API_KEY', 'd47ssnpr01qk80bicu4gd47ssnpr01qk80bicu50')
+        
+        if finnhub_key:
+            try:
+                # 1. News Sentiment from Finnhub
+                news_score = 50
+                try:
+                    news_url = f"https://finnhub.io/api/v1/company-news?symbol={symbol}&from={(datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')}&to={datetime.now().strftime('%Y-%m-%d')}&token={finnhub_key}"
+                    news_response = requests.get(news_url, timeout=5)
+                    if news_response.status_code == 200:
+                        news_data = news_response.json()
+                        if news_data:
+                            # Average sentiment from news articles
+                            sentiments = [article.get('sentiment', 0) for article in news_data[:20]]
+                            if sentiments:
+                                avg_sentiment = sum(sentiments) / len(sentiments)
+                                # Convert Finnhub sentiment (-1 to 1) to score (0-100)
+                                news_score = int((avg_sentiment + 1) * 50)
+                except Exception as e:
+                    logger.debug(f"Finnhub news sentiment error: {e}")
+                
+                # 2. Insider Sentiment from Finnhub
+                insider_score = 50
+                try:
+                    from_date = (datetime.now() - timedelta(days=90)).strftime('%Y-%m-%d')
+                    to_date = datetime.now().strftime('%Y-%m-%d')
+                    insider_url = f"https://finnhub.io/api/v1/stock/insider-sentiment?symbol={symbol}&from={from_date}&to={to_date}&token={finnhub_key}"
+                    insider_response = requests.get(insider_url, timeout=5)
+                    if insider_response.status_code == 200:
+                        insider_data = insider_response.json()
+                        if insider_data and 'data' in insider_data and insider_data['data']:
+                            # Calculate net insider sentiment
+                            recent = insider_data['data'][0]  # Most recent period
+                            mspr = recent.get('mspr', 0)  # Monthly share purchase ratio
+                            change = recent.get('change', 0)  # Change in shares held
+                            
+                            # Positive MSPR and positive change = bullish
+                            if mspr > 0 and change > 0:
+                                insider_score = 75
+                            elif mspr > 0 or change > 0:
+                                insider_score = 60
+                            elif mspr < 0 and change < 0:
+                                insider_score = 25
+                            elif mspr < 0 or change < 0:
+                                insider_score = 40
+                except Exception as e:
+                    logger.debug(f"Finnhub insider sentiment error: {e}")
+                
+                # 3. Analyst Recommendations from Finnhub
+                analyst_score = 50
+                try:
+                    rec_url = f"https://finnhub.io/api/v1/stock/recommendation?symbol={symbol}&token={finnhub_key}"
+                    rec_response = requests.get(rec_url, timeout=5)
+                    if rec_response.status_code == 200:
+                        rec_data = rec_response.json()
+                        if rec_data and len(rec_data) > 0:
+                            latest = rec_data[0]
+                            buy = latest.get('buy', 0) + latest.get('strongBuy', 0)
+                            hold = latest.get('hold', 0)
+                            sell = latest.get('sell', 0) + latest.get('strongSell', 0)
+                            total = buy + hold + sell
+                            
+                            if total > 0:
+                                # Weighted score based on recommendations
+                                analyst_score = int((buy * 100 + hold * 50 + sell * 0) / total)
+                except Exception as e:
+                    logger.debug(f"Finnhub analyst recommendations error: {e}")
+                
+                overall_score = (news_score * 0.4 + analyst_score * 0.3 + insider_score * 0.3)
+                
+                logger.info(f"Finnhub sentiment for {symbol}: News={news_score}, Analyst={analyst_score}, Insider={insider_score}")
+                
+                return {
+                    'news_score': news_score,
+                    'analyst_score': analyst_score,
+                    'insider_score': insider_score,
+                    'overall_score': overall_score
+                }
+                
+            except Exception as e:
+                logger.warning(f"Finnhub API error for {symbol}, falling back to yfinance: {e}")
+        
+        # Fallback to yfinance if Finnhub fails or no API key
         try:
             ticker = yf.Ticker(symbol)
             info = ticker.info
