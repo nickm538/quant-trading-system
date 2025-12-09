@@ -33,6 +33,8 @@ interface QuantMLAnalysisProps {
 }
 
 export function QuantMLAnalysis({ mlPrediction, loading }: QuantMLAnalysisProps) {
+  console.log('📊 QuantMLAnalysis render:', { mlPrediction, loading });
+  
   if (loading) {
     return (
       <Card className="w-full">

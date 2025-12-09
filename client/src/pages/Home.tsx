@@ -38,7 +38,18 @@ export default function Home() {
 
   const mlPredictionMutation = trpc.trading.getMLPrediction.useMutation({
     onSuccess: (data) => {
+      console.log('🧠 ML Prediction received:', data);
+      console.log('  Success:', data.success);
+      if (!data.success) {
+        console.log('  Error:', data.error);
+      } else {
+        console.log('  Predicted price:', data.predicted_price);
+        console.log('  Recommendation:', data.recommendation);
+      }
       setMlPrediction(data);
+    },
+    onError: (error) => {
+      console.error('❌ ML Prediction mutation error:', error);
     },
   });
 
