@@ -263,7 +263,17 @@ def make_transfer_learning_prediction(
             try:
                 # Deserialize model
                 model_data = base64.b64decode(model_dict['model_data'])
-                model = pickle.loads(model_data)
+                loaded_object = pickle.loads(model_data)
+                
+                # Handle case where model was saved as dict
+                if isinstance(loaded_object, dict):
+                    if 'model' in loaded_object:
+                        model = loaded_object['model']
+                    else:
+                        logger.warning(f"Model {model_dict['id']} is a dict without 'model' key, skipping")
+                        continue
+                else:
+                    model = loaded_object
                 
                 # Make prediction
                 pred = model.predict(latest_features)[0]
