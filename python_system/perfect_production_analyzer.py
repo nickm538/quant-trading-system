@@ -281,6 +281,11 @@ class PerfectProductionAnalyzer:
                 total_debt = float(info.get('totalDebt', 0) or 0)
                 total_equity = float(info.get('totalStockholderEquity', 0) or 0)
                 
+                # Get P/S and estimated EPS
+                price_to_sales = float(info.get('priceToSalesTrailing12Months', 0) or 0)
+                forward_eps = float(info.get('forwardEps', 0) or 0)
+                trailing_eps = float(info.get('trailingEps', 0) or 0)
+                
                 # Override D/E with more accurate yfinance data if available
                 if total_equity > 0 and total_debt > 0:
                     debt_to_equity = total_debt / total_equity
@@ -309,9 +314,12 @@ class PerfectProductionAnalyzer:
                 'dividend_yield': float(metric.get('dividendYieldIndicatedAnnual', 0) or 0) / 100,  # Already in % (0.3747 = 0.3747%), convert to decimal
                 'book_value': float(metric.get('bookValuePerShareQuarterly', 0) or 0),
                 'price_to_book': float(metric.get('pbQuarterly', 0) or 0),
+                'price_to_sales': price_to_sales,
                 'current_ratio': current_ratio,
                 'quick_ratio': quick_ratio,
                 'ebitda': ebitda,
+                'eps': trailing_eps,
+                'forward_eps': forward_eps,
                 'total_debt': total_debt,
                 'total_equity': total_equity
             }
@@ -366,9 +374,12 @@ class PerfectProductionAnalyzer:
                     'dividend_yield': float(info.get('dividendYield', 0) or 0),
                     'book_value': float(info.get('bookValue', 0) or 0),
                     'price_to_book': float(info.get('priceToBook', 0) or 0),
+                    'price_to_sales': float(info.get('priceToSalesTrailing12Months', 0) or 0),
                     'current_ratio': current_ratio,
                     'quick_ratio': quick_ratio,
                     'ebitda': ebitda,
+                    'eps': float(info.get('trailingEps', 0) or 0),
+                    'forward_eps': float(info.get('forwardEps', 0) or 0),
                     'total_debt': total_debt,
                     'total_equity': total_equity
                 }
