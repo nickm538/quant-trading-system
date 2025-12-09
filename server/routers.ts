@@ -111,13 +111,6 @@ export const appRouter = router({
       const isHealthy = await checkPythonSystem();
       return { healthy: isHealthy, timestamp: new Date().toISOString() };
     }),
-  }),
-
-  ml: router({
-    // Get all trained models summary
-    getModels: publicProcedure.query(async () => {
-      return await getAllModelsSummary();
-    }),
     
     // Get ML prediction for a stock
     getMLPrediction: publicProcedure
@@ -185,6 +178,13 @@ export const appRouter = router({
           };
         }
       }),
+  }),
+
+  ml: router({
+    // Get all trained models summary
+    getModels: publicProcedure.query(async () => {
+      return await getAllModelsSummary();
+    }),
     
     // Train models on the 15 selected stocks
     trainModels: publicProcedure.mutation(async () => {
