@@ -215,8 +215,6 @@ class OptionsScanner:
         for i, candidate in enumerate(candidates, 1):
             try:
                 symbol = candidate['symbol']
-                logger.info(f"\n[{i}/{len(candidates)}] Analyzing {symbol}...")
-                
                 ticker = yf.Ticker(symbol)
                 info = ticker.info
                 current_price = candidate['price']
@@ -224,7 +222,7 @@ class OptionsScanner:
                 # Get historical data for momentum (use 2mo to ensure >= 20 trading days)
                 hist = ticker.history(period='2mo')
                 if hist.empty or len(hist) < 20:
-                    logger.info(f"  ✗ Insufficient historical data")
+                    pass  # Insufficient historical data
                     rejection_stats['insufficient_history'] += 1
                     continue
                 
@@ -250,19 +248,19 @@ class OptionsScanner:
                     atm_call = calls.nsmallest(1, 'strike_diff')
                     
                     if atm_call.empty or atm_call.iloc[0]['impliedVolatility'] <= 0:
-                        logger.info(f"  ✗ No valid ATM IV data")
+                        pass  # No valid ATM IV data
                         continue
                     
                     implied_vol_pct = atm_call.iloc[0]['impliedVolatility'] * 100
                     
                     # More lenient: allow IV >= 70% of HV (testing to find bottleneck)
                     if implied_vol_pct < hist_vol * 0.7:
-                        logger.info(f"  ✗ IV ({implied_vol_pct:.1f}%) < 70% of HV ({hist_vol:.1f}%)")
+                        pass  # IV too low
                         rejection_stats['low_iv'] += 1
                         continue
                         
                 except Exception as e:
-                    logger.info(f"  ✗ Error getting IV: {str(e)}")
+                    pass  # Error getting IV
                     continue
                 
                 # Find best call option (0.30-0.70 delta)
@@ -386,12 +384,7 @@ class OptionsScanner:
                 continue
         
         logger.info(f"\nTier 2 Complete: {len(qualified)}/{len(candidates)} passed")
-        logger.info(f"\nREJECTION BREAKDOWN:")
-        logger.info(f"  Insufficient history: {rejection_stats['insufficient_history']}")
-        logger.info(f"  Negative momentum: {rejection_stats['negative_momentum']}")
-        logger.info(f"  Low IV (< 90% of HV): {rejection_stats['low_iv']}")
-        logger.info(f"  No valid delta options: {rejection_stats['no_valid_delta']}")
-        logger.info(f"  Errors: {rejection_stats['errors']}")
+        # Rejection stats tracked but not logged
         return qualified
     
     def tier3_deep_analysis(self, candidates: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -399,13 +392,11 @@ class OptionsScanner:
         Tier 3: Full institutional analysis on top candidates (limit to 15 to prevent timeouts)
         Run complete 8-factor scoring with Greeks, IV crush, Kelly sizing
         """
-        logger.info(f"\n{'='*80}")
-        logger.info(f"TIER 3: Deep Analysis - Full institutional scoring")
-        logger.info(f"{'='*80}")
+        # Tier 3: Deep Analysis
         
         # Limit to top 5 to prevent API rate limits and timeouts
         if len(candidates) > 5:
-            logger.info(f"Limiting Tier 3 analysis to top 5 of {len(candidates)} candidates")
+            pass  # Limiting to top 5
             candidates = candidates[:5]
         
         results = []
@@ -429,7 +420,7 @@ class OptionsScanner:
                 )
                 
                 if not analysis or 'error' in analysis:
-                    logger.info(f"  ✗ Analysis failed")
+                    pass  # Analysis failed
                     continue
                 
                 # Extract key metrics
@@ -496,8 +487,7 @@ class OptionsScanner:
                     break
                 continue
         
-        logger.info(f"\nTier 3 Complete: {len(results)} high-quality opportunities found")
-        logger.info(f"Errors encountered: {errors}")
+        # Tier 3 complete
         
         # Sort by total score descending
         results.sort(key=lambda x: x.get('total_score', 0), reverse=True)
@@ -508,10 +498,7 @@ class OptionsScanner:
         """
         Run full 3-tier scan and return top opportunities
         """
-        logger.info(f"\n{'#'*80}")
-        logger.info(f"OPTIONS SCANNER - Finding Best Long Call Opportunities")
-        logger.info(f"Target: Short to mid-term (2-12 weeks), Medium delta (0.30-0.70)")
-        logger.info(f"{'#'*80}")
+        # Starting scan
         
         # Tier 1: Quick filter
         tier1_candidates = self.tier1_quick_filter(self.universe)
