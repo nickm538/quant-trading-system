@@ -319,6 +319,7 @@ class MarketScanner:
                 
                 # Full comprehensive analysis
                 # Reduced Monte Carlo sims to 5000 for stability in parallel processing
+                logger.info(f"  Starting comprehensive analysis for {symbol}...")
                 analysis = self.trading_system.analyze_stock_comprehensive(
                     symbol=symbol,
                     monte_carlo_sims=5000,
@@ -326,7 +327,12 @@ class MarketScanner:
                     bankroll=1000.0
                 )
                 
-                if not analysis or 'recommendation' not in analysis:
+                if not analysis:
+                    logger.warning(f"  {symbol}: Analysis returned None/empty")
+                    continue
+                    
+                if 'recommendation' not in analysis:
+                    logger.warning(f"  {symbol}: Analysis missing 'recommendation' key. Keys: {list(analysis.keys())}")
                     continue
                 
                 rec = analysis['recommendation']
