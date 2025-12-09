@@ -210,6 +210,15 @@ class OptionsScanner:
         
         qualified = []
         
+        # Track rejection reasons
+        rejection_stats = {
+            'insufficient_history': 0,
+            'negative_momentum': 0,
+            'low_iv': 0,
+            'no_valid_delta': 0,
+            'errors': 0
+        }
+        
         for i, candidate in enumerate(candidates, 1):
             try:
                 symbol = candidate['symbol']
@@ -223,13 +232,16 @@ class OptionsScanner:
                 hist = ticker.history(period='2mo')
                 if hist.empty or len(hist) < 20:
                     logger.info(f"  ✗ Insufficient historical data")
+                    rejection_stats['insufficient_history'] += 1
                     continue
                 
-                # Check momentum (balanced: allow within 1% below MA20)
+                # Check momentum (temporarily disabled for testing)
                 ma_20 = hist['Close'].tail(20).mean()
-                if current_price < ma_20 * 0.99:  # Allow up to 1% below MA20
-                    logger.info(f"  ✗ Weak momentum (price ${current_price:.2f} < 99% of MA20 ${ma_20:.2f})")
-                    continue
+                # TEMPORARILY DISABLED: Testing if this is blocking all stocks
+                # if current_price < ma_20 * 0.99:  # Allow up to 1% below MA20
+                #     logger.info(f"  ✗ Weak momentum (price ${current_price:.2f} < 99% of MA20 ${ma_20:.2f})")
+                #     rejection_stats['negative_momentum'] += 1
+                #     continue
                 
                 # Get IV vs HV (use ATM options IV, not stock-level IV)
                 hist_vol = hist['Close'].pct_change().std() * np.sqrt(252) * 100
@@ -250,9 +262,10 @@ class OptionsScanner:
                     
                     implied_vol_pct = atm_call.iloc[0]['impliedVolatility'] * 100
                     
-                    # Balanced: allow IV >= 90% of HV (not strictly > HV)
-                    if implied_vol_pct < hist_vol * 0.9:
-                        logger.info(f"  ✗ IV ({implied_vol_pct:.1f}%) < 90% of HV ({hist_vol:.1f}%)")
+                    # More lenient: allow IV >= 70% of HV (testing to find bottleneck)
+                    if implied_vol_pct < hist_vol * 0.7:
+                        logger.info(f"  ✗ IV ({implied_vol_pct:.1f}%) < 70% of HV ({hist_vol:.1f}%)")
+                        rejection_stats['low_iv'] += 1
                         continue
                         
                 except Exception as e:
@@ -362,7 +375,8 @@ class OptionsScanner:
                         continue
                 
                 if not best_call:
-                    logger.info(f"  ✗ No suitable calls found (need 0.30-0.70 delta range)")
+                    logger.info(f"  ✗ No suitable calls found (need 0.28-0.72 delta range)")
+                    rejection_stats['no_valid_delta'] += 1
                     continue
                 
                 # Add to qualified list
@@ -383,9 +397,16 @@ class OptionsScanner:
                 
             except Exception as e:
                 logger.error(f"  ✗ Error analyzing {candidate['symbol']}: {str(e)}")
+                rejection_stats['errors'] += 1
                 continue
         
         logger.info(f"\nTier 2 Complete: {len(qualified)}/{len(candidates)} passed")
+        logger.info(f"\nREJECTION BREAKDOWN:")
+        logger.info(f"  Insufficient history: {rejection_stats['insufficient_history']}")
+        logger.info(f"  Negative momentum: {rejection_stats['negative_momentum']}")
+        logger.info(f"  Low IV (< 90% of HV): {rejection_stats['low_iv']}")
+        logger.info(f"  No valid delta options: {rejection_stats['no_valid_delta']}")
+        logger.info(f"  Errors: {rejection_stats['errors']}")
         return qualified
     
     def tier3_deep_analysis(self, candidates: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
