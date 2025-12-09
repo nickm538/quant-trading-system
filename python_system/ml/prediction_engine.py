@@ -241,10 +241,32 @@ def make_price_prediction(symbol: str, horizon_days: int = 5) -> Dict:
         
     except Exception as e:
         import traceback
+        logger.error(f"Error in direct prediction: {e}")
+        
+        # Try transfer learning as fallback
+        logger.info(f"Attempting transfer learning for {symbol}...")
+        try:
+            from ml.transfer_learning import make_transfer_learning_prediction
+            
+            # Get list of trained symbols
+            cursor = conn.cursor()
+            cursor.execute("SELECT DISTINCT stock_symbol FROM trained_models WHERE is_active = 'active'")
+            trained_symbols = [row[0] for row in cursor.fetchall()]
+            cursor.close()
+            
+            if trained_symbols:
+                result = make_transfer_learning_prediction(conn, symbol, trained_symbols, horizon_days)
+                if result.get('success'):
+                    logger.info(f"Transfer learning successful for {symbol}")
+                    return result
+        except Exception as transfer_error:
+            logger.error(f"Transfer learning also failed: {transfer_error}")
+        
         return {
             'success': False,
             'error': str(e),
-            'traceback': traceback.format_exc()
+            'traceback': traceback.format_exc(),
+            'symbol': symbol
         }
 
 def save_prediction_to_db(conn, model_id: int, symbol: str, predicted_price: float, confidence: float, horizon_days: int):

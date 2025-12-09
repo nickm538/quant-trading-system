@@ -34,6 +34,7 @@ def main():
             sys.exit(1)
         
         symbol = sys.argv[1].upper()
+        start_time = datetime.now()
         logger.info(f"Starting institutional options analysis for {symbol}")
         
         # Import required modules
@@ -214,6 +215,31 @@ def main():
         
         # Add success flag
         result['success'] = True
+        
+        # Save to database
+        try:
+            from options_db_saver import OptionsDBSaver
+            
+            db_saver = OptionsDBSaver()
+            scan_duration_ms = int((datetime.now() - start_time).total_seconds() * 1000)
+            
+            save_result = db_saver.save_full_analysis(
+                symbol=symbol,
+                analysis_result=result,
+                scan_duration_ms=scan_duration_ms
+            )
+            
+            if save_result.get('success'):
+                logger.info(f"✅ Saved to database: scan_id={save_result['scan_id']}, "
+                          f"calls={save_result['saved_calls']}, puts={save_result['saved_puts']}")
+                result['database_saved'] = True
+                result['scan_id'] = save_result['scan_id']
+            else:
+                logger.warning(f"⚠️ Database save failed: {save_result.get('reason')}")
+                result['database_saved'] = False
+        except Exception as db_error:
+            logger.error(f"Error saving to database: {db_error}")
+            result['database_saved'] = False
         
         # Output JSON to stdout
         print(json.dumps(result, default=str, indent=2))
