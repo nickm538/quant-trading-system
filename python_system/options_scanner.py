@@ -288,8 +288,8 @@ class OptionsScanner:
                         
                         # Filter for liquidity (don't filter ITM/OTM yet - delta will handle it)
                         valid_calls = calls[
-                            (calls['volume'] > 10) &  # Minimum volume
-                            (calls['openInterest'] > 50)  # Minimum OI
+                            (calls['volume'] > 5) &  # Minimum volume (lowered from 10)
+                            (calls['openInterest'] > 20)  # Minimum OI (lowered from 50)
                         ].copy()
                         
                         if valid_calls.empty:
@@ -311,7 +311,7 @@ class OptionsScanner:
                         )
                         
                         # Filter for reasonable spreads
-                        valid_calls = valid_calls[valid_calls['spread_pct'] < 10]
+                        valid_calls = valid_calls[valid_calls['spread_pct'] < 20]  # Widened from 10%
                         
                         if valid_calls.empty:
                             continue
@@ -341,10 +341,10 @@ class OptionsScanner:
                         
                         valid_calls['real_delta'] = deltas
                         
-                        # Filter for REAL delta range 0.28-0.72 (balanced: was 0.30-0.70, then 0.25-0.75)
+                        # Filter for REAL delta range 0.25-0.75 (widened for more results)
                         target_calls = valid_calls[
-                            (valid_calls['real_delta'] >= 0.28) &
-                            (valid_calls['real_delta'] <= 0.72)
+                            (valid_calls['real_delta'] >= 0.25) &
+                            (valid_calls['real_delta'] <= 0.75)
                         ].copy()
                         
                         if target_calls.empty:
