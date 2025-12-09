@@ -405,10 +405,10 @@ class OptionsScanner:
         """
         # Tier 3: Deep Analysis
         
-        # Limit to top 5 to prevent API rate limits and timeouts
-        if len(candidates) > 5:
-            pass  # Limiting to top 5
-            candidates = candidates[:5]
+        # Limit to top 10 for optimal diversification and industry standard
+        if len(candidates) > 10:
+            pass  # Limiting to top 10
+            candidates = candidates[:10]
         
         results = []
         errors = 0
