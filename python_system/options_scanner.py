@@ -264,8 +264,8 @@ class OptionsScanner:
                     
                     implied_vol_pct = atm_call.iloc[0]['impliedVolatility'] * 100
                     
-                    # Very lenient: allow IV >= 25% of HV
-                    if implied_vol_pct < hist_vol * 0.25:
+                    # More lenient: allow IV >= 70% of HV (testing to find bottleneck)
+                    if implied_vol_pct < hist_vol * 0.7:
                         pass  # IV too low
                         rejection_stats['low_iv'] += 1
                         continue
@@ -288,8 +288,8 @@ class OptionsScanner:
                         
                         # Filter for liquidity (don't filter ITM/OTM yet - delta will handle it)
                         valid_calls = calls[
-                            (calls['volume'] > 5) &  # Minimum volume (lowered from 10)
-                            (calls['openInterest'] > 20)  # Minimum OI (lowered from 50)
+                            (calls['volume'] > 10) &  # Minimum volume
+                            (calls['openInterest'] > 50)  # Minimum OI
                         ].copy()
                         
                         if valid_calls.empty:
@@ -311,7 +311,7 @@ class OptionsScanner:
                         )
                         
                         # Filter for reasonable spreads
-                        valid_calls = valid_calls[valid_calls['spread_pct'] < 20]  # Widened from 10%
+                        valid_calls = valid_calls[valid_calls['spread_pct'] < 10]
                         
                         if valid_calls.empty:
                             continue
@@ -341,10 +341,10 @@ class OptionsScanner:
                         
                         valid_calls['real_delta'] = deltas
                         
-                        # Filter for REAL delta range 0.25-0.75 (widened for more results)
+                        # Filter for REAL delta range 0.28-0.72 (balanced: was 0.30-0.70, then 0.25-0.75)
                         target_calls = valid_calls[
-                            (valid_calls['real_delta'] >= 0.25) &
-                            (valid_calls['real_delta'] <= 0.75)
+                            (valid_calls['real_delta'] >= 0.28) &
+                            (valid_calls['real_delta'] <= 0.72)
                         ].copy()
                         
                         if target_calls.empty:
@@ -405,10 +405,10 @@ class OptionsScanner:
         """
         # Tier 3: Deep Analysis
         
-        # Limit to top 10 for optimal diversification and industry standard
-        if len(candidates) > 10:
-            pass  # Limiting to top 10
-            candidates = candidates[:10]
+        # Limit to top 5 to prevent API rate limits and timeouts
+        if len(candidates) > 5:
+            pass  # Limiting to top 5
+            candidates = candidates[:5]
         
         results = []
         errors = 0
