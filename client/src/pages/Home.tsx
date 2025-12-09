@@ -104,6 +104,15 @@ export default function Home() {
     });
   };
 
+  const handleMLPredict = () => {
+    if (!symbol) return;
+    setMlPrediction(null);
+    mlPredictionMutation.mutate({
+      symbol: symbol.toUpperCase(),
+      horizon_days: 30,
+    });
+  };
+
   const handleScanMarket = () => {
     setMarketScan(null);
     scanMutation.mutate({
