@@ -65,7 +65,7 @@ class InstitutionalOptionsEngine:
         }
         
         # Minimum score thresholds
-        self.min_score = 60.0  # Only recommend options scoring 60+ (balanced selectivity)
+        self.min_score = 50.0  # Balanced: strict but not too strict (was 60, then 40)
         
     def analyze_single_option(
         self,

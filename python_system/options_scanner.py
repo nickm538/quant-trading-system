@@ -158,7 +158,7 @@ class OptionsScanner:
                     
                     # Total call volume (handle NaN values)
                     total_volume = calls['volume'].fillna(0).sum()
-                    if total_volume < 500:  # Minimum 500 contracts/day
+                    if total_volume < 300:  # Minimum 300 contracts/day (balanced: was 500, then 200)
                         return None
                     
                     return {
@@ -225,10 +225,10 @@ class OptionsScanner:
                     logger.info(f"  ✗ Insufficient historical data")
                     continue
                 
-                # Check momentum
+                # Check momentum (balanced: allow within 1% below MA20)
                 ma_20 = hist['Close'].tail(20).mean()
-                if current_price < ma_20:
-                    logger.info(f"  ✗ Negative momentum (price ${current_price:.2f} < MA20 ${ma_20:.2f})")
+                if current_price < ma_20 * 0.99:  # Allow up to 1% below MA20
+                    logger.info(f"  ✗ Weak momentum (price ${current_price:.2f} < 99% of MA20 ${ma_20:.2f})")
                     continue
                 
                 # Get IV vs HV (use ATM options IV, not stock-level IV)
@@ -250,8 +250,9 @@ class OptionsScanner:
                     
                     implied_vol_pct = atm_call.iloc[0]['impliedVolatility'] * 100
                     
-                    if implied_vol_pct <= hist_vol:
-                        logger.info(f"  ✗ IV ({implied_vol_pct:.1f}%) <= HV ({hist_vol:.1f}%)")
+                    # Balanced: allow IV >= 90% of HV (not strictly > HV)
+                    if implied_vol_pct < hist_vol * 0.9:
+                        logger.info(f"  ✗ IV ({implied_vol_pct:.1f}%) < 90% of HV ({hist_vol:.1f}%)")
                         continue
                         
                 except Exception as e:
@@ -325,10 +326,10 @@ class OptionsScanner:
                         
                         valid_calls['real_delta'] = deltas
                         
-                        # Filter for REAL delta range 0.30-0.70 (medium risk/reward)
+                        # Filter for REAL delta range 0.28-0.72 (balanced: was 0.30-0.70, then 0.25-0.75)
                         target_calls = valid_calls[
-                            (valid_calls['real_delta'] >= 0.30) &
-                            (valid_calls['real_delta'] <= 0.70)
+                            (valid_calls['real_delta'] >= 0.28) &
+                            (valid_calls['real_delta'] <= 0.72)
                         ].copy()
                         
                         if target_calls.empty:
@@ -423,7 +424,7 @@ class OptionsScanner:
                 # Extract key metrics
                 total_score = analysis.get('total_score', 0)
                 
-                if total_score < 50:  # Minimum quality threshold
+                if total_score < 45:  # Minimum quality threshold (balanced: was 50, then 35)
                     logger.info(f"  ✗ Score too low: {total_score:.1f}/100")
                     continue
                 
