@@ -7,14 +7,15 @@ import { TrendingUp, TrendingDown, Brain, Target, AlertTriangle, Lightbulb, BarC
 interface MLPrediction {
   success: boolean;
   symbol: string;
-  current_price: number;
-  predicted_price: number;
-  predicted_change_pct: number;
-  confidence: number;
-  recommendation: string;
-  reasoning: string;
-  horizon_days: number;
-  model_performance: {
+  error?: string;
+  current_price?: number;
+  predicted_price?: number;
+  predicted_change_pct?: number;
+  confidence?: number;
+  recommendation?: string;
+  reasoning?: string;
+  horizon_days?: number;
+  model_performance?: {
     avg_accuracy: number;
     avg_sharpe_ratio: number;
     avg_win_rate: number;
@@ -69,7 +70,7 @@ export function QuantMLAnalysis({ mlPrediction, loading }: QuantMLAnalysisProps)
           <Alert>
             <AlertTriangle className="h-4 w-4" />
             <AlertDescription>
-              No trained ML models available for this stock. Train models first to see AI-powered predictions.
+              {mlPrediction?.error || "No trained ML models available for this stock. Train models first to see AI-powered predictions."}
             </AlertDescription>
           </Alert>
         </CardContent>
