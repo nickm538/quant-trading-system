@@ -18,6 +18,15 @@ from mysql.connector import Error
 # Add parent directory to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+# Redirect all print() to stderr by default (stdout is reserved for JSON output)
+import builtins
+_original_print = builtins.print
+def print(*args, **kwargs):
+    if 'file' not in kwargs:
+        kwargs['file'] = sys.stderr
+    _original_print(*args, **kwargs)
+builtins.print = print
+
 from ml.backtest_and_train import load_stock_data, calculate_technical_features, prepare_features_and_target
 
 def get_db_connection():
@@ -27,7 +36,7 @@ def get_db_connection():
         print("❌ ERROR: DATABASE_URL environment variable not set!")
         raise ValueError("DATABASE_URL not set")
     
-    print(f"🔗 Connecting to database...")
+    print(f"🔗 Connecting to database...", file=sys.stderr)
     
     # Parse DATABASE_URL (format: mysql://user:password@host:port/database)
     import re
@@ -37,7 +46,7 @@ def get_db_connection():
         raise ValueError(f"Invalid DATABASE_URL format: {database_url}")
     
     user, password, host, port, database = match.groups()
-    print(f"📊 Connecting to {host}:{port}/{database} as {user}")
+    print(f"📊 Connecting to {host}:{port}/{database} as {user}", file=sys.stderr)
     
     try:
         conn = mysql.connector.connect(
@@ -59,7 +68,7 @@ def get_best_models_for_stock(conn, symbol: str, top_n: int = 3) -> List[Dict]:
     Retrieve the best performing models for a stock from database
     Returns top N models sorted by test accuracy
     """
-    print(f"\n🔍 Retrieving models for {symbol}...")
+    print(f"\n🔍 Retrieving models for {symbol}...", file=sys.stderr)
     cursor = conn.cursor(dictionary=True)
     
     # First check if table exists
@@ -111,7 +120,7 @@ def get_best_models_for_stock(conn, symbol: str, top_n: int = 3) -> List[Dict]:
     LIMIT %s
     """
     
-    print(f"🔍 Executing query for {symbol}...")
+    print(f"🔍 Executing query for {symbol}...", file=sys.stderr)
     try:
         cursor.execute(query, (symbol, top_n))
         models = cursor.fetchall()
@@ -467,7 +476,9 @@ if __name__ == "__main__":
     symbol = sys.argv[1].upper()
     horizon_days = int(sys.argv[2]) if len(sys.argv) > 2 else 5
     
-    print(f"Generating prediction for {symbol}...")
+    # Send debug message to stderr (not stdout, which is for JSON only)
+    print(f"Generating prediction for {symbol}...", file=sys.stderr)
     result = predict_stock_price(symbol, horizon_days)
     
-    print(json.dumps(result, indent=2))
+    # Output ONLY JSON to stdout (explicitly specify stdout)
+    _original_print(json.dumps(result, indent=2), file=sys.stdout)
