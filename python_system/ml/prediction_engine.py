@@ -467,6 +467,6 @@ if __name__ == "__main__":
     horizon_days = int(sys.argv[2]) if len(sys.argv) > 2 else 5
     
     print(f"Generating prediction for {symbol}...")
-    result = make_price_prediction(symbol, horizon_days)
+    result = predict_stock_price(symbol, horizon_days)
     
     print(json.dumps(result, indent=2))
