@@ -180,17 +180,10 @@ class OptionsScanner:
         with ThreadPoolExecutor(max_workers=10) as executor:
             futures = {executor.submit(check_stock, sym): sym for sym in symbols}
             
-            for i, future in enumerate(as_completed(futures), 1):
-                if i % 20 == 0:
-                    logger.info(f"  Progress: {i}/{len(symbols)} stocks checked...")
-                
+            for future in as_completed(futures):
                 result = future.result()
                 if result:
                     candidates.append(result)
-                    logger.info(f"  ✓ {result['symbol']}: ${result['price']:.2f}, "
-                              f"MCap ${result['market_cap']/1e9:.1f}B, "
-                              f"Vol {result['options_volume']:.0f}, "
-                              f"{result['sector']}")
         
         logger.info(f"\nTier 1 Complete: {len(candidates)}/{len(symbols)} stocks passed")
         return candidates
@@ -386,13 +379,9 @@ class OptionsScanner:
                 
                 qualified.append(candidate)
                 
-                # Only log every 10th qualified or first 5 to reduce Railway rate limits
-                if len(qualified) <= 5 or len(qualified) % 10 == 0:
-                    logger.info(f"  ✓ [{len(qualified)}] {symbol}: ${best_call['strike']:.2f} call, "
-                              f"Delta {best_call['real_delta']:.3f}, IV {implied_vol_pct:.1f}%")
+                # Logging removed to prevent Railway rate limits
                 
             except Exception as e:
-                logger.error(f"  ✗ Error analyzing {candidate['symbol']}: {str(e)}")
                 rejection_stats['errors'] += 1
                 continue
         
@@ -414,10 +403,10 @@ class OptionsScanner:
         logger.info(f"TIER 3: Deep Analysis - Full institutional scoring")
         logger.info(f"{'='*80}")
         
-        # Limit to top 15 to prevent API rate limits and timeouts
-        if len(candidates) > 15:
-            logger.info(f"Limiting Tier 3 analysis to top 15 of {len(candidates)} candidates")
-            candidates = candidates[:15]
+        # Limit to top 5 to prevent API rate limits and timeouts
+        if len(candidates) > 5:
+            logger.info(f"Limiting Tier 3 analysis to top 5 of {len(candidates)} candidates")
+            candidates = candidates[:5]
         
         results = []
         errors = 0
@@ -427,8 +416,7 @@ class OptionsScanner:
                 symbol = candidate['symbol']
                 call = candidate['best_call']
                 
-                logger.info(f"\n[{i}/{len(candidates)}] Deep analysis: {symbol}")
-                logger.info(f"  Analyzing ${call['strike']:.2f} call exp {call['expiration']}")
+                # Deep analysis in progress
                 
                 # Run full institutional analysis
                 analysis = self.options_engine.analyze_single_option(
@@ -447,8 +435,7 @@ class OptionsScanner:
                 # Extract key metrics
                 total_score = analysis.get('total_score', 0)
                 
-                if total_score < 45:  # Minimum quality threshold (balanced: was 50, then 35)
-                    logger.info(f"  ✗ Score too low: {total_score:.1f}/100")
+                if total_score < 45:  # Minimum score threshold (balanced: was 50, then 35)
                     continue
                 
                 # Build result
@@ -501,12 +488,8 @@ class OptionsScanner:
                 
                 results.append(result)
                 
-                # Reduced logging
-                logger.info(f"  ✓ Score: {result['total_score']:.1f}/100, "
-                          f"Delta: {result['delta']:.3f}, "
-                          f"Kelly: {result['kelly_fraction']*100:.1f}%")              
+                # Logging removed              
             except Exception as e:
-                logger.error(f"  ✗ Error in deep analysis for {candidate['symbol']}: {str(e)}")
                 errors += 1
                 if errors > 5:
                     logger.warning(f"Too many errors ({errors}), stopping Tier 3 early")
@@ -537,8 +520,8 @@ class OptionsScanner:
             logger.warning("No candidates passed Tier 1 filter")
             return []
         
-        # Tier 2: Medium analysis
-        tier2_candidates = self.tier2_medium_analysis(tier1_candidates)
+        # Tier 2: Medium analysis (limit to top 100 to reduce load)
+        tier2_candidates = self.tier2_medium_analysis(tier1_candidates[:100])
         
         if not tier2_candidates:
             logger.warning("No candidates passed Tier 2 analysis")
@@ -550,18 +533,7 @@ class OptionsScanner:
         # Return top N results
         top_results = final_results[:max_results]
         
-        logger.info(f"\n{'='*80}")
-        logger.info(f"SCAN COMPLETE - Top {len(top_results)} Opportunities:")
-        logger.info(f"{'='*80}")
-        
-        for i, result in enumerate(top_results, 1):
-            logger.info(f"\n{i}. {result['symbol']} - Score: {result['total_score']:.1f}/100")
-            logger.info(f"   ${result['strike']:.2f} call @ ${result['option_price']:.2f} "
-                       f"exp {result['expiration']} ({result['days_to_expiry']} days)")
-            logger.info(f"   Delta: {result['delta']:.3f}, IV: {result['implied_vol']:.1f}%, "
-                       f"Momentum: +{result['momentum']:.1f}%")
-            logger.info(f"   Max Loss: ${result['max_loss']:.0f}, "
-                       f"Breakeven: ${result['breakeven']:.2f}")
+        logger.info(f"\nSCAN COMPLETE - {len(top_results)} opportunities found")
         
         return top_results
 
