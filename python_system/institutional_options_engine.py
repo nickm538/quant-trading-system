@@ -150,6 +150,9 @@ class InstitutionalOptionsEngine:
                 return {'error': 'Option failed hard filters'}
             
             # Return with scanner-friendly keys
+            key_metrics = result.get('key_metrics', {})
+            risk_mgmt = result.get('risk_management', {})
+            
             return {
                 'success': True,
                 'symbol': symbol,
@@ -159,20 +162,20 @@ class InstitutionalOptionsEngine:
                 'liquidity_score': result.get('scores', {}).get('liquidity', 0),
                 'risk_reward_score': result.get('scores', {}).get('expected_value', 0),
                 'greeks': {
-                    'delta': result.get('delta', 0),
-                    'gamma': result.get('gamma', 0),
-                    'theta': result.get('theta', 0),
-                    'vega': result.get('vega', 0),
-                    'rho': result.get('rho', 0)
+                    'delta': key_metrics.get('delta', 0),
+                    'gamma': key_metrics.get('gamma', 0),
+                    'theta': key_metrics.get('theta', 0),
+                    'vega': key_metrics.get('vega', 0),
+                    'rho': 0  # rho not in key_metrics
                 },
                 'days_to_expiry': result.get('dte', 0),
                 'iv_rank': result.get('iv_rank', 0),
                 'iv_percentile': result.get('iv_percentile', 0),
-                'profit_target': result.get('profit_target', 0),
-                'expected_return': result.get('expected_return', 0),
-                'kelly_fraction': result.get('kelly_fraction', 0),
-                'recommended_contracts': result.get('recommended_contracts', 1),
-                'position_size_pct': result.get('position_size_pct', 0)
+                'profit_target': 0,  # Not in _score_option return
+                'expected_return': 0,  # Not in _score_option return
+                'kelly_fraction': risk_mgmt.get('kelly_pct', 0) / 100,
+                'recommended_contracts': 1,  # Calculate based on Kelly
+                'position_size_pct': risk_mgmt.get('max_position_size_pct', 0)
             }
             
         except Exception as e:

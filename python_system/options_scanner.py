@@ -375,7 +375,6 @@ class OptionsScanner:
                         continue
                 
                 if not best_call:
-                    logger.info(f"  ✗ No suitable calls found (need 0.28-0.72 delta range)")
                     rejection_stats['no_valid_delta'] += 1
                     continue
                 
@@ -387,13 +386,10 @@ class OptionsScanner:
                 
                 qualified.append(candidate)
                 
-                logger.info(f"  ✓ Found call: ${best_call['strike']:.2f} exp {best_call['expiration']}")
-                logger.info(f"    Premium: ${best_call['last_price']:.2f}, "
-                          f"Delta: {best_call['real_delta']:.3f}, "
-                          f"Vol: {best_call['volume']:.0f}, "
-                          f"OI: {best_call['open_interest']:.0f}")
-                logger.info(f"    IV: {implied_vol_pct:.1f}% vs HV: {hist_vol:.1f}%, "
-                          f"Momentum: +{candidate['momentum']:.1f}%")
+                # Only log every 10th qualified or first 5 to reduce Railway rate limits
+                if len(qualified) <= 5 or len(qualified) % 10 == 0:
+                    logger.info(f"  ✓ [{len(qualified)}] {symbol}: ${best_call['strike']:.2f} call, "
+                              f"Delta {best_call['real_delta']:.3f}, IV {implied_vol_pct:.1f}%")
                 
             except Exception as e:
                 logger.error(f"  ✗ Error analyzing {candidate['symbol']}: {str(e)}")
@@ -505,15 +501,10 @@ class OptionsScanner:
                 
                 results.append(result)
                 
-                logger.info(f"  ✓ Score: {total_score:.1f}/100")
-                logger.info(f"    Delta: {result['delta']:.3f}, "
-                          f"Theta: {result['theta']:.3f}, "
-                          f"Vega: {result['vega']:.3f}")
-                logger.info(f"    Max Loss: ${result['max_loss']:.0f}, "
-                          f"Breakeven: ${result['breakeven']:.2f}")
-                logger.info(f"    Kelly: {result['kelly_fraction']*100:.1f}%, "
-                          f"Contracts: {result['recommended_contracts']}")
-                
+                # Reduced logging
+                logger.info(f"  ✓ Score: {result['total_score']:.1f}/100, "
+                          f"Delta: {result['greeks']['delta']:.3f}, "
+                          f"Kelly: {result['kelly_fraction']*100:.1f}%")              
             except Exception as e:
                 logger.error(f"  ✗ Error in deep analysis for {candidate['symbol']}: {str(e)}")
                 errors += 1
