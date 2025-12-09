@@ -1286,17 +1286,82 @@ class InstitutionalOptionsEngine:
         return {'next_earnings_date': None, 'days_to_earnings': None}
     
     def _get_sentiment_data(self, symbol: str) -> Dict[str, Any]:
-        """Get sentiment data - neutral baseline (real-time sentiment requires paid API)."""
-        # Note: Real-time sentiment requires Finnhub, NewsAPI, or similar paid service
-        # Using neutral baseline (50) to avoid bias
-        # Sentiment has low weight (10%) in overall scoring
-        logger.info(f"Using neutral sentiment baseline for {symbol} (real-time sentiment requires API integration)")
-        return {
-            'news_score': 50,  # Neutral
-            'analyst_score': 50,  # Neutral
-            'insider_score': 50,  # Neutral
-            'overall_score': 50  # Neutral
-        }
+        """Get sentiment data from yfinance (analyst recommendations + news)."""
+        try:
+            ticker = yf.Ticker(symbol)
+            info = ticker.info
+            
+            # 1. Analyst recommendations score (0-100)
+            analyst_score = 50  # Default neutral
+            recommendation = info.get('recommendationKey', 'hold')
+            if recommendation in ['strong_buy', 'buy']:
+                analyst_score = 80
+            elif recommendation == 'hold':
+                analyst_score = 50
+            elif recommendation in ['sell', 'strong_sell']:
+                analyst_score = 20
+            
+            # 2. News sentiment from recent news (0-100)
+            news_score = 50  # Default neutral
+            try:
+                news = ticker.news
+                if news and len(news) > 0:
+                    # Simple sentiment: count positive vs negative keywords in titles
+                    positive_keywords = ['beat', 'surge', 'gain', 'up', 'high', 'strong', 'growth', 'profit', 'buy', 'upgrade']
+                    negative_keywords = ['miss', 'drop', 'fall', 'down', 'low', 'weak', 'loss', 'sell', 'downgrade', 'cut']
+                    
+                    positive_count = 0
+                    negative_count = 0
+                    
+                    for article in news[:10]:  # Check last 10 articles
+                        title = article.get('title', '').lower()
+                        positive_count += sum(1 for word in positive_keywords if word in title)
+                        negative_count += sum(1 for word in negative_keywords if word in title)
+                    
+                    if positive_count > negative_count:
+                        news_score = min(50 + (positive_count - negative_count) * 10, 90)
+                    elif negative_count > positive_count:
+                        news_score = max(50 - (negative_count - positive_count) * 10, 10)
+            except:
+                pass
+            
+            # 3. Insider trading score (0-100)
+            insider_score = 50  # Default neutral
+            try:
+                # Check if insiders are buying or selling
+                insider_transactions = ticker.insider_transactions
+                if insider_transactions is not None and not insider_transactions.empty:
+                    recent = insider_transactions.head(10)
+                    buys = len(recent[recent['Transaction'] == 'Buy'])
+                    sells = len(recent[recent['Transaction'] == 'Sale'])
+                    
+                    if buys > sells:
+                        insider_score = 70
+                    elif sells > buys:
+                        insider_score = 30
+            except:
+                pass
+            
+            overall_score = (news_score * 0.4 + analyst_score * 0.3 + insider_score * 0.3)
+            
+            logger.info(f"Sentiment for {symbol}: News={news_score}, Analyst={analyst_score}, Insider={insider_score}")
+            
+            return {
+                'news_score': news_score,
+                'analyst_score': analyst_score,
+                'insider_score': insider_score,
+                'overall_score': overall_score
+            }
+            
+        except Exception as e:
+            logger.warning(f"Error getting sentiment for {symbol}: {e}")
+            # Return neutral on error
+            return {
+                'news_score': 50,
+                'analyst_score': 50,
+                'insider_score': 50,
+                'overall_score': 50
+            }
     
     def _generate_insights(
         self,
