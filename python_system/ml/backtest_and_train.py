@@ -277,6 +277,16 @@ def calculate_backtest_metrics(predictions: np.ndarray, actuals: np.ndarray, ret
     total_losses = abs(trading_returns[trading_returns < 0].sum())
     profit_factor = total_wins / total_losses if total_losses > 0 else 0
     
+    # Value at Risk (VaR) at 95% confidence level
+    # VaR represents the maximum expected loss at 95% confidence
+    # Using historical simulation method
+    var_95 = np.percentile(trading_returns, 5)  # 5th percentile (worst 5% of returns)
+    
+    # Conditional Value at Risk (CVaR) at 95% confidence level
+    # CVaR is the expected loss given that we're in the worst 5% of outcomes
+    # Also known as Expected Shortfall (ES)
+    cvar_95 = trading_returns[trading_returns <= var_95].mean() if len(trading_returns[trading_returns <= var_95]) > 0 else var_95
+    
     return {
         'mse': mse,
         'mae': mae,
@@ -292,7 +302,9 @@ def calculate_backtest_metrics(predictions: np.ndarray, actuals: np.ndarray, ret
         'win_rate': win_rate,
         'avg_win': avg_win,
         'avg_loss': avg_loss,
-        'profit_factor': profit_factor
+        'profit_factor': profit_factor,
+        'value_at_risk_95': var_95,
+        'conditional_var_95': cvar_95
     }
 
 def save_model_to_db(conn, symbol: str, model_type: str, model_obj, metrics: Dict, hyperparams: Dict, feature_importance: Dict = None) -> int:
@@ -384,8 +396,8 @@ def save_backtest_results_to_db(conn, model_id: int, symbol: str, metrics: Dict,
         int(float(metrics['avg_win']) * 10000),
         int(float(metrics['avg_loss']) * 10000),
         int(float(metrics['profit_factor']) * 10000),
-        0,  # VaR placeholder
-        0,  # CVaR placeholder
+        int(float(metrics['value_at_risk_95']) * 10000),  # VaR at 95% confidence
+        int(float(metrics['conditional_var_95']) * 10000),  # CVaR at 95% confidence
         'walk_forward'
     )
     
