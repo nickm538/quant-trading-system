@@ -67,6 +67,116 @@ class InstitutionalOptionsEngine:
         # Minimum score thresholds
         self.min_score = 60.0  # Only recommend options scoring 60+ (balanced selectivity)
         
+    def analyze_single_option(
+        self,
+        symbol: str,
+        strike_price: float,
+        expiration_date: str,
+        option_type: str,
+        current_price: float,
+        option_price: float
+    ) -> Dict[str, Any]:
+        """
+        Analyze a single specific option (used by options scanner).
+        
+        Args:
+            symbol: Stock ticker
+            strike_price: Option strike
+            expiration_date: Expiration in 'YYYY-MM-DD' format
+            option_type: 'call' or 'put'
+            current_price: Current stock price
+            option_price: Current option premium
+            
+        Returns:
+            Dictionary with scoring and Greeks for this specific option
+        """
+        try:
+            logger.info(f"Analyzing single {option_type}: {symbol} ${strike_price} exp {expiration_date}")
+            
+            # Get options chain data for this expiration
+            ticker = yf.Ticker(symbol)
+            opt_chain = ticker.option_chain(expiration_date)
+            
+            if option_type.lower() == 'call':
+                options_df = opt_chain.calls
+            else:
+                options_df = opt_chain.puts
+            
+            # Find the specific option
+            option_row = options_df[options_df['strike'] == strike_price]
+            
+            if option_row.empty:
+                return {'error': f'Option not found: {strike_price} {option_type}'}
+            
+            option_data = option_row.iloc[0].to_dict()
+            option_data['expiration'] = expiration_date
+            
+            # Get stock data
+            hist = ticker.history(period='3mo')
+            if hist.empty:
+                return {'error': 'No historical data available'}
+            
+            stock_data = {
+                'current_price': current_price,
+                'rsi': self._calculate_rsi(hist['Close']),
+                'macd_signal': self._calculate_macd_signal(hist['Close'])
+            }
+            
+            # Calculate historical volatility
+            historical_vol = self._calculate_historical_volatility(symbol)
+            
+            # Get IV history
+            iv_history = self._get_iv_history(symbol, days=252)
+            
+            # Get earnings and sentiment
+            earnings_data = self._get_earnings_data(symbol)
+            sentiment_data = self._get_sentiment_data(symbol)
+            
+            # Score this single option
+            result = self._score_option(
+                option=option_data,
+                option_type=option_type,
+                current_price=current_price,
+                stock_data=stock_data,
+                historical_vol=historical_vol,
+                iv_history=iv_history,
+                earnings_data=earnings_data,
+                sentiment_data=sentiment_data
+            )
+            
+            if not result:
+                return {'error': 'Option failed hard filters'}
+            
+            # Return with scanner-friendly keys
+            return {
+                'success': True,
+                'symbol': symbol,
+                'total_score': result.get('final_score', 0),
+                'greek_score': result.get('scores', {}).get('greeks', 0),
+                'volatility_score': result.get('scores', {}).get('volatility', 0),
+                'liquidity_score': result.get('scores', {}).get('liquidity', 0),
+                'risk_reward_score': result.get('scores', {}).get('expected_value', 0),
+                'greeks': {
+                    'delta': result.get('delta', 0),
+                    'gamma': result.get('gamma', 0),
+                    'theta': result.get('theta', 0),
+                    'vega': result.get('vega', 0),
+                    'rho': result.get('rho', 0)
+                },
+                'days_to_expiry': result.get('dte', 0),
+                'iv_rank': result.get('iv_rank', 0),
+                'iv_percentile': result.get('iv_percentile', 0),
+                'profit_target': result.get('profit_target', 0),
+                'expected_return': result.get('expected_return', 0),
+                'kelly_fraction': result.get('kelly_fraction', 0),
+                'recommended_contracts': result.get('recommended_contracts', 1),
+                'position_size_pct': result.get('position_size_pct', 0)
+            }
+            
+        except Exception as e:
+            logger.error(f"Error analyzing single option: {str(e)}")
+            return {'error': str(e)}
+    
     def analyze_options_chain(
         self,
         symbol: str,
@@ -956,6 +1066,39 @@ class InstitutionalOptionsEngine:
         return score
     
     # ==================== HELPER FUNCTIONS ====================
+    
+    def _calculate_rsi(self, prices: pd.Series, period: int = 14) -> float:
+        """
+        Calculate RSI (Relative Strength Index)
+        """
+        try:
+            delta = prices.diff()
+            gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
+            loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
+            rs = gain / loss
+            rsi = 100 - (100 / (1 + rs))
+            return rsi.iloc[-1] if not rsi.empty else 50.0
+        except:
+            return 50.0
+    
+    def _calculate_macd_signal(self, prices: pd.Series) -> str:
+        """
+        Calculate MACD signal (bullish/bearish/neutral)
+        """
+        try:
+            exp1 = prices.ewm(span=12, adjust=False).mean()
+            exp2 = prices.ewm(span=26, adjust=False).mean()
+            macd = exp1 - exp2
+            signal = macd.ewm(span=9, adjust=False).mean()
+            
+            if macd.iloc[-1] > signal.iloc[-1]:
+                return 'bullish'
+            elif macd.iloc[-1] < signal.iloc[-1]:
+                return 'bearish'
+            else:
+                return 'neutral'
+        except:
+            return 'neutral'
     
     def _calculate_historical_volatility(self, symbol: str, days: int = 60) -> float:
         """Calculate historical volatility using yfinance."""

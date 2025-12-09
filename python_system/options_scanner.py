@@ -125,6 +125,8 @@ class OptionsScanner:
                 # Check basic filters
                 if market_cap < 500_000_000:  # $500M minimum
                     return None
+                if not price or price <= 0:  # Must have valid price
+                    return None
                 if price < 5:  # Avoid penny stocks
                     return None
                 
@@ -154,8 +156,8 @@ class OptionsScanner:
                     if calls.empty:
                         return None
                     
-                    # Total call volume
-                    total_volume = calls['volume'].sum()
+                    # Total call volume (handle NaN values)
+                    total_volume = calls['volume'].fillna(0).sum()
                     if total_volume < 500:  # Minimum 500 contracts/day
                         return None
                     
@@ -217,8 +219,8 @@ class OptionsScanner:
                 info = ticker.info
                 current_price = candidate['price']
                 
-                # Get historical data for momentum
-                hist = ticker.history(period='1mo')
+                # Get historical data for momentum (use 2mo to ensure >= 20 trading days)
+                hist = ticker.history(period='2mo')
                 if hist.empty or len(hist) < 20:
                     logger.info(f"  ✗ Insufficient historical data")
                     continue
@@ -277,7 +279,16 @@ class OptionsScanner:
                         if valid_calls.empty:
                             continue
                         
-                        # Calculate bid-ask spread
+                        # Calculate bid-ask spread (filter out invalid bid/ask first)
+                        valid_calls = valid_calls[
+                            (valid_calls['bid'] > 0) & 
+                            (valid_calls['ask'] > 0) &
+                            (valid_calls['ask'] > valid_calls['bid'])  # Sanity check
+                        ].copy()
+                        
+                        if valid_calls.empty:
+                            continue
+                        
                         valid_calls['spread_pct'] = (
                             (valid_calls['ask'] - valid_calls['bid']) / 
                             ((valid_calls['ask'] + valid_calls['bid']) / 2) * 100
@@ -294,6 +305,9 @@ class OptionsScanner:
                         days_to_exp = (exp_datetime - datetime.now()).days
                         time_to_expiry = max(days_to_exp / 365.0, 0.001)  # Years
                         
+                        # Get real dividend yield (not hardcoded)
+                        div_yield = info.get('dividendYield', 0.0) or 0.0
+                        
                         deltas = []
                         for idx, row in valid_calls.iterrows():
                             try:
@@ -303,10 +317,10 @@ class OptionsScanner:
                                     time_to_expiry=time_to_expiry,
                                     volatility=row['impliedVolatility'],
                                     option_type='call',
-                                    dividend_yield=0.0
+                                    dividend_yield=div_yield  # Real dividend yield
                                 )
                                 deltas.append(greeks['delta'])
-                            except:
+                            except Exception as e:
                                 deltas.append(0.0)
                         
                         valid_calls['real_delta'] = deltas
@@ -393,7 +407,7 @@ class OptionsScanner:
                 logger.info(f"  Analyzing ${call['strike']:.2f} call exp {call['expiration']}")
                 
                 # Run full institutional analysis
-                analysis = self.options_engine.analyze_options(
+                analysis = self.options_engine.analyze_single_option(
                     symbol=symbol,
                     strike_price=call['strike'],
                     expiration_date=call['expiration'],
