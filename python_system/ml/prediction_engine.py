@@ -24,31 +24,79 @@ def get_db_connection():
     """Get database connection"""
     database_url = os.getenv('DATABASE_URL')
     if not database_url:
+        print("❌ ERROR: DATABASE_URL environment variable not set!")
         raise ValueError("DATABASE_URL not set")
+    
+    print(f"🔗 Connecting to database...")
     
     # Parse DATABASE_URL (format: mysql://user:password@host:port/database)
     import re
     match = re.match(r'mysql://([^:]+):([^@]+)@([^:]+):(\d+)/(.+)', database_url)
     if not match:
+        print(f"❌ ERROR: Invalid DATABASE_URL format")
         raise ValueError(f"Invalid DATABASE_URL format: {database_url}")
     
     user, password, host, port, database = match.groups()
+    print(f"📊 Connecting to {host}:{port}/{database} as {user}")
     
-    return mysql.connector.connect(
-        host=host,
-        port=int(port),
-        user=user,
-        password=password,
-        database=database,
-        ssl_disabled=False
-    )
+    try:
+        conn = mysql.connector.connect(
+            host=host,
+            port=int(port),
+            user=user,
+            password=password,
+            database=database,
+            ssl_disabled=False
+        )
+        print("✅ Database connection successful")
+        return conn
+    except Exception as e:
+        print(f"❌ ERROR: Database connection failed: {e}")
+        raise
 
 def get_best_models_for_stock(conn, symbol: str, top_n: int = 3) -> List[Dict]:
     """
     Retrieve the best performing models for a stock from database
     Returns top N models sorted by test accuracy
     """
+    print(f"\n🔍 Retrieving models for {symbol}...")
     cursor = conn.cursor(dictionary=True)
+    
+    # First check if table exists
+    try:
+        cursor.execute("SHOW TABLES LIKE 'trained_models'")
+        if not cursor.fetchone():
+            print("❌ ERROR: trained_models table does not exist!")
+            cursor.close()
+            return []
+    except Exception as e:
+        print(f"❌ ERROR checking table existence: {e}")
+        cursor.close()
+        return []
+    
+    # Count total models in database
+    try:
+        cursor.execute("SELECT COUNT(*) as count FROM trained_models")
+        total = cursor.fetchone()['count']
+        print(f"📊 Total models in database: {total}")
+    except Exception as e:
+        print(f"❌ ERROR counting models: {e}")
+    
+    # Count models for this symbol
+    try:
+        cursor.execute("SELECT COUNT(*) as count FROM trained_models WHERE stock_symbol = %s", (symbol,))
+        symbol_total = cursor.fetchone()['count']
+        print(f"📊 Models for {symbol}: {symbol_total}")
+    except Exception as e:
+        print(f"❌ ERROR counting symbol models: {e}")
+    
+    # Count active models for this symbol
+    try:
+        cursor.execute("SELECT COUNT(*) as count FROM trained_models WHERE stock_symbol = %s AND is_active = 'active'", (symbol,))
+        active_count = cursor.fetchone()['count']
+        print(f"📊 Active models for {symbol}: {active_count}")
+    except Exception as e:
+        print(f"❌ ERROR counting active models: {e}")
     
     query = """
     SELECT 
@@ -63,11 +111,32 @@ def get_best_models_for_stock(conn, symbol: str, top_n: int = 3) -> List[Dict]:
     LIMIT %s
     """
     
-    cursor.execute(query, (symbol, top_n))
-    models = cursor.fetchall()
-    cursor.close()
-    
-    return models
+    print(f"🔍 Executing query for {symbol}...")
+    try:
+        cursor.execute(query, (symbol, top_n))
+        models = cursor.fetchall()
+        print(f"✅ Retrieved {len(models)} models for {symbol}")
+        
+        if models:
+            for i, m in enumerate(models):
+                has_data = 'YES' if m.get('model_data') else 'NO'
+                print(f"   Model {i+1}: {m['model_type']} (accuracy: {m['test_accuracy']/10000:.2f}%, has_data: {has_data})")
+        else:
+            print(f"⚠️  No models found for {symbol} with is_active='active'")
+            # Check if there are ANY models for this symbol
+            cursor.execute("SELECT COUNT(*) as count, GROUP_CONCAT(DISTINCT is_active) as statuses FROM trained_models WHERE stock_symbol = %s", (symbol,))
+            check = cursor.fetchone()
+            if check and check['count'] > 0:
+                print(f"   Found {check['count']} models with statuses: {check['statuses']}")
+        
+        cursor.close()
+        return models
+    except Exception as e:
+        print(f"❌ ERROR executing query: {e}")
+        import traceback
+        traceback.print_exc()
+        cursor.close()
+        return []
 
 def deserialize_model(model_data_b64: str):
     """Deserialize model from base64 encoded pickle"""
