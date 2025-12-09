@@ -182,7 +182,7 @@ class MarketScanner:
                 }
                 
             except Exception as e:
-                logger.debug(f"  Error analyzing {symbol}: {str(e)}")
+                logger.warning(f"  Error analyzing {symbol}: {str(e)}")
                 return None
         
         # Parallel processing
@@ -224,8 +224,12 @@ class MarketScanner:
                 symbol = candidate['symbol']
                 
                 # Get full price data
-                complete_data = self.data_ingestion.get_complete_stock_data(symbol)
-                price_data = complete_data['price_data']
+                try:
+                    complete_data = self.data_ingestion.get_complete_stock_data(symbol)
+                    price_data = complete_data['price_data']
+                except Exception as e:
+                    logger.warning(f"  Failed to get data for {symbol}: {str(e)}")
+                    return None
                 
                 if price_data.empty or len(price_data) < 100:
                     return None
@@ -270,7 +274,7 @@ class MarketScanner:
                 return candidate
                 
             except Exception as e:
-                logger.debug(f"  Error in tier 2 for {candidate['symbol']}: {str(e)}")
+                logger.warning(f"  Error in tier 2 for {candidate['symbol']}: {str(e)}")
                 return None
         
         # Parallel processing
