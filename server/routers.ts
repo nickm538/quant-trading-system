@@ -107,6 +107,53 @@ export const appRouter = router({
         return await scanMarket(input);
       }),
     
+    // Options scanner endpoint
+    scanOptions: publicProcedure
+      .input(
+        z.object({
+          max_results: z.number().int().min(5).max(20).optional().default(10),
+        })
+      )
+      .mutation(async ({ input }) => {
+        try {
+          const pythonPath = 'python3.11';
+          const scriptPath = path.join(process.cwd(), 'python_system/options_scanner.py');
+          
+          console.log(`🔍 Starting options scan for top ${input.max_results} opportunities...`);
+          
+          const { stdout, stderr } = await execAsync(
+            `${pythonPath} ${scriptPath} ${input.max_results}`,
+            { 
+              maxBuffer: 20 * 1024 * 1024, 
+              timeout: 600000, // 10min timeout (options scanning is intensive)
+              env: {
+                ...process.env,
+                PYTHONPATH: '',
+                PYTHONHOME: '',
+                LD_LIBRARY_PATH: process.env.LD_LIBRARY_PATH || '',
+              },
+            }
+          );
+          
+          if (stderr) {
+            console.log(`⚠️  Options scanner stderr: ${stderr}`);
+          }
+          
+          console.log(`✅ Options scanner completed`);
+          
+          // Parse JSON output from Python
+          const result = JSON.parse(stdout);
+          return result;
+        } catch (error: any) {
+          console.error('❌ Options scanner error:', error);
+          return {
+            success: false,
+            error: error.message,
+            opportunities: [],
+          };
+        }
+      }),
+    
     healthCheck: publicProcedure.query(async () => {
       const isHealthy = await checkPythonSystem();
       return { healthy: isHealthy, timestamp: new Date().toISOString() };

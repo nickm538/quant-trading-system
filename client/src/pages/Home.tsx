@@ -25,6 +25,7 @@ export default function Home() {
   const [institutionalOptions, setInstitutionalOptions] = useState<any>(null);
   const [greeksHeatmapData, setGreeksHeatmapData] = useState<any>(null);
   const [marketScan, setMarketScan] = useState<any>(null);
+  const [optionsScan, setOptionsScan] = useState<any>(null);
   const [trainingOutput, setTrainingOutput] = useState<string>("");
   const [mlPrediction, setMlPrediction] = useState<any>(null);
 
@@ -76,6 +77,12 @@ export default function Home() {
   const scanMutation = trpc.trading.scanMarket.useMutation({
     onSuccess: (data) => {
       setMarketScan(data);
+    },
+  });
+
+  const optionsScanMutation = trpc.trading.scanOptions.useMutation({
+    onSuccess: (data) => {
+      setOptionsScan(data);
     },
   });
 
@@ -131,6 +138,13 @@ export default function Home() {
     });
   };
 
+  const handleScanOptions = () => {
+    setOptionsScan(null);
+    optionsScanMutation.mutate({
+      max_results: 10,
+    });
+  };
+
   const getSignalColor = (signal: string) => {
     if (signal === 'BUY') return 'text-green-500';
     if (signal === 'SELL') return 'text-red-500';
@@ -172,7 +186,7 @@ export default function Home() {
       {/* Main Content */}
       <div className="container py-8">
         <Tabs defaultValue="stock" className="w-full">
-          <TabsList className="grid w-full grid-cols-6 mb-8">
+          <TabsList className="grid w-full grid-cols-7 mb-8">
             <TabsTrigger value="stock" className="flex items-center gap-2">
               <TrendingUp className="h-4 w-4" />
               Stock Analysis
@@ -188,6 +202,10 @@ export default function Home() {
             <TabsTrigger value="scanner" className="flex items-center gap-2">
               <Search className="h-4 w-4" />
               Market Scanner
+            </TabsTrigger>
+            <TabsTrigger value="options-scanner" className="flex items-center gap-2">
+              <Search className="h-4 w-4" />
+              Option Scanner
             </TabsTrigger>
             <TabsTrigger value="ml" className="flex items-center gap-2">
               <Brain className="h-4 w-4" />
@@ -810,6 +828,200 @@ export default function Home() {
                             <div>
                               <div className="text-xs text-muted-foreground">Position</div>
                               <div className="text-lg font-bold">{opp.shares} shares</div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+          </TabsContent>
+
+          {/* Options Scanner Tab */}
+          <TabsContent value="options-scanner" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Options Scanner - Best Long Call Opportunities</CardTitle>
+                <CardDescription>
+                  Scan entire market for optimal short-to-mid term long calls (2-12 weeks, 0.30-0.70 delta) with institutional-grade analysis
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    3-tier filtering: Quick screen → Medium analysis → Deep institutional scoring with Greeks, IV crush, Kelly sizing.
+                    Expected time: 5-10 minutes. Returns top 10 opportunities.
+                  </AlertDescription>
+                </Alert>
+                <Button 
+                  onClick={handleScanOptions} 
+                  disabled={optionsScanMutation.isPending}
+                  className="w-full"
+                  size="lg"
+                >
+                  {optionsScanMutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Scanning Options Market (5-10 min)...
+                    </>
+                  ) : (
+                    'Start Options Scan'
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
+
+            {optionsScanMutation.isError && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  {optionsScanMutation.error.message}
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {optionsScan && optionsScan.success && (
+              <div className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Scan Summary</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                      <div className="p-4 bg-muted/30 rounded-lg">
+                        <div className="text-sm text-muted-foreground">Total Scanned</div>
+                        <div className="text-2xl font-bold">{optionsScan.total_scanned}</div>
+                      </div>
+                      <div className="p-4 bg-muted/30 rounded-lg">
+                        <div className="text-sm text-muted-foreground">Opportunities Found</div>
+                        <div className="text-2xl font-bold text-green-500">{optionsScan.opportunities?.length || 0}</div>
+                      </div>
+                      <div className="p-4 bg-muted/30 rounded-lg">
+                        <div className="text-sm text-muted-foreground">Timestamp</div>
+                        <div className="text-sm font-semibold">{new Date(optionsScan.timestamp).toLocaleString()}</div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Top Long Call Opportunities</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {optionsScan.opportunities?.map((opp: any, idx: number) => (
+                        <div key={idx} className="p-5 border-2 border-border rounded-lg bg-gradient-to-br from-muted/20 to-muted/5 hover:from-muted/30 hover:to-muted/10 transition-all">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-4">
+                              <div className="text-3xl font-bold text-primary">#{idx + 1}</div>
+                              <div>
+                                <div className="text-2xl font-bold">{opp.symbol}</div>
+                                <div className="text-sm text-muted-foreground">{opp.sector}</div>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-sm text-muted-foreground">Institutional Score</div>
+                              <div className="text-3xl font-bold text-green-500">{opp.total_score?.toFixed(1)}/100</div>
+                            </div>
+                          </div>
+
+                          {/* Option Details */}
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3 p-3 bg-muted/20 rounded-lg">
+                            <div>
+                              <div className="text-xs text-muted-foreground">Strike</div>
+                              <div className="text-lg font-bold">${opp.strike?.toFixed(2)}</div>
+                            </div>
+                            <div>
+                              <div className="text-xs text-muted-foreground">Premium</div>
+                              <div className="text-lg font-bold">${opp.option_price?.toFixed(2)}</div>
+                            </div>
+                            <div>
+                              <div className="text-xs text-muted-foreground">Expiration</div>
+                              <div className="text-sm font-bold">{opp.expiration} ({opp.days_to_expiry}d)</div>
+                            </div>
+                            <div>
+                              <div className="text-xs text-muted-foreground">Breakeven</div>
+                              <div className="text-lg font-bold">${opp.breakeven?.toFixed(2)}</div>
+                            </div>
+                          </div>
+
+                          {/* Greeks */}
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+                            <div>
+                              <div className="text-xs text-muted-foreground">Delta</div>
+                              <div className="text-lg font-bold text-blue-500">{opp.delta?.toFixed(3)}</div>
+                            </div>
+                            <div>
+                              <div className="text-xs text-muted-foreground">Gamma</div>
+                              <div className="text-lg font-bold">{opp.gamma?.toFixed(4)}</div>
+                            </div>
+                            <div>
+                              <div className="text-xs text-muted-foreground">Theta</div>
+                              <div className="text-lg font-bold text-red-500">{opp.theta?.toFixed(3)}</div>
+                            </div>
+                            <div>
+                              <div className="text-xs text-muted-foreground">Vega</div>
+                              <div className="text-lg font-bold">{opp.vega?.toFixed(3)}</div>
+                            </div>
+                          </div>
+
+                          {/* Risk Metrics */}
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+                            <div>
+                              <div className="text-xs text-muted-foreground">IV</div>
+                              <div className="text-lg font-bold">{opp.implied_vol?.toFixed(1)}%</div>
+                            </div>
+                            <div>
+                              <div className="text-xs text-muted-foreground">HV</div>
+                              <div className="text-lg font-bold">{opp.hist_vol?.toFixed(1)}%</div>
+                            </div>
+                            <div>
+                              <div className="text-xs text-muted-foreground">Max Loss</div>
+                              <div className="text-lg font-bold text-red-500">${opp.max_loss?.toFixed(0)}</div>
+                            </div>
+                            <div>
+                              <div className="text-xs text-muted-foreground">Momentum</div>
+                              <div className="text-lg font-bold text-green-500">+{opp.momentum?.toFixed(1)}%</div>
+                            </div>
+                          </div>
+
+                          {/* Position Sizing */}
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 p-3 bg-primary/5 rounded-lg">
+                            <div>
+                              <div className="text-xs text-muted-foreground">Kelly Fraction</div>
+                              <div className="text-lg font-bold">{(opp.kelly_fraction * 100)?.toFixed(1)}%</div>
+                            </div>
+                            <div>
+                              <div className="text-xs text-muted-foreground">Recommended Contracts</div>
+                              <div className="text-lg font-bold text-primary">{opp.recommended_contracts}</div>
+                            </div>
+                            <div>
+                              <div className="text-xs text-muted-foreground">Volume / OI</div>
+                              <div className="text-sm font-bold">{opp.volume} / {opp.open_interest}</div>
+                            </div>
+                          </div>
+
+                          {/* Score Breakdown */}
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3 pt-3 border-t border-border">
+                            <div className="text-center">
+                              <div className="text-xs text-muted-foreground">Greek Score</div>
+                              <div className="text-sm font-bold">{opp.greek_score?.toFixed(0)}</div>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-xs text-muted-foreground">Vol Score</div>
+                              <div className="text-sm font-bold">{opp.volatility_score?.toFixed(0)}</div>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-xs text-muted-foreground">Liquidity</div>
+                              <div className="text-sm font-bold">{opp.liquidity_score?.toFixed(0)}</div>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-xs text-muted-foreground">Risk/Reward</div>
+                              <div className="text-sm font-bold">{opp.risk_reward_score?.toFixed(0)}</div>
                             </div>
                           </div>
                         </div>
