@@ -322,9 +322,8 @@ class InstitutionalOptionsEngine:
             ask = option.get('ask', 0)
             volume = option.get('volume', 0)
             open_interest = option.get('openInterest', 0)
-            iv = option.get('impliedVolatility', 0)
             
-            # Calculate DTE first (needed for Greeks calculation)
+            # Calculate DTE first (needed for IV and Greeks calculation)
             expiration = option.get('expiration')
             if isinstance(expiration, str):
                 exp_date = datetime.strptime(expiration, '%Y-%m-%d')
@@ -332,8 +331,25 @@ class InstitutionalOptionsEngine:
                 exp_date = expiration
             dte = (exp_date - datetime.now()).days
             
-            # ALWAYS calculate Greeks using Black-Scholes (yfinance doesn't provide them)
-            logger.debug(f"Calculating Greeks for {option_type} strike {strike}")
+            # Calculate IV from option price (NEVER use yfinance IV - it's broken)
+            # Check if already calculated (from scanner)
+            iv = option.get('calculated_iv', 0)
+            if iv == 0:
+                # Calculate it now
+                mid_price = (bid + ask) / 2 if bid > 0 and ask > 0 else last_price
+                if mid_price > 0:
+                    iv = self.greeks_calc.calculate_implied_volatility(
+                        option_price=mid_price,
+                        spot=current_price,
+                        strike=strike,
+                        time_to_expiry=dte / 365.0,
+                        option_type=option_type
+                    )
+                if iv == 0:
+                    iv = 0.25  # Default 25% if calculation fails
+            
+            # ALWAYS calculate Greeks using Black-Scholes with CALCULATED IV
+            logger.debug(f"Calculating Greeks for {option_type} strike {strike} with IV={iv*100:.1f}%")
             greeks = self._calculate_greeks_for_option(
                 current_price=current_price,
                 strike=strike,

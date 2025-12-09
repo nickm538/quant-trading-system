@@ -385,6 +385,102 @@ class GreeksCalculator:
                 
         except:
             return 0.5  # Default to 50% if calculation fails
+    
+    def calculate_implied_volatility(
+        self,
+        option_price: float,
+        spot: float,
+        strike: float,
+        time_to_expiry: float,
+        option_type: str,
+        dividend_yield: float = 0.0,
+        max_iterations: int = 100,
+        tolerance: float = 1e-5
+    ) -> float:
+        """
+        Calculate implied volatility from option price using Newton-Raphson method.
+        
+        Args:
+            option_price: Market price of the option
+            spot: Current stock price
+            strike: Option strike price
+            time_to_expiry: Time to expiration in years
+            option_type: 'call' or 'put'
+            dividend_yield: Annual dividend yield
+            max_iterations: Maximum number of iterations
+            tolerance: Convergence tolerance
+            
+        Returns:
+            Implied volatility (annualized) or 0.0 if calculation fails
+        """
+        try:
+            # Validate inputs
+            if option_price <= 0 or spot <= 0 or strike <= 0 or time_to_expiry <= 0:
+                return 0.0
+            
+            # Calculate intrinsic value
+            if option_type.lower() == 'call':
+                intrinsic = max(0, spot - strike)
+            else:
+                intrinsic = max(0, strike - spot)
+            
+            # Time value must be positive
+            time_value = option_price - intrinsic
+            if time_value <= 0:
+                return 0.0  # No time value means no IV to calculate
+            
+            # Initial guess using Brenner-Subrahmanyam approximation
+            # IV ≈ sqrt(2π/T) * (time_value / spot)
+            iv = np.sqrt(2 * np.pi / time_to_expiry) * (time_value / spot)
+            iv = max(0.05, min(iv, 2.0))  # Clamp between 5% and 200%
+            
+            for i in range(max_iterations):
+                # Calculate option price with current IV guess
+                d1, d2 = self._calculate_d1_d2(
+                    spot, strike, time_to_expiry, iv, dividend_yield
+                )
+                
+                discount_factor = np.exp(-dividend_yield * time_to_expiry)
+                
+                if option_type.lower() == 'call':
+                    calculated_price = (
+                        spot * discount_factor * norm.cdf(d1) -
+                        strike * np.exp(-self.risk_free_rate * time_to_expiry) * norm.cdf(d2)
+                    )
+                else:  # put
+                    calculated_price = (
+                        strike * np.exp(-self.risk_free_rate * time_to_expiry) * norm.cdf(-d2) -
+                        spot * discount_factor * norm.cdf(-d1)
+                    )
+                
+                # Check convergence
+                price_diff = calculated_price - option_price
+                if abs(price_diff) < tolerance:
+                    return iv
+                
+                # Calculate vega for Newton-Raphson update
+                # Vega from _calculate_vega is per 1%, so multiply by 100
+                vega = self._calculate_vega(spot, d1, time_to_expiry, dividend_yield) * 100
+                
+                if abs(vega) < 1e-10:
+                    # Vega too small, can't converge
+                    break
+                
+                # Newton-Raphson update
+                iv = iv - price_diff / vega
+                
+                # Keep IV in reasonable range
+                iv = max(0.01, min(iv, 3.0))
+            
+            # If we didn't converge but got reasonable value, return it
+            if 0.01 <= iv <= 3.0:
+                return iv
+            else:
+                return 0.0
+            
+        except Exception as e:
+            logger.warning(f"IV calculation failed: {e}")
+            return 0.0
 
 
 def test_greeks_calculator():

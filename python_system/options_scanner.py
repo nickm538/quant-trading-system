@@ -245,13 +245,12 @@ class OptionsScanner:
                 #     rejection_stats['negative_momentum'] += 1
                 #     continue
                 
-                # REMOVED: IV filter - yfinance's impliedVolatility field is unreliable
-                # Returns values like 0.78% when actual IV is ~20%, causing all stocks to be rejected
-                # TODO: Calculate IV from option prices using Black-Scholes inverse if needed
-                
-                # Calculate HV for reference (even though we're not filtering on IV)
+                # Calculate Historical Volatility (HV)
                 hist_vol = hist['Close'].pct_change().std() * np.sqrt(252) * 100
-                implied_vol_pct = 0.0  # Not used for filtering anymore
+                
+                # Calculate Implied Volatility (IV) from ATM call option price
+                # We'll calculate this after finding the best call option
+                implied_vol_pct = 0.0  # Will be calculated later
                 
                 # Find best call option (0.20-0.80 delta)
                 best_call = None
@@ -268,29 +267,31 @@ class OptionsScanner:
                         # Filter for liquidity (don't filter ITM/OTM yet - delta will handle it)
                         valid_calls = calls[
                             (calls['volume'] > 0) &  # Any volume (even 1)
-                            (calls['openInterest'] > 10)  # Lowered from 50
+                            (calls['openInterest'] > 10) &  # Lowered from 50
+                            (calls['lastPrice'] > 0)  # Must have a price
                         ].copy()
                         
                         if valid_calls.empty:
                             continue
                         
-                        # Calculate bid-ask spread (filter out invalid bid/ask first)
-                        valid_calls = valid_calls[
-                            (valid_calls['bid'] > 0) & 
-                            (valid_calls['ask'] > 0) &
-                            (valid_calls['ask'] > valid_calls['bid'])  # Sanity check
-                        ].copy()
-                        
-                        if valid_calls.empty:
-                            continue
-                        
-                        valid_calls['spread_pct'] = (
-                            (valid_calls['ask'] - valid_calls['bid']) / 
-                            ((valid_calls['ask'] + valid_calls['bid']) / 2) * 100
+                        # Calculate bid-ask spread (yfinance often returns 0 for bid/ask)
+                        # Use lastPrice as fallback when bid/ask unavailable
+                        valid_calls['effective_bid'] = valid_calls.apply(
+                            lambda row: row['bid'] if row['bid'] > 0 else row['lastPrice'] * 0.95,
+                            axis=1
+                        )
+                        valid_calls['effective_ask'] = valid_calls.apply(
+                            lambda row: row['ask'] if row['ask'] > 0 else row['lastPrice'] * 1.05,
+                            axis=1
                         )
                         
-                        # Filter for reasonable spreads
-                        valid_calls = valid_calls[valid_calls['spread_pct'] < 30]  # Widened from 10%
+                        valid_calls['spread_pct'] = (
+                            (valid_calls['effective_ask'] - valid_calls['effective_bid']) / 
+                            ((valid_calls['effective_ask'] + valid_calls['effective_bid']) / 2) * 100
+                        )
+                        
+                        # Filter for reasonable spreads (more lenient since we're estimating)
+                        valid_calls = valid_calls[valid_calls['spread_pct'] < 50]  # Very wide for estimated spreads
                         
                         if valid_calls.empty:
                             continue
@@ -304,21 +305,46 @@ class OptionsScanner:
                         div_yield = info.get('dividendYield', 0.0) or 0.0
                         
                         deltas = []
+                        calculated_ivs = []
                         for idx, row in valid_calls.iterrows():
                             try:
+                                # Calculate IV from option mid price using effective bid/ask
+                                mid_price = (row['effective_bid'] + row['effective_ask']) / 2
+                                
+                                calculated_iv = self.greeks_calc.calculate_implied_volatility(
+                                    option_price=mid_price,
+                                    spot=current_price,
+                                    strike=row['strike'],
+                                    time_to_expiry=time_to_expiry,
+                                    option_type='call',
+                                    dividend_yield=div_yield
+                                )
+                                
+                                # Use calculated IV if valid, otherwise use reasonable default
+                                # NEVER use yfinance IV - it's garbage (0.78% when should be 20%)
+                                if calculated_iv > 0.01:  # Valid IV from Newton-Raphson
+                                    iv_to_use = calculated_iv
+                                else:
+                                    iv_to_use = 0.25  # Default 25% if calculation fails
+                                
+                                calculated_ivs.append(iv_to_use)
+                                
+                                # Calculate Greeks with correct IV
                                 greeks = self.greeks_calc.calculate_all_greeks(
                                     spot=current_price,
                                     strike=row['strike'],
                                     time_to_expiry=time_to_expiry,
-                                    volatility=row['impliedVolatility'],
+                                    volatility=iv_to_use,
                                     option_type='call',
-                                    dividend_yield=div_yield  # Real dividend yield
+                                    dividend_yield=div_yield
                                 )
                                 deltas.append(greeks['delta'])
                             except Exception as e:
                                 deltas.append(0.0)
+                                calculated_ivs.append(0.0)
                         
                         valid_calls['real_delta'] = deltas
+                        valid_calls['calculated_iv'] = calculated_ivs
                         
                         # Filter for REAL delta range 0.20-0.80 (widened to get results)
                         target_calls = valid_calls[
@@ -344,12 +370,12 @@ class OptionsScanner:
                                 'expiration': exp_date,
                                 'strike': best_in_exp.iloc[0]['strike'],
                                 'last_price': best_in_exp.iloc[0]['lastPrice'],
-                                'bid': best_in_exp.iloc[0]['bid'],
-                                'ask': best_in_exp.iloc[0]['ask'],
+                                'bid': best_in_exp.iloc[0]['effective_bid'],
+                                'ask': best_in_exp.iloc[0]['effective_ask'],
                                 'volume': best_in_exp.iloc[0]['volume'],
                                 'open_interest': best_in_exp.iloc[0]['openInterest'],
-                                'implied_volatility': best_in_exp.iloc[0]['impliedVolatility'],
-                                'real_delta': best_in_exp.iloc[0]['real_delta']
+                                'real_delta': best_in_exp.iloc[0]['real_delta'],
+                                'calculated_iv': best_in_exp.iloc[0]['calculated_iv']  # From Newton-Raphson (NOT yfinance)
                             }
                     
                     except Exception as e:
@@ -359,10 +385,16 @@ class OptionsScanner:
                     rejection_stats['no_valid_delta'] += 1
                     continue
                 
+                # Use already-calculated IV from best_call
+                calculated_iv = best_call.get('calculated_iv', 0.0)
+                implied_vol_pct = calculated_iv * 100  # Convert to percentage
+                best_call['calculated_iv_pct'] = implied_vol_pct
+                
                 # Add to qualified list
                 candidate['best_call'] = best_call
                 candidate['hist_vol'] = hist_vol
                 candidate['implied_vol'] = implied_vol_pct
+                candidate['iv_hv_ratio'] = implied_vol_pct / hist_vol if hist_vol > 0 else 0.0
                 candidate['momentum'] = ((current_price / ma_20) - 1) * 100
                 
                 qualified.append(candidate)
@@ -449,6 +481,7 @@ class OptionsScanner:
                     # Volatility
                     'implied_vol': candidate['implied_vol'],
                     'hist_vol': candidate['hist_vol'],
+                    'iv_hv_ratio': candidate.get('iv_hv_ratio', 0),
                     'iv_rank': analysis.get('iv_rank', 0),
                     'iv_percentile': analysis.get('iv_percentile', 0),
                     
