@@ -128,6 +128,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ input }) => {
+        console.log(`\n🧠 ML PREDICTION REQUEST: ${input.symbol} (${input.horizon_days} days)`);
         try {
           const pythonPath = 'python3.11';
           const scriptPath = path.join(process.cwd(), 'python_system/ml/prediction_engine.py');
@@ -142,6 +143,9 @@ export const appRouter = router({
             const database = process.env.MYSQLDATABASE || 'railway';
             databaseUrl = `mysql://${user}:${password}@${host}:${port}/${database}`;
           }
+          
+          console.log(`🐍 Executing Python: ${pythonPath} ${scriptPath} ${input.symbol.toUpperCase()} ${input.horizon_days}`);
+          console.log(`📊 DATABASE_URL set: ${databaseUrl ? 'YES' : 'NO'}`);
           
           const { stdout, stderr } = await execAsync(
             `${pythonPath} ${scriptPath} ${input.symbol.toUpperCase()} ${input.horizon_days}`,
@@ -158,11 +162,22 @@ export const appRouter = router({
             }
           );
           
+          if (stderr) {
+            console.log(`⚠️  Python stderr: ${stderr}`);
+          }
+          
+          console.log(`✅ Python stdout (first 500 chars): ${stdout.substring(0, 500)}`);
+          
           // Parse JSON output from Python
           const result = JSON.parse(stdout);
+          console.log(`📊 Result success: ${result.success}`);
+          if (!result.success) {
+            console.log(`❌ Result error: ${result.error}`);
+          }
           return result;
         } catch (error: any) {
-          console.error('ML Prediction error:', error);
+          console.error('❌ ML Prediction error:', error);
+          console.error('❌ Error stack:', error.stack);
           return {
             success: false,
             error: error.message,
