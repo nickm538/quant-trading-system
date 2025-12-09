@@ -20,6 +20,17 @@ warnings.filterwarnings('ignore')
 from institutional_options_engine import InstitutionalOptionsEngine
 from greeks_calculator import GreeksCalculator
 
+# Custom JSON encoder to handle NumPy/Pandas types
+class NumpyEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, (np.integer, np.int64)):
+            return int(obj)
+        if isinstance(obj, (np.floating, np.float64)):
+            return float(obj)
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return super().default(obj)
+
 # Setup logging
 logging.basicConfig(
     level=logging.INFO,
@@ -535,13 +546,13 @@ def main():
         scanner = OptionsScanner()
         results = scanner.scan(max_results=max_results)
         
-        # Output JSON for backend
+        # Output JSON for backend (use custom encoder for NumPy types)
         print(json.dumps({
             'success': True,
             'opportunities': results,
             'total_scanned': len(scanner.universe),
             'timestamp': datetime.now().isoformat()
-        }))
+        }, cls=NumpyEncoder))
         
     except Exception as e:
         logger.error(f"Scanner failed: {str(e)}", exc_info=True)
