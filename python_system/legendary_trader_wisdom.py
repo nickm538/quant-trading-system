@@ -150,12 +150,22 @@ class LegendaryTraderWisdom:
         pe_ratio = fundamentals.get('pe_ratio', 0)
         earnings_growth = fundamentals.get('earnings_growth', 0)
         revenue_growth = fundamentals.get('revenue_growth', 0)
-        peg_ratio = fundamentals.get('peg_ratio', 999)
+        peg_ratio = fundamentals.get('peg_ratio', 0)
         
         # Lynch's PEG ratio (P/E divided by growth rate)
         # PEG < 1 = undervalued, PEG 1-2 = fair, PEG > 2 = overvalued
         
-        if peg_ratio < 1.0 and earnings_growth > 0.15:
+        # Handle cases where PEG can't be calculated (negative/zero earnings growth)
+        if peg_ratio == 0 or peg_ratio > 100:
+            if earnings_growth <= 0:
+                advice = f"**LYNCH WOULD AVOID**: PEG ratio unavailable due to negative/zero earnings growth ({earnings_growth*100:.1f}%). "
+                advice += f"P/E of {pe_ratio:.1f} is meaningless without growth. "
+                advice += "**'I can't recall ever once having seen the name of a market timer on Forbes 400.'** Wait for profitability."
+            else:
+                advice = f"**LYNCH WOULD AVOID**: Extremely high P/E ({pe_ratio:.1f}) with minimal growth. PEG ratio too high to justify. "
+                advice += "**'The trick is not to learn to trust your gut feelings, but rather to discipline yourself to ignore them.'** This is overpriced."
+        
+        elif peg_ratio < 1.0 and earnings_growth > 0.15:
             advice = f"**LYNCH WOULD BUY**: Classic GARP setup! PEG ratio of {peg_ratio:.2f} with {earnings_growth*100:.1f}% earnings growth. "
             advice += "**'Find a stock that's undervalued and hold it until it's overvalued.'** This is undervalued."
         
