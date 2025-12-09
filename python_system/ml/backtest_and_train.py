@@ -227,9 +227,48 @@ def train_lightgbm_model(X_train, y_train, X_val, y_val):
     
     return model
 
+def decode_metrics_from_db(mse_int: int, mae_int: int, r2_int: int) -> Dict:
+    """
+    Decode metrics from database integer storage to float values
+    
+    Args:
+        mse_int: MSE stored as int (multiply by 1,000,000)
+        mae_int: MAE stored as int (multiply by 10,000)
+        r2_int: R² stored as int (multiply by 10,000)
+    
+    Returns:
+        Dict with decoded float values
+    
+    Example:
+        >>> decode_metrics_from_db(90, 76, 7200)
+        {'mse': 0.00009, 'mae': 0.0076, 'r2_score': 0.72}
+    """
+    return {
+        'mse': mse_int / 1000000.0,
+        'mae': mae_int / 10000.0,
+        'r2_score': r2_int / 10000.0,
+        'rmse': np.sqrt(mse_int / 1000000.0)  # Root mean squared error
+    }
+
 def calculate_backtest_metrics(predictions: np.ndarray, actuals: np.ndarray, returns: np.ndarray) -> Dict:
-    """Calculate comprehensive backtest metrics"""
-    # Regression metrics
+    """
+    Calculate comprehensive backtest metrics
+    
+    Args:
+        predictions: Predicted percentage changes (e.g., 0.02 = 2% up)
+        actuals: Actual percentage changes (e.g., 0.025 = 2.5% up)
+        returns: Actual returns for trading simulation (same as actuals)
+    
+    Returns:
+        Dict with regression metrics (MSE, MAE, R²) and trading metrics
+    
+    Note:
+        - MSE/MAE/R² are calculated on percentage changes (scale-invariant)
+        - All metrics returned as decimals (not percentages)
+        - MAE = 0.01 means 0.01 (1%) average prediction error
+        - R² = 0.8 means model explains 80% of variance
+    """
+    # Regression metrics (on percentage changes)
     mse = mean_squared_error(actuals, predictions)
     mae = mean_absolute_error(actuals, predictions)
     r2 = r2_score(actuals, predictions)
@@ -341,9 +380,9 @@ def save_model_to_db(conn, symbol: str, model_type: str, model_obj, metrics: Dic
         int(metrics['direction_accuracy'] * 10000),
         int(metrics['direction_accuracy'] * 10000),  # Same as training for now
         int(metrics['direction_accuracy'] * 10000),
-        int(metrics.get('mse', 0) * 10000),
-        int(metrics.get('mae', 0) * 10000),
-        int(metrics.get('r2_score', 0) * 10000),
+        int(metrics.get('mse', 0) * 1000000),  # MSE: multiply by 1M (0.00009 → 90)
+        int(metrics.get('mae', 0) * 10000),    # MAE: multiply by 10K (0.0076 → 76)
+        int(metrics.get('r2_score', 0) * 10000),  # R²: multiply by 10K (0.72 → 7200)
         json.dumps(hyperparams),
         json.dumps(feature_importance) if feature_importance else None,
         'active'
