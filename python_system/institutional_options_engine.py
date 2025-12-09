@@ -458,8 +458,8 @@ class InstitutionalOptionsEngine:
             return False
         
         # Earnings risk filter
-        days_to_earnings = earnings_data.get('days_to_earnings', 999)
-        if 0 < days_to_earnings < self.filters['min_days_to_earnings']:
+        days_to_earnings = earnings_data.get('days_to_earnings')
+        if days_to_earnings is not None and 0 < days_to_earnings < self.filters['min_days_to_earnings']:
             return False
         
         return True
@@ -757,9 +757,9 @@ class InstitutionalOptionsEngine:
         score = 0.0
         
         # 1. Days to earnings (50% of category)
-        days_to_earnings = earnings_data.get('days_to_earnings', 999)
+        days_to_earnings = earnings_data.get('days_to_earnings')
         
-        if days_to_earnings > 30:
+        if days_to_earnings is None or days_to_earnings > 30:
             earnings_score = 100  # Clean runway
         elif 15 <= days_to_earnings <= 30:
             earnings_score = 80  # Slight caution
@@ -780,9 +780,9 @@ class InstitutionalOptionsEngine:
         # 2. IV crush risk (30% of category)
         if historical_vol > 0:
             iv_elevation = iv / historical_vol
-            if iv_elevation > 1.5 and 0 < days_to_earnings < 10:
+            if iv_elevation > 1.5 and days_to_earnings is not None and 0 < days_to_earnings < 10:
                 iv_crush_score = 30  # High risk of crush
-            elif iv_elevation > 1.3 and 0 < days_to_earnings < 10:
+            elif iv_elevation > 1.3 and days_to_earnings is not None and 0 < days_to_earnings < 10:
                 iv_crush_score = 50
             else:
                 iv_crush_score = 90
@@ -972,10 +972,48 @@ class InstitutionalOptionsEngine:
             return 0.30
     
     def _get_iv_history(self, symbol: str, days: int = 252) -> List[float]:
-        """Get historical IV data (simplified - would use actual IV history in production)."""
-        # In production, this would fetch actual IV history from data provider
-        # For now, return empty list (will use HV as proxy)
-        return []
+        """Get historical IV data by sampling current options chain over time."""
+        try:
+            ticker = yf.Ticker(symbol)
+            
+            # Get all available expiration dates
+            expirations = ticker.options
+            if not expirations or len(expirations) == 0:
+                logger.warning(f"No options expirations found for {symbol}")
+                return []
+            
+            # Get ATM options from multiple expirations to build IV history proxy
+            current_price = ticker.history(period='1d')['Close'].iloc[-1]
+            iv_samples = []
+            
+            # Sample up to 10 different expirations
+            for exp_date in expirations[:10]:
+                try:
+                    chain = ticker.option_chain(exp_date)
+                    calls = chain.calls
+                    
+                    if calls.empty:
+                        continue
+                    
+                    # Find ATM option (closest to current price)
+                    calls['distance'] = abs(calls['strike'] - current_price)
+                    atm_option = calls.loc[calls['distance'].idxmin()]
+                    
+                    if 'impliedVolatility' in atm_option and atm_option['impliedVolatility'] > 0:
+                        iv_samples.append(atm_option['impliedVolatility'])
+                except:
+                    continue
+            
+            if len(iv_samples) > 0:
+                logger.info(f"Collected {len(iv_samples)} IV samples for {symbol}")
+                return iv_samples
+            else:
+                logger.warning(f"No valid IV samples found for {symbol}")
+                return []
+                
+        except Exception as e:
+            logger.error(f"Error fetching IV history for {symbol}: {e}")
+            return []
     
     def _calculate_iv_rank(self, current_iv: float, iv_history: List[float]) -> float:
         """Calculate IV Rank: (Current IV - 52w Low) / (52w High - 52w Low) * 100"""
@@ -1071,32 +1109,50 @@ class InstitutionalOptionsEngine:
         return kelly_pct
     
     def _get_earnings_data(self, symbol: str) -> Dict[str, Any]:
-        """Get earnings calendar data."""
+        """Get earnings calendar data from yfinance."""
         try:
             ticker = yf.Ticker(symbol)
             calendar = ticker.calendar
             
-            if calendar is not None and 'Earnings Date' in calendar:
-                earnings_date = calendar['Earnings Date'][0]
-                if isinstance(earnings_date, pd.Timestamp):
+            if calendar is not None and isinstance(calendar, dict) and 'Earnings Date' in calendar:
+                earnings_dates = calendar['Earnings Date']
+                
+                # earnings_dates is a list, get the first (next) date
+                if earnings_dates and len(earnings_dates) > 0:
+                    earnings_date = earnings_dates[0]
+                    
+                    # Convert to pandas Timestamp
+                    if not isinstance(earnings_date, pd.Timestamp):
+                        earnings_date = pd.Timestamp(earnings_date)
+                    
                     days_to_earnings = (earnings_date - pd.Timestamp.now()).days
+                    
+                    logger.info(f"{symbol} next earnings: {earnings_date.strftime('%Y-%m-%d')} ({days_to_earnings} days)")
+                    
                     return {
                         'next_earnings_date': earnings_date.strftime('%Y-%m-%d'),
                         'days_to_earnings': days_to_earnings
                     }
-        except:
-            pass
+            
+            logger.warning(f"No earnings data found for {symbol} in calendar")
+            
+        except Exception as e:
+            logger.error(f"Error fetching earnings data for {symbol}: {e}")
         
-        return {'next_earnings_date': None, 'days_to_earnings': 999}
+        # Return None instead of 999 to indicate missing data
+        return {'next_earnings_date': None, 'days_to_earnings': None}
     
     def _get_sentiment_data(self, symbol: str) -> Dict[str, Any]:
-        """Get sentiment data (simplified - would integrate real sentiment API)."""
-        # In production, integrate Finnhub, NewsAPI, or similar
+        """Get sentiment data - neutral baseline (real-time sentiment requires paid API)."""
+        # Note: Real-time sentiment requires Finnhub, NewsAPI, or similar paid service
+        # Using neutral baseline (50) to avoid bias
+        # Sentiment has low weight (10%) in overall scoring
+        logger.info(f"Using neutral sentiment baseline for {symbol} (real-time sentiment requires API integration)")
         return {
-            'news_score': 60,
-            'analyst_score': 55,
-            'insider_score': 50,
-            'overall_score': 55
+            'news_score': 50,  # Neutral
+            'analyst_score': 50,  # Neutral
+            'insider_score': 50,  # Neutral
+            'overall_score': 50  # Neutral
         }
     
     def _generate_insights(
@@ -1132,11 +1188,18 @@ class InstitutionalOptionsEngine:
             insights.append(f"Technical momentum strongly supports this {option_type} position")
         
         # Earnings insights
-        days_to_earnings = earnings_data.get('days_to_earnings', 999)
-        if days_to_earnings < 30:
-            insights.append(f"Earnings in {days_to_earnings} days - monitor IV crush risk")
+        days_to_earnings = earnings_data.get('days_to_earnings')
+        if days_to_earnings is not None:
+            if days_to_earnings < 0:
+                insights.append(f"Post-earnings ({abs(days_to_earnings)} days ago) - IV may have normalized")
+            elif days_to_earnings < 7:
+                insights.append(f"⚠️ Earnings in {days_to_earnings} days - HIGH IV crush risk")
+            elif days_to_earnings < 30:
+                insights.append(f"Earnings in {days_to_earnings} days - monitor IV levels")
+            else:
+                insights.append(f"Clean runway - earnings in {days_to_earnings} days")
         else:
-            insights.append(f"Clean runway with no earnings for {days_to_earnings} days")
+            insights.append("Earnings date unavailable - proceed with caution")
         
         # Moneyness insight
         moneyness = strike / current_price

@@ -144,16 +144,39 @@ def calculate_technical_features(df: pd.DataFrame) -> pd.DataFrame:
     df['volatility_20'] = df['returns'].rolling(20).std()
     df['volatility_50'] = df['returns'].rolling(50).std()
     
-    # Target: Next day's return
-    df['target'] = df['close'].shift(-1) / df['close'] - 1
+    # NOTE: Target is NOT calculated here to avoid look-ahead bias
+    # Target will be calculated properly in prepare_features_and_target()
+    # using only data available at prediction time
     
-    # Drop NaN rows
+    # Drop NaN rows from feature calculations
     df = df.dropna()
     
     return df
 
-def prepare_features_and_target(df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.Series, List[str]]:
-    """Prepare features (X) and target (y) and return feature names"""
+def prepare_features_and_target(df: pd.DataFrame, horizon_days: int = 1) -> Tuple[pd.DataFrame, pd.Series, List[str]]:
+    """
+    Prepare features (X) and target (y) WITHOUT look-ahead bias
+    
+    Args:
+        df: DataFrame with features calculated
+        horizon_days: Number of days ahead to predict (default 1)
+    
+    Returns:
+        X: Features (without last horizon_days rows)
+        y: Target (price change after horizon_days)
+        feature_cols: List of feature column names
+    """
+    # Calculate target: Future price change after horizon_days
+    # Using shift(-horizon_days) but then we DROP those rows
+    # This ensures we only use data available at prediction time
+    df = df.copy()
+    df['target'] = df['close'].shift(-horizon_days) / df['close'] - 1
+    
+    # CRITICAL: Drop last horizon_days rows (they have NaN targets)
+    # This prevents look-ahead bias
+    df = df[:-horizon_days] if horizon_days > 0 else df
+    df = df.dropna(subset=['target'])
+    
     # Feature columns (exclude date, price columns, and target)
     exclude_cols = ['Date', 'open', 'high', 'low', 'close', 'adj_close', 'volume', 'target']
     feature_cols = [col for col in df.columns if col not in exclude_cols]

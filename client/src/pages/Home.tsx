@@ -361,6 +361,12 @@ export default function Home() {
                   </Card>
                 )}
 
+                {/* ML/Quantum Predictions */}
+                <QuantMLAnalysis 
+                  mlPrediction={mlPrediction} 
+                  loading={mlPredictionMutation.isPending}
+                />
+
                 {/* Raw Data Display */}
                 <RawDataDisplay analysis={analysis} />
               </div>
