@@ -20,12 +20,12 @@ class GreeksCalculator:
     Calculate option Greeks using Black-Scholes-Merton model.
     """
     
-    def __init__(self, risk_free_rate: float = 0.05):
+    def __init__(self, risk_free_rate: float = 0.0525):
         """
         Initialize Greeks calculator.
         
         Args:
-            risk_free_rate: Annual risk-free rate (default 5% = 0.05)
+            risk_free_rate: Annual risk-free rate (default 5.25% = 0.0525, current Fed rate Dec 2025)
         """
         self.risk_free_rate = risk_free_rate
     

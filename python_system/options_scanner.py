@@ -503,7 +503,7 @@ class OptionsScanner:
                 
                 # Reduced logging
                 logger.info(f"  ✓ Score: {result['total_score']:.1f}/100, "
-                          f"Delta: {result['greeks']['delta']:.3f}, "
+                          f"Delta: {result['delta']:.3f}, "
                           f"Kelly: {result['kelly_fraction']*100:.1f}%")              
             except Exception as e:
                 logger.error(f"  ✗ Error in deep analysis for {candidate['symbol']}: {str(e)}")
