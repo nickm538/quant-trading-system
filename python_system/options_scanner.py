@@ -18,6 +18,7 @@ warnings.filterwarnings('ignore')
 
 # Import our institutional options engine
 from institutional_options_engine import InstitutionalOptionsEngine
+from greeks_calculator import GreeksCalculator
 
 # Setup logging
 logging.basicConfig(
@@ -32,6 +33,7 @@ class OptionsScanner:
     
     def __init__(self):
         self.options_engine = InstitutionalOptionsEngine()
+        self.greeks_calc = GreeksCalculator(risk_free_rate=0.05)  # 5% risk-free rate
         
         # Universe of stocks to scan (sector-agnostic)
         # Using Russell 1000 + mid-caps for broad coverage
@@ -227,18 +229,31 @@ class OptionsScanner:
                     logger.info(f"  ✗ Negative momentum (price ${current_price:.2f} < MA20 ${ma_20:.2f})")
                     continue
                 
-                # Get IV vs HV
+                # Get IV vs HV (use ATM options IV, not stock-level IV)
                 hist_vol = hist['Close'].pct_change().std() * np.sqrt(252) * 100
-                implied_vol = info.get('impliedVolatility')
                 
-                if not implied_vol or implied_vol <= 0:
-                    logger.info(f"  ✗ No implied volatility data")
-                    continue
-                
-                implied_vol_pct = implied_vol * 100
-                
-                if implied_vol_pct <= hist_vol:
-                    logger.info(f"  ✗ IV ({implied_vol_pct:.1f}%) <= HV ({hist_vol:.1f}%)")
+                # Get ATM call IV from first valid expiration
+                try:
+                    first_exp = candidate['valid_expirations'][0]
+                    opt_chain = ticker.option_chain(first_exp)
+                    calls = opt_chain.calls
+                    
+                    # Find ATM call (strike closest to current price)
+                    calls['strike_diff'] = abs(calls['strike'] - current_price)
+                    atm_call = calls.nsmallest(1, 'strike_diff')
+                    
+                    if atm_call.empty or atm_call.iloc[0]['impliedVolatility'] <= 0:
+                        logger.info(f"  ✗ No valid ATM IV data")
+                        continue
+                    
+                    implied_vol_pct = atm_call.iloc[0]['impliedVolatility'] * 100
+                    
+                    if implied_vol_pct <= hist_vol:
+                        logger.info(f"  ✗ IV ({implied_vol_pct:.1f}%) <= HV ({hist_vol:.1f}%)")
+                        continue
+                        
+                except Exception as e:
+                    logger.info(f"  ✗ Error getting IV: {str(e)}")
                     continue
                 
                 # Find best call option (0.30-0.70 delta)
@@ -253,9 +268,8 @@ class OptionsScanner:
                         if calls.empty:
                             continue
                         
-                        # Filter for delta range and liquidity
+                        # Filter for liquidity (don't filter ITM/OTM yet - delta will handle it)
                         valid_calls = calls[
-                            (calls['inTheMoney'] == False) &  # OTM only
                             (calls['volume'] > 10) &  # Minimum volume
                             (calls['openInterest'] > 50)  # Minimum OI
                         ].copy()
@@ -275,14 +289,33 @@ class OptionsScanner:
                         if valid_calls.empty:
                             continue
                         
-                        # Estimate delta based on moneyness (strike / spot)
-                        valid_calls['moneyness'] = valid_calls['strike'] / current_price
+                        # Calculate REAL delta using Black-Scholes (NO APPROXIMATIONS)
+                        exp_datetime = datetime.strptime(exp_date, '%Y-%m-%d')
+                        days_to_exp = (exp_datetime - datetime.now()).days
+                        time_to_expiry = max(days_to_exp / 365.0, 0.001)  # Years
                         
-                        # Target calls with moneyness 1.02-1.10 (roughly 0.30-0.70 delta)
+                        deltas = []
+                        for idx, row in valid_calls.iterrows():
+                            try:
+                                greeks = self.greeks_calc.calculate_all_greeks(
+                                    spot=current_price,
+                                    strike=row['strike'],
+                                    time_to_expiry=time_to_expiry,
+                                    volatility=row['impliedVolatility'],
+                                    option_type='call',
+                                    dividend_yield=0.0
+                                )
+                                deltas.append(greeks['delta'])
+                            except:
+                                deltas.append(0.0)
+                        
+                        valid_calls['real_delta'] = deltas
+                        
+                        # Filter for REAL delta range 0.30-0.70 (medium risk/reward)
                         target_calls = valid_calls[
-                            (valid_calls['moneyness'] >= 1.02) &
-                            (valid_calls['moneyness'] <= 1.10)
-                        ]
+                            (valid_calls['real_delta'] >= 0.30) &
+                            (valid_calls['real_delta'] <= 0.70)
+                        ].copy()
                         
                         if target_calls.empty:
                             continue
@@ -307,7 +340,7 @@ class OptionsScanner:
                                 'volume': best_in_exp.iloc[0]['volume'],
                                 'open_interest': best_in_exp.iloc[0]['openInterest'],
                                 'implied_volatility': best_in_exp.iloc[0]['impliedVolatility'],
-                                'moneyness': best_in_exp.iloc[0]['moneyness']
+                                'real_delta': best_in_exp.iloc[0]['real_delta']
                             }
                     
                     except Exception as e:
@@ -327,6 +360,7 @@ class OptionsScanner:
                 
                 logger.info(f"  ✓ Found call: ${best_call['strike']:.2f} exp {best_call['expiration']}")
                 logger.info(f"    Premium: ${best_call['last_price']:.2f}, "
+                          f"Delta: {best_call['real_delta']:.3f}, "
                           f"Vol: {best_call['volume']:.0f}, "
                           f"OI: {best_call['open_interest']:.0f}")
                 logger.info(f"    IV: {implied_vol_pct:.1f}% vs HV: {hist_vol:.1f}%, "
