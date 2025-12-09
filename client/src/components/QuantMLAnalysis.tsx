@@ -207,7 +207,7 @@ export function QuantMLAnalysis({ mlPrediction, loading }: QuantMLAnalysisProps)
             </p>
             <p>
               <strong className="text-foreground">⚡ Early Warning System:</strong> When models detect high-confidence 
-              predictions (>{confidence.toFixed(0)}%), it means they've identified a pattern that historically 
+              predictions (&gt;{confidence.toFixed(0)}%), it means they've identified a pattern that historically 
               precedes price movements. This gives you an edge to act before the market moves.
             </p>
           </div>
@@ -225,7 +225,7 @@ export function QuantMLAnalysis({ mlPrediction, loading }: QuantMLAnalysisProps)
                 Direction Accuracy
               </div>
               <div className="text-xs text-muted-foreground mt-1">
-                {model_performance.avg_accuracy > 55 ? 'Excellent' : 'Good'} (>50% beats random)
+                {model_performance.avg_accuracy > 55 ? 'Excellent' : 'Good'} (&gt;50% beats random)
               </div>
             </div>
             
