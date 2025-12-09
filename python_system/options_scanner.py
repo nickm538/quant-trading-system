@@ -245,34 +245,9 @@ class OptionsScanner:
                 #     rejection_stats['negative_momentum'] += 1
                 #     continue
                 
-                # Get IV vs HV (use ATM options IV, not stock-level IV)
-                hist_vol = hist['Close'].pct_change().std() * np.sqrt(252) * 100
-                
-                # Get ATM call IV from first valid expiration
-                try:
-                    first_exp = candidate['valid_expirations'][0]
-                    opt_chain = ticker.option_chain(first_exp)
-                    calls = opt_chain.calls
-                    
-                    # Find ATM call (strike closest to current price)
-                    calls['strike_diff'] = abs(calls['strike'] - current_price)
-                    atm_call = calls.nsmallest(1, 'strike_diff')
-                    
-                    if atm_call.empty or atm_call.iloc[0]['impliedVolatility'] <= 0:
-                        pass  # No valid ATM IV data
-                        continue
-                    
-                    implied_vol_pct = atm_call.iloc[0]['impliedVolatility'] * 100
-                    
-                    # More lenient: allow IV >= 70% of HV (testing to find bottleneck)
-                    if implied_vol_pct < hist_vol * 0.7:
-                        pass  # IV too low
-                        rejection_stats['low_iv'] += 1
-                        continue
-                        
-                except Exception as e:
-                    pass  # Error getting IV
-                    continue
+                # REMOVED: IV filter - yfinance's impliedVolatility field is unreliable
+                # Returns values like 0.78% when actual IV is ~20%, causing all stocks to be rejected
+                # TODO: Calculate IV from option prices using Black-Scholes inverse if needed
                 
                 # Find best call option (0.30-0.70 delta)
                 best_call = None
@@ -288,8 +263,8 @@ class OptionsScanner:
                         
                         # Filter for liquidity (don't filter ITM/OTM yet - delta will handle it)
                         valid_calls = calls[
-                            (calls['volume'] > 10) &  # Minimum volume
-                            (calls['openInterest'] > 50)  # Minimum OI
+                            (calls['volume'] > 0) &  # Any volume (even 1)
+                            (calls['openInterest'] > 10)  # Lowered from 50
                         ].copy()
                         
                         if valid_calls.empty:
@@ -311,7 +286,7 @@ class OptionsScanner:
                         )
                         
                         # Filter for reasonable spreads
-                        valid_calls = valid_calls[valid_calls['spread_pct'] < 10]
+                        valid_calls = valid_calls[valid_calls['spread_pct'] < 30]  # Widened from 10%
                         
                         if valid_calls.empty:
                             continue
@@ -341,10 +316,10 @@ class OptionsScanner:
                         
                         valid_calls['real_delta'] = deltas
                         
-                        # Filter for REAL delta range 0.28-0.72 (balanced: was 0.30-0.70, then 0.25-0.75)
+                        # Filter for REAL delta range 0.20-0.80 (widened to get results)
                         target_calls = valid_calls[
-                            (valid_calls['real_delta'] >= 0.28) &
-                            (valid_calls['real_delta'] <= 0.72)
+                            (valid_calls['real_delta'] >= 0.20) &
+                            (valid_calls['real_delta'] <= 0.80)
                         ].copy()
                         
                         if target_calls.empty:
