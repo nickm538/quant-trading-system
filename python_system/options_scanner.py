@@ -264,8 +264,8 @@ class OptionsScanner:
                     
                     implied_vol_pct = atm_call.iloc[0]['impliedVolatility'] * 100
                     
-                    # More lenient: allow IV >= 50% of HV
-                    if implied_vol_pct < hist_vol * 0.5:
+                    # Very lenient: allow IV >= 25% of HV
+                    if implied_vol_pct < hist_vol * 0.25:
                         pass  # IV too low
                         rejection_stats['low_iv'] += 1
                         continue
