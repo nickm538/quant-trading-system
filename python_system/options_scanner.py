@@ -249,7 +249,11 @@ class OptionsScanner:
                 # Returns values like 0.78% when actual IV is ~20%, causing all stocks to be rejected
                 # TODO: Calculate IV from option prices using Black-Scholes inverse if needed
                 
-                # Find best call option (0.30-0.70 delta)
+                # Calculate HV for reference (even though we're not filtering on IV)
+                hist_vol = hist['Close'].pct_change().std() * np.sqrt(252) * 100
+                implied_vol_pct = 0.0  # Not used for filtering anymore
+                
+                # Find best call option (0.20-0.80 delta)
                 best_call = None
                 best_score = 0
                 
