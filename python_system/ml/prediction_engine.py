@@ -128,16 +128,21 @@ def generate_ensemble_prediction(models: List[Dict], features: np.ndarray) -> Di
         'num_models': len(predictions)
     }
 
-def make_price_prediction(symbol: str, horizon_days: int = 5) -> Dict:
+def predict_stock_price(symbol: str, horizon_days: int = 30) -> Dict:
     """
-    Make advanced price prediction for a stock
+    Predict stock price using ML models
     
     Args:
-        symbol: Stock ticker symbol
-        horizon_days: Number of days ahead to predict
+        symbol: Stock symbol
+        horizon_days: Prediction horizon in days
     
     Returns:
-        Dictionary with prediction results
+        Dict with prediction results
+    
+    Features:
+    - Uses trained models for the stock if available
+    - Falls back to transfer learning if no direct models
+    - Works for ANY stock through transfer learning
     """
     try:
         # Connect to database
@@ -146,11 +151,38 @@ def make_price_prediction(symbol: str, horizon_days: int = 5) -> Dict:
         # Get best models for this stock
         models = get_best_models_for_stock(conn, symbol, top_n=5)
         
+        # If no direct models, try transfer learning
         if not models:
-            return {
-                'success': False,
-                'error': f'No trained models found for {symbol}. Please train models first.'
-            }
+            print(f"No direct models for {symbol}, attempting transfer learning...")
+            try:
+                from ml.transfer_learning import make_transfer_learning_prediction
+                
+                # Get list of all trained symbols
+                cursor = conn.cursor()
+                cursor.execute("SELECT DISTINCT stock_symbol FROM trained_models WHERE is_active = 'active'")
+                trained_symbols = [row[0] for row in cursor.fetchall()]
+                cursor.close()
+                
+                if not trained_symbols:
+                    return {
+                        'success': False,
+                        'error': 'No trained models available in the system. Please train models first.'
+                    }
+                
+                # Use transfer learning
+                transfer_result = make_transfer_learning_prediction(
+                    conn, symbol, trained_symbols, horizon_days
+                )
+                
+                conn.close()
+                return transfer_result
+                
+            except Exception as e:
+                print(f"Transfer learning failed: {e}")
+                return {
+                    'success': False,
+                    'error': f'No trained models found for {symbol} and transfer learning failed. Please train models first.'
+                }
         
         # Download latest data
         df = load_stock_data(symbol, years=2)
