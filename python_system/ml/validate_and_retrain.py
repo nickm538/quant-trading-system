@@ -46,23 +46,23 @@ def get_db_connection():
         ssl_disabled=False
     )
 
-def fetch_actual_price(symbol: str, target_date: datetime) -> float:
+def fetch_actual_price(symbol: str, target_date: datetime) -> dict:
     """
-    Fetch actual closing price for a given date
+    Fetch actual price data (close, high, low) for a given date
     
     Args:
         symbol: Stock symbol
         target_date: Date to fetch price for
     
     Returns:
-        Actual closing price, or None if not available
+        Dict with 'close', 'high', 'low' prices, or None if not available
     """
     try:
         ticker = yf.Ticker(symbol)
         
-        # Fetch data around target date (±3 days to handle weekends/holidays)
-        start_date = target_date - timedelta(days=3)
-        end_date = target_date + timedelta(days=3)
+        # Fetch data around target date (±5 days to handle weekends/holidays)
+        start_date = target_date - timedelta(days=5)
+        end_date = target_date + timedelta(days=5)
         
         hist = ticker.history(start=start_date, end=end_date)
         
@@ -70,16 +70,49 @@ def fetch_actual_price(symbol: str, target_date: datetime) -> float:
             logger.warning(f"No price data found for {symbol} around {target_date}")
             return None
         
-        # Find closest date to target
+        # Find closest date to target (prefer exact match or next trading day)
         hist.index = pd.to_datetime(hist.index)
-        closest_idx = (hist.index - target_date).abs().argmin()
-        actual_price = hist.iloc[closest_idx]['Close']
         
-        logger.info(f"Fetched actual price for {symbol} on {target_date.date()}: ${actual_price:.2f}")
-        return float(actual_price)
+        # Normalize target date and make it timezone-aware if needed
+        target_date_normalized = pd.Timestamp(target_date.date())
+        if hist.index.tz is not None:
+            # Make target_date timezone-aware to match hist.index
+            target_date_normalized = target_date_normalized.tz_localize(hist.index.tz)
+        
+        # Try exact date first (compare dates only, ignore time)
+        hist_dates = hist.index.normalize()  # Remove time component
+        target_date_only = target_date_normalized.normalize()
+        
+        if target_date_only in hist_dates:
+            row = hist.loc[hist_dates == target_date_only].iloc[0]
+        else:
+            # Find closest trading day (prefer future dates for forward-looking predictions)
+            future_dates = hist_dates[hist_dates >= target_date_only]
+            if len(future_dates) > 0:
+                row = hist.loc[hist_dates == future_dates[0]].iloc[0]
+            else:
+                # Fall back to closest date
+                closest_idx = (hist_dates - target_date_only).abs().argmin()
+                row = hist.iloc[closest_idx]
+        
+        actual_close = float(row['Close'])
+        actual_high = float(row['High'])
+        actual_low = float(row['Low'])
+        actual_date = row.name.date()
+        
+        logger.info(f"Fetched actual prices for {symbol} on {actual_date}: Close=${actual_close:.2f}, High=${actual_high:.2f}, Low=${actual_low:.2f}")
+        
+        return {
+            'close': actual_close,
+            'high': actual_high,
+            'low': actual_low,
+            'date': actual_date
+        }
         
     except Exception as e:
         logger.error(f"Error fetching actual price for {symbol}: {e}")
+        import traceback
+        traceback.print_exc()
         return None
 
 def validate_pending_predictions(conn) -> Dict[str, any]:
@@ -117,23 +150,29 @@ def validate_pending_predictions(conn) -> Dict[str, any]:
         target_date = pred['target_date']
         predicted_price = pred['predicted_price'] / 100.0  # Convert from cents
         
-        # Fetch actual price
-        actual_price = fetch_actual_price(symbol, target_date)
+        # Fetch actual price data (close, high, low)
+        price_data = fetch_actual_price(symbol, target_date)
         
-        if actual_price is None:
+        if price_data is None:
             failed_count += 1
             # Mark as failed
             update_query = """
             UPDATE model_predictions
-            SET status = 'failed'
+            SET status = 'failed',
+                updated_at = NOW()
             WHERE id = %s
             """
             cursor.execute(update_query, (pred_id,))
+            logger.warning(f"Failed to fetch price for {symbol} on {target_date.date()}")
             continue
         
-        # Calculate errors
-        price_error = abs(actual_price - predicted_price)
-        percentage_error = abs((actual_price - predicted_price) / actual_price * 100)
+        actual_close = price_data['close']
+        actual_high = price_data['high']
+        actual_low = price_data['low']
+        
+        # Calculate errors based on closing price
+        price_error = abs(actual_close - predicted_price)
+        percentage_error = abs((actual_close - predicted_price) / actual_close * 100)
         
         total_error += price_error
         total_pct_error += percentage_error
@@ -146,23 +185,24 @@ def validate_pending_predictions(conn) -> Dict[str, any]:
             actual_high = %s,
             price_error = %s,
             percentage_error = %s,
-            status = 'validated'
+            status = 'validated',
+            updated_at = NOW()
         WHERE id = %s
         """
         
         values = (
-            int(actual_price * 100),  # Convert to cents
-            int(actual_price * 100),  # Same for low (we don't track intraday)
-            int(actual_price * 100),  # Same for high
-            int(price_error * 100),
-            int(percentage_error * 100),
+            int(actual_close * 100),  # Convert to cents
+            int(actual_low * 100),    # Actual low from yfinance
+            int(actual_high * 100),   # Actual high from yfinance
+            int(price_error * 100),   # Price error in cents
+            int(percentage_error * 100),  # Percentage error in basis points
             pred_id
         )
         
         cursor.execute(update_query, values)
         validated_count += 1
         
-        logger.info(f"Validated {symbol}: Predicted ${predicted_price:.2f}, Actual ${actual_price:.2f}, Error {percentage_error:.2f}%")
+        logger.info(f"Validated {symbol}: Predicted ${predicted_price:.2f}, Actual ${actual_close:.2f} (H: ${actual_high:.2f}, L: ${actual_low:.2f}), Error {percentage_error:.2f}%")
     
     conn.commit()
     cursor.close()

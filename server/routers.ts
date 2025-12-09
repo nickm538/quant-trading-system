@@ -278,6 +278,52 @@ export const appRouter = router({
         };
       }
     }),
+    
+    // Validate pending predictions (fetch actual prices and calculate errors)
+    validatePredictions: publicProcedure.mutation(async () => {
+      try {
+        const pythonPath = 'python3.11';
+        const scriptPath = path.join(process.cwd(), 'python_system/ml/continuous_learning_scheduler.py');
+        
+        // Construct DATABASE_URL from Railway's MySQL variables if not already set
+        let databaseUrl = process.env.DATABASE_URL;
+        if (!databaseUrl && process.env.MYSQLHOST) {
+          const host = process.env.MYSQLHOST;
+          const port = process.env.MYSQLPORT || '3306';
+          const user = process.env.MYSQLUSER || 'root';
+          const password = process.env.MYSQLPASSWORD || '';
+          const database = process.env.MYSQLDATABASE || 'railway';
+          databaseUrl = `mysql://${user}:${password}@${host}:${port}/${database}`;
+        }
+        
+        const { stdout, stderr } = await execAsync(
+          `${pythonPath} ${scriptPath} validate`,
+          { 
+            maxBuffer: 10 * 1024 * 1024, 
+            timeout: 120000, // 2min timeout
+            env: {
+              ...process.env,
+              DATABASE_URL: databaseUrl || '',
+              PYTHONPATH: '',
+              PYTHONHOME: '',
+              LD_LIBRARY_PATH: process.env.LD_LIBRARY_PATH || '',
+            },
+          }
+        );
+        
+        return {
+          success: true,
+          output: stdout,
+          errors: stderr || null,
+        };
+      } catch (error: any) {
+        return {
+          success: false,
+          output: error.stdout || '',
+          errors: error.stderr || error.message,
+        };
+      }
+    }),
   }),
 });
 
