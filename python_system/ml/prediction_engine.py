@@ -261,7 +261,7 @@ def predict_stock_price(symbol: str, horizon_days: int = 30) -> Dict:
         
         # Prepare features (use last row for prediction)
         X, _, feature_cols = prepare_features_and_target(df)
-        latest_features = X[-1:, :]  # Last row
+        latest_features = X.iloc[-1:].values  # Last row as numpy array
         
         # Generate ensemble prediction
         ensemble_result = generate_ensemble_prediction(models, latest_features)
@@ -359,10 +359,10 @@ def predict_stock_price(symbol: str, horizon_days: int = 30) -> Dict:
             if trained_symbols:
                 result = make_transfer_learning_prediction(conn, symbol, trained_symbols, horizon_days)
                 if result.get('success'):
-                    logger.info(f"Transfer learning successful for {symbol}")
+                    print(f"✅ Transfer learning successful for {symbol}")
                     return result
         except Exception as transfer_error:
-            logger.error(f"Transfer learning also failed: {transfer_error}")
+            print(f"❌ Transfer learning also failed: {transfer_error}")
         
         return {
             'success': False,
