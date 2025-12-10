@@ -20,6 +20,10 @@ warnings.filterwarnings('ignore')
 from institutional_options_engine import InstitutionalOptionsEngine
 from greeks_calculator import GreeksCalculator
 
+# Import TTM Squeeze indicator
+sys.path.insert(0, '/home/ubuntu/quant-trading/quant-trading-web-source/quant-trading-web/python_system')
+from indicators.ttm_squeeze import TTMSqueeze
+
 # Custom JSON encoder to handle NumPy/Pandas types
 class NumpyEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -45,6 +49,7 @@ class OptionsScanner:
     def __init__(self):
         self.options_engine = InstitutionalOptionsEngine()
         self.greeks_calc = GreeksCalculator(risk_free_rate=0.05)  # 5% risk-free rate
+        self.ttm_squeeze = TTMSqueeze()  # TTM Squeeze indicator for volatility compression detection
         
         # Universe of stocks to scan (sector-agnostic)
         # Using Russell 1000 + mid-caps for broad coverage
@@ -230,12 +235,54 @@ class OptionsScanner:
                 info = ticker.info
                 current_price = candidate['price']
                 
-                # Get historical data for momentum (use 2mo to ensure >= 20 trading days)
+                # Get historical data for momentum and TTM Squeeze (use 2mo to ensure >= 20 trading days)
                 hist = ticker.history(period='2mo')
                 if hist.empty or len(hist) < 20:
                     pass  # Insufficient historical data
                     rejection_stats['insufficient_history'] += 1
                     continue
+                
+                # Calculate TTM Squeeze on historical data
+                squeeze_result = None
+                squeeze_active = False
+                squeeze_bars = 0
+                squeeze_momentum = 0.0
+                squeeze_signal = 'none'
+                squeeze_score = 0.0
+                
+                try:
+                    # Rename columns to lowercase for TTM Squeeze
+                    hist_lower = hist.copy()
+                    hist_lower.columns = [col.lower() for col in hist_lower.columns]
+                    
+                    # Calculate TTM Squeeze
+                    squeeze_result = self.ttm_squeeze.calculate(hist_lower)
+                    
+                    # Get latest squeeze state
+                    squeeze_active = bool(squeeze_result['squeeze_state'].iloc[-1])
+                    squeeze_momentum = float(squeeze_result['momentum'].iloc[-1])
+                    squeeze_signal = str(squeeze_result['signal'].iloc[-1])
+                    
+                    # Count consecutive squeeze bars
+                    squeeze_series = squeeze_result['squeeze_state']
+                    if squeeze_active:
+                        # Count from end backwards while True
+                        for i in range(len(squeeze_series) - 1, -1, -1):
+                            if squeeze_series.iloc[i]:
+                                squeeze_bars += 1
+                            else:
+                                break
+                    
+                    # Calculate squeeze score contribution
+                    squeeze_score = squeeze_result.get('score_contrib', 0.0)
+                    
+                    logger.info(f"  TTM Squeeze: {'🔴 ON' if squeeze_active else '🟢 OFF'} | "
+                              f"Bars: {squeeze_bars} | Momentum: {squeeze_momentum:.2f} | "
+                              f"Signal: {squeeze_signal.upper()} | Score: {squeeze_score:+.2f}")
+                    
+                except Exception as e:
+                    logger.warning(f"  ⚠️  TTM Squeeze calculation failed: {e}")
+                    pass  # Continue without squeeze data
                 
                 # Check momentum (temporarily disabled for testing)
                 ma_20 = hist['Close'].tail(20).mean()
@@ -247,6 +294,31 @@ class OptionsScanner:
                 
                 # Calculate Historical Volatility (HV)
                 hist_vol = hist['Close'].pct_change().std() * np.sqrt(252) * 100
+                
+                # Calculate ATR for expected move (using squeeze data if available)
+                atr_14 = 0.0
+                expected_move_pct = 0.0
+                try:
+                    # Calculate True Range
+                    high_low = hist['High'] - hist['Low']
+                    high_close = np.abs(hist['High'] - hist['Close'].shift())
+                    low_close = np.abs(hist['Low'] - hist['Close'].shift())
+                    true_range = pd.concat([high_low, high_close, low_close], axis=1).max(axis=1)
+                    
+                    # ATR is 14-period average of True Range
+                    atr_14 = true_range.rolling(window=14).mean().iloc[-1]
+                    
+                    # Expected move % = ATR / Current Price
+                    expected_move_pct = (atr_14 / current_price) * 100
+                    
+                    # If squeeze is active, expect larger move on breakout
+                    if squeeze_active and squeeze_bars >= 3:
+                        expected_move_pct *= 1.5  # 50% larger expected move
+                        logger.info(f"  💥 Squeeze active {squeeze_bars} bars - Expected move increased to {expected_move_pct:.2f}%")
+                    
+                except Exception as e:
+                    logger.warning(f"  ⚠️  ATR calculation failed: {e}")
+                    expected_move_pct = hist_vol / 16  # Fallback: HV / sqrt(252) for daily move
                 
                 # Calculate Implied Volatility (IV) from ATM call option price
                 # We'll calculate this after finding the best call option
@@ -397,6 +469,19 @@ class OptionsScanner:
                 candidate['iv_hv_ratio'] = implied_vol_pct / hist_vol if hist_vol > 0 else 0.0
                 candidate['momentum'] = ((current_price / ma_20) - 1) * 100
                 
+                # Add TTM Squeeze data
+                candidate['ttm_squeeze'] = {
+                    'active': squeeze_active,
+                    'bars': squeeze_bars,
+                    'momentum': squeeze_momentum,
+                    'signal': squeeze_signal,
+                    'score': squeeze_score
+                }
+                
+                # Add ATR and expected move
+                candidate['atr_14'] = atr_14
+                candidate['expected_move_pct'] = expected_move_pct
+                
                 qualified.append(candidate)
                 
                 # Logging removed to prevent Railway rate limits
@@ -451,6 +536,28 @@ class OptionsScanner:
                 if total_score < 45:  # Minimum score threshold (balanced: was 50, then 35)
                     continue
                 
+                # Get TTM Squeeze data
+                ttm_squeeze = candidate.get('ttm_squeeze', {})
+                squeeze_active = ttm_squeeze.get('active', False)
+                squeeze_bars = ttm_squeeze.get('bars', 0)
+                squeeze_momentum = ttm_squeeze.get('momentum', 0.0)
+                squeeze_signal = ttm_squeeze.get('signal', 'none')
+                squeeze_score = ttm_squeeze.get('score', 0.0)
+                
+                # Adjust total score with TTM Squeeze contribution
+                # Squeeze active >3 bars: High-probability setup for options
+                if squeeze_active and squeeze_bars >= 3:
+                    total_score += 5.0  # Bonus for squeeze setup
+                    logger.info(f"  🎯 TTM Squeeze Setup Detected! {squeeze_bars} bars active, adding +5.0 to score")
+                
+                # Squeeze fired: Strong directional signal
+                if squeeze_signal == 'long':
+                    total_score += 3.0  # Bonus for bullish squeeze fire
+                    logger.info(f"  🚀 Squeeze Fired LONG! Adding +3.0 to score")
+                elif squeeze_signal == 'short':
+                    total_score -= 3.0  # Penalty for bearish squeeze fire (we're looking for calls)
+                    logger.info(f"  ⚠️  Squeeze Fired SHORT, subtracting -3.0 from score")
+                
                 # Build result
                 result = {
                     'symbol': symbol,
@@ -465,12 +572,13 @@ class OptionsScanner:
                     'volume': call['volume'],
                     'open_interest': call['open_interest'],
                     
-                    # Scoring
+                    # Scoring (includes TTM Squeeze adjustments)
                     'total_score': total_score,
                     'greek_score': analysis.get('greek_score', 0),
                     'volatility_score': analysis.get('volatility_score', 0),
                     'liquidity_score': analysis.get('liquidity_score', 0),
                     'risk_reward_score': analysis.get('risk_reward_score', 0),
+                    'squeeze_score': squeeze_score,
                     
                     # Greeks
                     'delta': analysis.get('greeks', {}).get('delta', 0),
@@ -497,7 +605,17 @@ class OptionsScanner:
                     'position_size_pct': analysis.get('position_size_pct', 0),
                     
                     # Momentum
-                    'momentum': candidate['momentum']
+                    'momentum': candidate['momentum'],
+                    
+                    # TTM Squeeze
+                    'squeeze_active': squeeze_active,
+                    'squeeze_bars': squeeze_bars,
+                    'squeeze_momentum': squeeze_momentum,
+                    'squeeze_signal': squeeze_signal,
+                    
+                    # ATR and Expected Move
+                    'atr_14': candidate.get('atr_14', 0),
+                    'expected_move_pct': candidate.get('expected_move_pct', 0)
                 }
                 
                 results.append(result)
