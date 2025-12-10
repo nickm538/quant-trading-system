@@ -666,6 +666,46 @@ class PerfectProductionAnalyzer:
             logger.warning(f"MFI calculation failed: {e}")
             indicators['mfi'] = 50.0  # Neutral
         
+        # TTM SQUEEZE - Volatility compression + momentum indicator
+        # Critical for identifying explosive breakout opportunities
+        try:
+            from indicators.ttm_squeeze import TTMSqueeze
+            
+            # Use daily data for TTM Squeeze (more reliable than intraday)
+            if daily_hist is not None and len(daily_hist) >= 20:
+                squeeze_calc = TTMSqueeze(
+                    bb_length=20,
+                    bb_mult=2.0,
+                    kc_length=20,
+                    kc_mult=1.5,
+                    momentum_length=20
+                )
+                
+                squeeze_result = squeeze_calc.calculate(daily_hist)
+                
+                # Extract latest values
+                indicators['ttm_squeeze_state'] = bool(squeeze_result['squeeze_state'].iloc[-1])
+                indicators['ttm_squeeze_momentum'] = float(squeeze_result['momentum'].iloc[-1])
+                indicators['ttm_squeeze_signal'] = str(squeeze_result['signal'].iloc[-1])
+                indicators['ttm_squeeze_score'] = float(squeeze_result['score_contrib'])
+                
+                logger.info(f"✓ TTM Squeeze: {'🔴 ON' if indicators['ttm_squeeze_state'] else '🟢 OFF'}, "
+                           f"Momentum: {indicators['ttm_squeeze_momentum']:.2f}, "
+                           f"Signal: {indicators['ttm_squeeze_signal']}, "
+                           f"Score: {indicators['ttm_squeeze_score']:+.2f}")
+            else:
+                logger.warning("Insufficient daily data for TTM Squeeze (need 20+ bars)")
+                indicators['ttm_squeeze_state'] = False
+                indicators['ttm_squeeze_momentum'] = 0.0
+                indicators['ttm_squeeze_signal'] = 'none'
+                indicators['ttm_squeeze_score'] = 0.0
+        except Exception as e:
+            logger.warning(f"TTM Squeeze calculation failed: {e}")
+            indicators['ttm_squeeze_state'] = False
+            indicators['ttm_squeeze_momentum'] = 0.0
+            indicators['ttm_squeeze_signal'] = 'none'
+            indicators['ttm_squeeze_score'] = 0.0
+        
         return indicators
     
     def _calculate_fundamental_score(self, fundamentals: Dict) -> float:
@@ -781,6 +821,13 @@ class PerfectProductionAnalyzer:
             score += 8  # Strong trend
         elif adx > 25:
             score += 4  # Moderate trend
+        
+        # TTM SQUEEZE (volatility compression + momentum)
+        # Squeeze indicator predicts explosive breakouts
+        ttm_squeeze_score = indicators.get('ttm_squeeze_score', 0)
+        if ttm_squeeze_score != 0:
+            score += ttm_squeeze_score  # Range: -2 to +2 (strong signal)
+            logger.info(f"TTM Squeeze contribution: {ttm_squeeze_score:+.2f}")
         
         # PATTERN RECOGNITION (10% weight max to avoid overfitting)
         # Fetch pattern indicators from TAAPI.io
