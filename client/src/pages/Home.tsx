@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { TTMSqueezeIndicator } from "@/components/TTMSqueezeIndicator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, TrendingUp, BarChart3, Search, AlertCircle, Brain, Zap } from "lucide-react";
@@ -989,6 +990,20 @@ export default function Home() {
                             </div>
                           </div>
 
+                          {/* TTM Squeeze Indicator */}
+                          {(opp.squeeze_active !== undefined || opp.expected_move_pct !== undefined) && (
+                            <div className="mb-3">
+                              <TTMSqueezeIndicator
+                                squeeze_active={opp.squeeze_active ?? false}
+                                squeeze_bars={opp.squeeze_bars ?? 0}
+                                squeeze_momentum={opp.squeeze_momentum ?? 0}
+                                squeeze_signal={opp.squeeze_signal ?? 'none'}
+                                expected_move_pct={opp.expected_move_pct}
+                                compact={false}
+                              />
+                            </div>
+                          )}
+
                           {/* Position Sizing */}
                           <div className="grid grid-cols-2 md:grid-cols-3 gap-3 p-3 bg-primary/5 rounded-lg">
                             <div>
@@ -1006,7 +1021,7 @@ export default function Home() {
                           </div>
 
                           {/* Score Breakdown */}
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3 pt-3 border-t border-border">
+                          <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mt-3 pt-3 border-t border-border">
                             <div className="text-center">
                               <div className="text-xs text-muted-foreground">Greek Score</div>
                               <div className="text-sm font-bold">{opp.greek_score?.toFixed(0)}</div>
@@ -1023,6 +1038,14 @@ export default function Home() {
                               <div className="text-xs text-muted-foreground">Risk/Reward</div>
                               <div className="text-sm font-bold">{opp.risk_reward_score?.toFixed(0)}</div>
                             </div>
+                            {opp.squeeze_score !== undefined && (
+                              <div className="text-center">
+                                <div className="text-xs text-muted-foreground">Squeeze</div>
+                                <div className={`text-sm font-bold ${opp.squeeze_score >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                                  {opp.squeeze_score > 0 ? '+' : ''}{opp.squeeze_score?.toFixed(1)}
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </div>
                       ))}
