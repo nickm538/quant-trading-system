@@ -459,10 +459,12 @@ class MarketScanner:
         if tier3_results:
             logger.info(f"\n🏆 TOP OPPORTUNITIES:")
             for i, opp in enumerate(tier3_results[:10], 1):
+                squeeze_info = f"Squeeze: {'ON' if opp.get('squeeze_active') else 'OFF'} ({opp.get('squeeze_bars', 0)} bars)" if opp.get('squeeze_active') is not None else "Squeeze: N/A"
                 logger.info(f"  {i}. {opp['symbol']:6s} - Score: {opp['opportunity_score']:6.1f} | "
                           f"Return: {opp['expected_return']:6.2f}% | "
                           f"Signal: {opp['signal']:4s} | "
-                          f"Confidence: {opp['confidence']:.1f}%")
+                          f"Confidence: {opp['confidence']:.1f}% | "
+                          f"{squeeze_info}")
         
         return {
             'timestamp': datetime.now().isoformat(),
