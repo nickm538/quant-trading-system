@@ -10,3 +10,4 @@ TA-Lib
 requests
 fastdtw
 mysql-connector-python
+websocket-client==1.7.0
