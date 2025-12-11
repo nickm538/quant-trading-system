@@ -7,7 +7,12 @@ Handles IPC via stdin/stdout using JSON messages
 import sys
 import json
 import logging
+import os
 from datetime import datetime
+
+# Add parent directory to Python path for imports
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+
 from python_system.realtime.trading_service import get_trading_service
 
 # Configure logging to stderr (stdout is for IPC)
