@@ -7,6 +7,7 @@ import websocket
 import json
 import threading
 import time
+import os
 from typing import Dict, List, Callable, Optional
 from datetime import datetime
 import logging
@@ -223,15 +224,16 @@ _stream_lock = threading.Lock()
 
 
 def get_realtime_stream(api_key: str = None) -> FinnhubRealtimeStream:
-    """Get singleton instance of real-time stream"""
+    """Get singleton instance of realtime stream"""
     global _stream_instance
     
     with _stream_lock:
         if _stream_instance is None:
             if api_key is None:
-                # Try to get from environment or use default
-                import os
-                api_key = os.getenv('FINNHUB_API_KEY', 'd47ssnpr01qk80bicu4gd47ssnpr01qk80bicu50')
+                # Try KEY first (user's env var), then FINNHUB_API_KEY
+                api_key = os.getenv('KEY', os.getenv('FINNHUB_API_KEY'))
+                if not api_key:
+                    raise ValueError("Finnhub API key required (set KEY or FINNHUB_API_KEY environment variable)")
             
             _stream_instance = FinnhubRealtimeStream(api_key)
         

@@ -10,6 +10,8 @@ interface TTMSqueezeIndicatorProps {
   squeeze_signal: 'long' | 'short' | 'active' | 'none';
   expected_move_pct?: number;
   compact?: boolean;
+  realtime?: boolean; // If true, shows live indicator
+  lastUpdate?: string; // Timestamp of last update
 }
 
 export function TTMSqueezeIndicator({
@@ -18,7 +20,9 @@ export function TTMSqueezeIndicator({
   squeeze_momentum,
   squeeze_signal,
   expected_move_pct,
-  compact = false
+  compact = false,
+  realtime = false,
+  lastUpdate
 }: TTMSqueezeIndicatorProps) {
   
   // Determine squeeze dot color (matches TradingView LazyBear)
@@ -114,6 +118,12 @@ export function TTMSqueezeIndicator({
         <div className="flex items-center gap-2">
           <Activity className="w-5 h-5 text-gray-600 dark:text-gray-400" />
           <span className="font-semibold text-gray-900 dark:text-gray-100">TTM Squeeze</span>
+          {realtime && (
+            <Badge className="bg-green-500 text-white border-0 text-xs animate-pulse">
+              <Circle className="w-2 h-2 mr-1 fill-current" />
+              LIVE
+            </Badge>
+          )}
         </div>
         {getSignalBadge()}
       </div>
