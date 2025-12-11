@@ -43,7 +43,7 @@ interface Position {
 
 let io: SocketIOServer | null = null;
 let pythonProcess: ChildProcess | null = null;
-const activeSqueeze Subscriptions = new Set<string>();
+const activeSqueezeSubscriptions = new Set<string>();
 
 /**
  * Initialize TTM Squeeze WebSocket server

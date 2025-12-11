@@ -8,6 +8,7 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { initializePriceStream } from "../priceStream";
+import { initializeSqueezeStream } from "../squeezeStream";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -60,6 +61,10 @@ async function startServer() {
 
   // Initialize WebSocket for real-time price streaming
   initializePriceStream(server);
+  
+  // Initialize WebSocket for TTM Squeeze real-time monitoring
+  initializeSqueezeStream(server);
+  console.log('TTM Squeeze real-time stream initialized');
 
   const host = process.env.RAILWAY_ENVIRONMENT ? '0.0.0.0' : 'localhost';
   
