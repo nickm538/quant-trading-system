@@ -146,7 +146,7 @@ class MarketScanner:
                 avg_volume = df['volume'].mean()
                 
                 # Liquidity filter
-                if avg_volume < 500000:  # Min 500k shares/day
+                if avg_volume < 100000:  # Min 100k shares/day (loosened for more opportunities)
                     return None
                 
                 # Calculate quick technical score
@@ -318,7 +318,7 @@ class MarketScanner:
         logger.info(f"\n✓ Tier 2 Complete: {len(results)} candidates in {elapsed:.1f}s")
         logger.info(f"  Top 5: {', '.join([r['symbol'] for r in results[:5]])}")
         
-        return results[:50]  # Top 50
+        return results[:100]  # Top 100 (increased for more opportunities)
     
     def tier3_deep_analysis(self, candidates: List[Dict], top_n: int = 20) -> List[Dict]:
         """
