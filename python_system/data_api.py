@@ -4,6 +4,7 @@ Provides access to financial data through the Manus API Hub with yfinance fallba
 """
 
 import os
+import sys
 import requests
 import yfinance as yf
 import pandas as pd
@@ -65,10 +66,10 @@ class ApiClient:
                     raise ValueError("API returned empty data")
 
         except Exception as e:
-            print(f"Manus API Hub failed: {e}")
+            print(f"Manus API Hub failed: {e}", file=sys.stderr)
             # FALLBACK to yfinance for Yahoo Finance endpoints
             if 'YahooFinance' in endpoint and self.use_yfinance_fallback:
-                print(f"Trying yfinance fallback...")
+                print(f"Trying yfinance fallback...", file=sys.stderr)
                 if 'get_stock_chart' in endpoint:
                     return self._get_stock_chart_yfinance(query)
                 elif 'get_stock_insights' in endpoint:
@@ -171,7 +172,7 @@ class ApiClient:
             return result
             
         except Exception as e:
-            print(f"yfinance chart fallback failed: {e}")
+            print(f"yfinance chart fallback failed: {e}", file=sys.stderr)
             return {}
     
     def _get_stock_insights_yfinance(self, query: Dict[str, Any]) -> Dict[str, Any]:
@@ -200,5 +201,5 @@ class ApiClient:
             return result
             
         except Exception as e:
-            print(f"yfinance insights fallback failed: {e}")
+            print(f"yfinance insights fallback failed: {e}", file=sys.stderr)
             return {}
