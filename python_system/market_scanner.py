@@ -112,31 +112,22 @@ class MarketScanner:
         
         def analyze_symbol(symbol: str) -> Dict:
             try:
-                # Get basic price data using yfinance directly (fast)
-                import yfinance as yf
-                ticker = yf.Ticker(symbol)
+                # Use EnhancedDataIngestion (Finnhub + fallbacks) instead of broken yfinance
+                complete_data = self.data_ingestion.get_complete_stock_data(symbol)
+                df = complete_data.get('price_data')
                 
-                # Get 3 months of daily data
-                df = ticker.history(period='3mo', interval='1d')
-                
-                if df.empty:
+                if df is None or df.empty:
                     return None
                 
-                # Rename columns to match expected format
-                df = df.rename(columns={
-                    'Close': 'close',
-                    'Volume': 'volume',
-                    'High': 'high',
-                    'Low': 'low'
-                })
-                df = df[['close', 'volume', 'high', 'low']].dropna()
+                # Ensure required columns exist (EnhancedDataIngestion already provides correct format)
+                required_cols = ['close', 'volume', 'high', 'low']
+                if not all(col in df.columns for col in required_cols):
+                    return None
                 
-                # Get market cap from info
-                try:
-                    info = ticker.info
-                    market_cap = info.get('marketCap', 0)
-                except:
-                    market_cap = 0
+                df = df[required_cols].dropna()
+                
+                # Get market cap from complete_data
+                market_cap = complete_data.get('market_cap', 0)
                 
                 if len(df) < 20:
                     return None
