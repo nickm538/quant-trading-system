@@ -426,14 +426,19 @@ class MarketScanner:
                 
                 # Full comprehensive analysis
                 # Reduced Monte Carlo sims to 5000 for stability in parallel processing
-                analysis = self.trading_system.analyze_stock_comprehensive(
-                    symbol=symbol,
-                    monte_carlo_sims=5000,
-                    forecast_days=30,
-                    bankroll=1000.0
-                )
+                try:
+                    analysis = self.trading_system.analyze_stock_comprehensive(
+                        symbol=symbol,
+                        monte_carlo_sims=5000,
+                        forecast_days=30,
+                        bankroll=1000.0
+                    )
+                except Exception as analysis_error:
+                    logger.error(f"  ✗ {symbol}: analyze_stock_comprehensive() failed: {str(analysis_error)}")
+                    continue
                 
                 if not analysis or 'recommendation' not in analysis:
+                    logger.warning(f"  ⚠️ {symbol}: No recommendation in analysis result")
                     continue
                 
                 rec = analysis['recommendation']
@@ -506,10 +511,15 @@ class MarketScanner:
             logger.info(f"\n🏆 TOP OPPORTUNITIES:")
             for i, opp in enumerate(results[:10], 1):
                 logger.info(f"  {i}. {opp['symbol']:6s} - Score: {opp['opportunity_score']:8.1f} | Return: {opp['expected_return']:6.2f}% | Signal: {opp['signal']:4s} | Confidence: {opp['confidence']:5.1f}% | Squeeze: {('ON (' + str(opp['squeeze_bars']) + ' bars)') if opp['squeeze_active'] else 'OFF'}")
+            return filtered_results[:top_n]
         else:
-            logger.warning(f"⚠️ No stocks completed Tier 3 analysis successfully")
-        
-        return filtered_results[:top_n]
+            logger.error(f"🚨 CRITICAL: No stocks completed Tier 3 analysis successfully")
+            logger.error(f"   Candidates received: {len(candidates)}")
+            logger.error(f"   This means ALL {len(candidates)} stocks crashed in analyze_stock_comprehensive()")
+            logger.error(f"   Check if main_trading_system is working properly")
+            
+            # Return empty list (don't fake data)
+            return []
     
     def scan_market(self, top_n: int = 20) -> Dict:
         """
