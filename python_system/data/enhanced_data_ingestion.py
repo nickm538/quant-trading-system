@@ -453,32 +453,70 @@ class EnhancedDataIngestion:
         
         complete_data['price_data'] = price_data
         
-        # 2. Profile from Finnhub
-        complete_data['profile'] = self.get_stock_profile_finnhub(symbol)
+        # 2. Profile from Finnhub (optional, fail gracefully)
+        try:
+            complete_data['profile'] = self.get_stock_profile_finnhub(symbol)
+            if complete_data['profile']:
+                complete_data['market_cap'] = complete_data['profile'].get('marketCapitalization', 0) * 1_000_000
+        except Exception as e:
+            logger.debug(f"Finnhub profile failed for {symbol}: {e}")
+            complete_data['profile'] = {}
         
-        # 3. Metrics from Finnhub
-        complete_data['metrics'] = self.get_stock_metrics_finnhub(symbol)
+        # 3. Metrics from Finnhub (optional, fail gracefully)
+        try:
+            complete_data['metrics'] = self.get_stock_metrics_finnhub(symbol)
+        except Exception as e:
+            logger.debug(f"Finnhub metrics failed for {symbol}: {e}")
+            complete_data['metrics'] = {}
         
-        # 4. Fundamentals from yfinance
-        complete_data['fundamentals'] = self.get_fundamental_data_yfinance(symbol)
+        # 4. Fundamentals from yfinance (optional, fail gracefully)
+        try:
+            complete_data['fundamentals'] = self.get_fundamental_data_yfinance(symbol)
+        except Exception as e:
+            logger.debug(f"Fundamentals failed for {symbol}: {e}")
+            complete_data['fundamentals'] = {}
         
-        # 5. Options chain from yfinance
-        complete_data['options'] = self.get_options_chain_yfinance(symbol)
+        # 5. Options chain from yfinance (optional, fail gracefully)
+        try:
+            complete_data['options'] = self.get_options_chain_yfinance(symbol)
+        except Exception as e:
+            logger.debug(f"Options chain failed for {symbol}: {e}")
+            complete_data['options'] = {}
         
-        # 6. News from Finnhub
-        complete_data['news'] = self.get_company_news_finnhub(symbol)
+        # 6. News from Finnhub (optional, fail gracefully)
+        try:
+            complete_data['news'] = self.get_company_news_finnhub(symbol)
+        except Exception as e:
+            logger.debug(f"Finnhub news failed for {symbol}: {e}")
+            complete_data['news'] = []
         
-        # 7. Earnings calendar from Finnhub
-        complete_data['earnings'] = self.get_earnings_calendar_finnhub(symbol)
+        # 7. Earnings calendar from Finnhub (optional, fail gracefully)
+        try:
+            complete_data['earnings'] = self.get_earnings_calendar_finnhub(symbol)
+        except Exception as e:
+            logger.debug(f"Finnhub earnings failed for {symbol}: {e}")
+            complete_data['earnings'] = []
         
-        # 8. Insider trades from Finnhub
-        complete_data['insider_trades'] = self.get_insider_transactions_finnhub(symbol)
+        # 8. Insider trades from Finnhub (optional, fail gracefully)
+        try:
+            complete_data['insider_trades'] = self.get_insider_transactions_finnhub(symbol)
+        except Exception as e:
+            logger.debug(f"Finnhub insider trades failed for {symbol}: {e}")
+            complete_data['insider_trades'] = pd.DataFrame()
         
-        # 9. Analyst recommendations from Finnhub
-        complete_data['analyst_recommendations'] = self.get_recommendation_trends_finnhub(symbol)
+        # 9. Analyst recommendations from Finnhub (optional, fail gracefully)
+        try:
+            complete_data['analyst_recommendations'] = self.get_recommendation_trends_finnhub(symbol)
+        except Exception as e:
+            logger.debug(f"Finnhub recommendations failed for {symbol}: {e}")
+            complete_data['analyst_recommendations'] = pd.DataFrame()
         
-        # 10. Price targets from Finnhub
-        complete_data['price_targets'] = self.get_price_target_finnhub(symbol)
+        # 10. Price targets from Finnhub (optional, fail gracefully)
+        try:
+            complete_data['price_targets'] = self.get_price_target_finnhub(symbol)
+        except Exception as e:
+            logger.debug(f"Finnhub price targets failed for {symbol}: {e}")
+            complete_data['price_targets'] = {}
         
         logger.info(f"=" * 80)
         logger.info(f"✓ COMPLETE REAL DATA FETCHED for {symbol}")
