@@ -412,6 +412,9 @@ class MarketScanner:
         Tier 3: Full institutional-grade analysis
         Complete Monte Carlo, GARCH, options, everything
         """
+        print(f"\n{'='*80}")
+        print(f"TIER 3: DEEP INSTITUTIONAL ANALYSIS - {len(candidates)} candidates")
+        print(f"{'='*80}")
         logger.info("\n" + "=" * 80)
         logger.info(f"TIER 3: DEEP INSTITUTIONAL ANALYSIS - {len(candidates)} candidates")
         logger.info("=" * 80)
@@ -419,10 +422,19 @@ class MarketScanner:
         results = []
         start_time = time.time()
         
+        # Debug file
+        debug_file = "/tmp/tier3_debug.txt"
+        with open(debug_file, 'w') as f:
+            f.write(f"Tier 3 started with {len(candidates)} candidates\n")
+        
         for i, candidate in enumerate(candidates):
             try:
                 symbol = candidate['symbol']
+                print(f"\n[{i+1}/{len(candidates)}] Deep analysis: {symbol}")
                 logger.info(f"\n[{i+1}/{len(candidates)}] Deep analysis: {symbol}")
+                
+                with open(debug_file, 'a') as f:
+                    f.write(f"[{i+1}/{len(candidates)}] Analyzing {symbol}\n")
                 
                 # Full comprehensive analysis
                 # Reduced Monte Carlo sims to 5000 for stability in parallel processing
@@ -434,11 +446,19 @@ class MarketScanner:
                         bankroll=1000.0
                     )
                 except Exception as analysis_error:
-                    logger.error(f"  ✗ {symbol}: analyze_stock_comprehensive() failed: {str(analysis_error)}")
+                    error_msg = f"  ✗ {symbol}: analyze_stock_comprehensive() failed: {str(analysis_error)}"
+                    print(error_msg)
+                    logger.error(error_msg)
+                    with open(debug_file, 'a') as f:
+                        f.write(f"  ERROR: {error_msg}\n")
                     continue
                 
                 if not analysis or 'recommendation' not in analysis:
-                    logger.warning(f"  ⚠️ {symbol}: No recommendation in analysis result")
+                    warning_msg = f"  ⚠️ {symbol}: No recommendation in analysis result"
+                    print(warning_msg)
+                    logger.warning(warning_msg)
+                    with open(debug_file, 'a') as f:
+                        f.write(f"  SKIP: No recommendation\n")
                     continue
                 
                 rec = analysis['recommendation']
@@ -492,7 +512,11 @@ class MarketScanner:
                     'full_analysis': analysis
                 })
                 
-                logger.info(f"  ✓ {symbol}: Score={opportunity_score:.1f}, Signal={rec['signal_type']}, Return={expected_return*100:.2f}%, Confidence={confidence:.1f}%")
+                success_msg = f"  ✓ {symbol}: Score={opportunity_score:.1f}, Signal={rec['signal_type']}, Return={expected_return*100:.2f}%, Confidence={confidence:.1f}%"
+                print(success_msg)
+                logger.info(success_msg)
+                with open(debug_file, 'a') as f:
+                    f.write(f"  SUCCESS: {success_msg}\n")
                 
             except Exception as e:
                 logger.error(f"  ✗ Error analyzing {candidate['symbol']}: {str(e)}")
@@ -507,16 +531,23 @@ class MarketScanner:
         elapsed = time.time() - start_time
         logger.info(f"\n✓ Tier 3 Complete: {len(results)} analyzed in {elapsed:.1f}s")
         
+        with open(debug_file, 'a') as f:
+            f.write(f"\nTier 3 complete: {len(results)} results\n")
+        
         if len(results) > 0:
+            print(f"\n🏆 TOP OPPORTUNITIES:")
             logger.info(f"\n🏆 TOP OPPORTUNITIES:")
             for i, opp in enumerate(results[:10], 1):
-                logger.info(f"  {i}. {opp['symbol']:6s} - Score: {opp['opportunity_score']:8.1f} | Return: {opp['expected_return']:6.2f}% | Signal: {opp['signal']:4s} | Confidence: {opp['confidence']:5.1f}% | Squeeze: {('ON (' + str(opp['squeeze_bars']) + ' bars)') if opp['squeeze_active'] else 'OFF'}")
+                msg = f"  {i}. {opp['symbol']:6s} - Score: {opp['opportunity_score']:8.1f} | Return: {opp['expected_return']:6.2f}% | Signal: {opp['signal']:4s} | Confidence: {opp['confidence']:5.1f}% | Squeeze: {('ON (' + str(opp['squeeze_bars']) + ' bars)') if opp['squeeze_active'] else 'OFF'}"
+                print(msg)
+                logger.info(msg)
             return filtered_results[:top_n]
         else:
-            logger.error(f"🚨 CRITICAL: No stocks completed Tier 3 analysis successfully")
-            logger.error(f"   Candidates received: {len(candidates)}")
-            logger.error(f"   This means ALL {len(candidates)} stocks crashed in analyze_stock_comprehensive()")
-            logger.error(f"   Check if main_trading_system is working properly")
+            error_msg = f"🚨 CRITICAL: No stocks completed Tier 3 analysis successfully. Candidates received: {len(candidates)}"
+            print(error_msg)
+            logger.error(error_msg)
+            with open(debug_file, 'a') as f:
+                f.write(f"\nCRITICAL: 0 results!\n")
             
             # Return empty list (don't fake data)
             return []
