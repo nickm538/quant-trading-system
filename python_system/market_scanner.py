@@ -7,6 +7,7 @@ Maximum computational power - pushing beyond limitations
 import sys
 sys.path.append('/opt/.manus/.sandbox-runtime')
 
+import os
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
@@ -112,22 +113,23 @@ class MarketScanner:
         
         def analyze_symbol(symbol: str) -> Dict:
             try:
-                # Use EnhancedDataIngestion (Finnhub + fallbacks) instead of broken yfinance
-                complete_data = self.data_ingestion.get_complete_stock_data(symbol)
-                df = complete_data.get('price_data')
+                # Use lightweight data fetch (just price data, not full analysis)
+                df = self.data_ingestion.get_stock_data_yahoo(symbol, period='3mo')
                 
-                if df is None or df.empty:
+                if df.empty or len(df) < 20:
                     return None
                 
-                # Ensure required columns exist (EnhancedDataIngestion already provides correct format)
-                required_cols = ['close', 'volume', 'high', 'low']
-                if not all(col in df.columns for col in required_cols):
+                # Ensure required columns
+                if 'close' not in df.columns or 'volume' not in df.columns:
                     return None
                 
-                df = df[required_cols].dropna()
-                
-                # Get market cap from complete_data
-                market_cap = complete_data.get('market_cap', 0)
+                # Get market cap (quick, don't fail if missing)
+                market_cap = 0
+                try:
+                    profile = self.data_ingestion.get_stock_profile_finnhub(symbol)
+                    market_cap = profile.get('marketCapitalization', 0) * 1_000_000 if profile else 0
+                except:
+                    pass
                 
                 if len(df) < 20:
                     return None
