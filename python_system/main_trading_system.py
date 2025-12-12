@@ -23,6 +23,10 @@ from dataclasses import dataclass, asdict
 from data.enhanced_data_ingestion import EnhancedDataIngestion
 from models.technical_indicators import TechnicalIndicators
 from models.stochastic_models import StochasticModels, GARCHResults, MonteCarloResults
+from analysis.safeguards import TradingSafeguards, SafeguardReport
+from analysis.execution_costs import ExecutionCostModel, get_retail_cost_model
+from analysis.risk_controls import RiskManager, get_moderate_risk_limits
+from data_validation import CircuitBreaker
 
 # Configure logging
 logging.basicConfig(
@@ -101,11 +105,19 @@ class InstitutionalTradingSystem:
         self.data_ingestion = EnhancedDataIngestion()
         self.technical_indicators = TechnicalIndicators()
         self.stochastic_models = StochasticModels(random_seed=42)
+        self.safeguards = TradingSafeguards()
+        self.execution_costs = get_retail_cost_model()  # Zero-commission broker model
+        self.risk_manager = RiskManager(get_moderate_risk_limits())  # Moderate risk profile
+        self.circuit_breaker = CircuitBreaker()  # Data quality validation
         
         logger.info("✓ All components initialized")
         logger.info("  - Data Ingestion: Yahoo Finance + Finnhub + Alpha Vantage")
         logger.info("  - Technical Indicators: 50+ indicators with correlation analysis")
         logger.info("  - Stochastic Models: GARCH + Monte Carlo + Jump-Diffusion + Heston")
+        logger.info("  - Safeguards: Look-ahead bias prevention, overfitting detection, data quality checks")
+        logger.info("  - Execution Costs: Slippage + spread modeling (zero-commission broker)")
+        logger.info("  - Risk Controls: Position limits, portfolio heat, daily loss limits")
+        logger.info("  - Data Validation: Circuit breaker with 95% confidence threshold")
         logger.info("=" * 80)
     
     # ==================== ALPHA VANTAGE INTEGRATION ====================
@@ -410,8 +422,40 @@ class InstitutionalTradingSystem:
         
         logger.info(f"  Sentiment score: {av_sentiment['sentiment_score']:.3f}")
         logger.info(f"  Total news articles: {av_sentiment['num_articles'] + len(news_articles)}")
-                # 7. Generate final trading signal
-        logger.info("\n7. Generating FINAL TRADING SIGNAL...")
+                # 7. Run safeguard checks
+        logger.info("\n7. Running INSTITUTIONAL SAFEGUARD CHECKS...")
+        safeguard_report = self.safeguards.check_temporal_integrity(
+            data=df_with_indicators,
+            feature_columns=list(df_with_indicators.columns)
+        )
+        
+        confidence_adjustment = safeguard_report.confidence_adjustment
+        
+        if safeguard_report.errors:
+            logger.error("  ⚠️  CRITICAL SAFEGUARD ERRORS:")
+            for error in safeguard_report.errors:
+                logger.error(f"    - {error}")
+        
+        if safeguard_report.warnings:
+            logger.warning("  ⚠️  Safeguard warnings:")
+            for warning in safeguard_report.warnings:
+                logger.warning(f"    - {warning}")
+        
+        if safeguard_report.passed:
+            logger.info(f"  ✓ Safeguards passed (confidence adjustment: {confidence_adjustment:.2f}x)")
+        else:
+            logger.warning(f"  ⚠️  Safeguards flagged issues (confidence adjustment: {confidence_adjustment:.2f}x)")
+        
+        analysis['safeguard_report'] = {
+            'passed': safeguard_report.passed,
+            'warnings': safeguard_report.warnings,
+            'errors': safeguard_report.errors,
+            'confidence_adjustment': confidence_adjustment
+        }
+        
+        # 8. Generate final trading signal
+        logger.info("\n8. Generating FINAL TRADING SIGNAL...")
+        avg_volume = price_data['volume'].mean() if 'volume' in price_data.columns else 1000000
         signal = self._generate_trading_signal(
             symbol=symbol,
             current_price=current_price,
@@ -420,7 +464,9 @@ class InstitutionalTradingSystem:
             options_analysis=analysis['options_analysis'],
             sentiment_analysis=analysis['sentiment_analysis'],
             bankroll=bankroll,
-            max_risk_pct=0.02  # Moderate 2% risk
+            max_risk_pct=0.02,  # Moderate 2% risk
+            confidence_adjustment=confidence_adjustment,  # Apply safeguard adjustment
+            avg_volume=avg_volume  # For execution cost calculation
         )       
         analysis['recommendation'] = asdict(signal)
         
@@ -521,7 +567,9 @@ class InstitutionalTradingSystem:
         options_analysis: Dict,
         sentiment_analysis: Dict,
         bankroll: float = 1000.0,  # Default $1,000 bankroll
-        max_risk_pct: float = 0.02  # Moderate 2% max risk per trade
+        max_risk_pct: float = 0.02,  # Moderate 2% max risk per trade
+        confidence_adjustment: float = 1.0,  # Safeguard confidence multiplier
+        avg_volume: float = 1000000  # Average daily volume for execution cost calc
     ) -> TradingSignal:
         """
         Generate trading signal by combining all analysis components
@@ -559,12 +607,16 @@ class InstitutionalTradingSystem:
             options_score = 50
         
         # Combined confidence score
-        confidence = (
+        raw_confidence = (
             technical_score * TECHNICAL_WEIGHT +
             stochastic_score * STOCHASTIC_WEIGHT +
             sentiment_score * SENTIMENT_WEIGHT +
             options_score * OPTIONS_WEIGHT
         )
+        
+        # Apply safeguard confidence adjustment
+        confidence = raw_confidence * confidence_adjustment
+        confidence = max(0, min(100, confidence))  # Clamp to 0-100
         
         # Determine signal type
         if confidence >= 65:
@@ -667,6 +719,38 @@ class InstitutionalTradingSystem:
         logger.info(f"    Dollar Risk: ${dollar_risk:.2f} ({dollar_risk/bankroll*100:.2f}% of bankroll)")
         logger.info(f"    Dollar Reward: ${dollar_reward:.2f}")
         logger.info(f"    Risk/Reward: 1:{dollar_reward/dollar_risk:.2f}" if dollar_risk > 0 else "    Risk/Reward: N/A")
+        
+        # Calculate execution costs
+        if shares_to_buy > 0:
+            execution_cost = self.execution_costs.calculate_total_costs(
+                entry_price=current_price,
+                exit_price=target_price,
+                shares=shares_to_buy,
+                volatility=current_vol,
+                avg_volume=avg_volume
+            )
+            
+            logger.info(f"\n  EXECUTION COSTS (Round-trip):")
+            logger.info(f"    Slippage: ${execution_cost.entry_slippage + execution_cost.exit_slippage:.2f}")
+            logger.info(f"    Spread: ${execution_cost.spread_cost:.2f}")
+            logger.info(f"    Commission: ${execution_cost.commission:.2f}")
+            logger.info(f"    Total Cost: ${execution_cost.total_cost:.2f} ({execution_cost.total_cost_pct:.2f}% of position)")
+            logger.info(f"    Gross Return: {execution_cost.gross_return:.2f}%")
+            logger.info(f"    Net Return: {execution_cost.net_return:.2f}%")
+            logger.info(f"    Cost Drag: {execution_cost.cost_drag:.2f}%")
+            
+            # Adjust target price to account for costs
+            adjusted_target = self.execution_costs.adjust_target_for_costs(
+                entry_price=current_price,
+                target_price=target_price,
+                shares=shares_to_buy,
+                volatility=current_vol,
+                avg_volume=avg_volume
+            )
+            
+            if abs(adjusted_target - target_price) > 0.01:
+                logger.info(f"    Adjusted Target (to compensate for costs): ${adjusted_target:.2f}")
+                target_price = adjusted_target  # Use adjusted target
         
         signal = TradingSignal(
             symbol=symbol,
