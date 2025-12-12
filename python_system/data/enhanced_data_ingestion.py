@@ -418,8 +418,40 @@ class EnhancedDataIngestion:
             'price_targets': {}
         }
         
-        # 1. Price data from Yahoo Finance
-        complete_data['price_data'] = self.get_stock_data_yahoo(symbol, period='2y')
+        # 1. Price data from Yahoo Finance (with Finnhub fallback)
+        price_data = self.get_stock_data_yahoo(symbol, period='2y')
+        
+        # Fallback to Finnhub if Yahoo fails
+        if price_data.empty:
+            logger.warning(f"Yahoo Finance failed for {symbol}, trying Finnhub...")
+            try:
+                # Get candles from Finnhub (last 2 years)
+                from datetime import datetime, timedelta
+                end_date = datetime.now()
+                start_date = end_date - timedelta(days=730)  # 2 years
+                
+                candles = self._finnhub_request('stock/candle', {
+                    'symbol': symbol,
+                    'resolution': 'D',  # Daily
+                    'from': int(start_date.timestamp()),
+                    'to': int(end_date.timestamp())
+                })
+                
+                if candles and candles.get('s') == 'ok':
+                    price_data = pd.DataFrame({
+                        'timestamp': pd.to_datetime(candles['t'], unit='s'),
+                        'open': candles['o'],
+                        'high': candles['h'],
+                        'low': candles['l'],
+                        'close': candles['c'],
+                        'volume': candles['v']
+                    })
+                    price_data.set_index('timestamp', inplace=True)
+                    logger.info(f"✓ Fetched {len(price_data)} data points from Finnhub for {symbol}")
+            except Exception as e:
+                logger.error(f"Finnhub fallback also failed for {symbol}: {e}")
+        
+        complete_data['price_data'] = price_data
         
         # 2. Profile from Finnhub
         complete_data['profile'] = self.get_stock_profile_finnhub(symbol)
