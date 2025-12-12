@@ -20,6 +20,7 @@ import time
 from data.enhanced_data_ingestion import EnhancedDataIngestion
 from models.technical_indicators import TechnicalIndicators
 from models.ttm_squeeze import TTMSqueeze
+from analysis.gemini_market_intelligence import GeminiMarketIntelligence
 from main_trading_system import InstitutionalTradingSystem
 
 logging.basicConfig(
@@ -41,6 +42,14 @@ class MarketScanner:
         self.data_ingestion = EnhancedDataIngestion()
         self.technical_indicators = TechnicalIndicators()
         self.trading_system = InstitutionalTradingSystem()
+        
+        # Initialize Gemini Pro for institutional-grade intelligence
+        try:
+            self.gemini_intelligence = GeminiMarketIntelligence()
+            logger.info("  Gemini Pro: Sentiment + Earnings + Market Context")
+        except Exception as e:
+            logger.warning(f"  Gemini Pro initialization failed: {e}")
+            self.gemini_intelligence = None
         
         # Major US market indices
         self.SP500_SYMBOLS = self._get_sp500_symbols()
@@ -242,12 +251,28 @@ class MarketScanner:
                 volatility_score = 100 - (latest['hist_vol_20'] * 100)
                 technical_score = (momentum_score + trend_score + volatility_score) / 3
                 
-                # News sentiment
+                # Gemini-powered sentiment analysis (institutional-grade)
                 news_articles = complete_data.get('news', [])
-                sentiment_score = 0
-                if news_articles:
-                    sentiments = [article.get('sentiment', 0) for article in news_articles if 'sentiment' in article]
-                    sentiment_score = np.mean(sentiments) if sentiments else 0
+                earnings_data = complete_data.get('earnings', [])
+                
+                if self.gemini_intelligence:
+                    # Get Gemini analysis
+                    sentiment_analysis = self.gemini_intelligence.analyze_news_sentiment(symbol, news_articles)
+                    earnings_analysis = self.gemini_intelligence.analyze_earnings_context(symbol, earnings_data)
+                    
+                    sentiment_score = sentiment_analysis.get('sentiment_score', 0) * 100  # Scale to 0-100
+                    sentiment_confidence = sentiment_analysis.get('confidence', 0)
+                    earnings_quality = earnings_analysis.get('earnings_quality', 50)
+                    growth_trajectory = earnings_analysis.get('growth_trajectory', 'unknown')
+                else:
+                    # Fallback to basic sentiment if Gemini unavailable
+                    sentiment_score = 0
+                    sentiment_confidence = 0
+                    earnings_quality = 50
+                    growth_trajectory = 'unknown'
+                    if news_articles:
+                        sentiments = [article.get('sentiment', 0) for article in news_articles if 'sentiment' in article]
+                        sentiment_score = np.mean(sentiments) * 100 if sentiments else 0
                 
                 # TTM Squeeze calculation (optional filter)
                 try:
@@ -276,6 +301,9 @@ class MarketScanner:
                     'macd': latest['macd'],
                     'adx': latest['adx'],
                     'sentiment': sentiment_score,
+                    'sentiment_confidence': sentiment_confidence if self.gemini_intelligence else 0,
+                    'earnings_quality': earnings_quality if self.gemini_intelligence else 50,
+                    'growth_trajectory': growth_trajectory if self.gemini_intelligence else 'unknown',
                     'num_news': len(news_articles),
                     'squeeze_active': squeeze_data.get('squeeze_on', False),
                     'squeeze_bars': squeeze_data.get('squeeze_bars', 0),
