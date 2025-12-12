@@ -18,7 +18,6 @@ import time
 
 from data.enhanced_data_ingestion import EnhancedDataIngestion
 from models.technical_indicators import TechnicalIndicators
-from models.ttm_squeeze import TTMSqueeze
 from main_trading_system import InstitutionalTradingSystem
 
 logging.basicConfig(
@@ -183,7 +182,7 @@ class MarketScanner:
                 }
                 
             except Exception as e:
-                logger.debug(f"  Error analyzing {symbol}: {str(e)}")
+                logger.warning(f"  Error analyzing {symbol}: {str(e)}")
                 return None
         
         # Parallel processing
@@ -225,8 +224,12 @@ class MarketScanner:
                 symbol = candidate['symbol']
                 
                 # Get full price data
-                complete_data = self.data_ingestion.get_complete_stock_data(symbol)
-                price_data = complete_data['price_data']
+                try:
+                    complete_data = self.data_ingestion.get_complete_stock_data(symbol)
+                    price_data = complete_data['price_data']
+                except Exception as e:
+                    logger.warning(f"  Failed to get data for {symbol}: {str(e)}")
+                    return None
                 
                 if price_data.empty or len(price_data) < 100:
                     return None
@@ -256,24 +259,6 @@ class MarketScanner:
                     sentiments = [article.get('sentiment', 0) for article in news_articles if 'sentiment' in article]
                     sentiment_score = np.mean(sentiments) if sentiments else 0
                 
-                # TTM Squeeze calculation (optional filter)
-                try:
-                    squeeze_data = TTMSqueeze.calculate_squeeze(
-                        high=price_data['high'],
-                        low=price_data['low'],
-                        close=price_data['close']
-                    )
-                except Exception as e:
-                    logger.debug(f"  Squeeze calc failed for {symbol}: {e}")
-                    squeeze_data = {
-                        'squeeze_on': False,
-                        'squeeze_bars': 0,
-                        'momentum': 0.0,
-                        'momentum_direction': 'neutral',
-                        'signal': 'none',
-                        'expected_move_pct': 0.0
-                    }
-                
                 candidate.update({
                     'technical_score': technical_score,
                     'momentum_score': momentum_score,
@@ -283,18 +268,13 @@ class MarketScanner:
                     'macd': latest['macd'],
                     'adx': latest['adx'],
                     'sentiment': sentiment_score,
-                    'num_news': len(news_articles),
-                    'squeeze_active': squeeze_data.get('squeeze_on', False),
-                    'squeeze_bars': squeeze_data.get('squeeze_bars', 0),
-                    'squeeze_momentum': squeeze_data.get('momentum', 0.0),
-                    'squeeze_signal': squeeze_data.get('signal', 'none'),
-                    'expected_move_pct': squeeze_data.get('expected_move_pct', 0.0)
+                    'num_news': len(news_articles)
                 })
                 
                 return candidate
                 
             except Exception as e:
-                logger.debug(f"  Error in tier 2 for {candidate['symbol']}: {str(e)}")
+                logger.warning(f"  Error in tier 2 for {candidate['symbol']}: {str(e)}")
                 return None
         
         # Parallel processing
@@ -338,15 +318,21 @@ class MarketScanner:
                 logger.info(f"\n[{i+1}/{len(candidates)}] Deep analysis: {symbol}")
                 
                 # Full comprehensive analysis
-                # Reduced Monte Carlo sims to 5000 for stability in parallel processing
+                # Reduced Monte Carlo sims to 2000 for speed (was 5000)
+                logger.info(f"  Starting comprehensive analysis for {symbol}...")
                 analysis = self.trading_system.analyze_stock_comprehensive(
                     symbol=symbol,
-                    monte_carlo_sims=5000,
+                    monte_carlo_sims=2000,
                     forecast_days=30,
                     bankroll=1000.0
                 )
                 
-                if not analysis or 'recommendation' not in analysis:
+                if not analysis:
+                    logger.warning(f"  {symbol}: Analysis returned None/empty")
+                    continue
+                    
+                if 'recommendation' not in analysis:
+                    logger.warning(f"  {symbol}: Analysis missing 'recommendation' key. Keys: {list(analysis.keys())}")
                     continue
                 
                 rec = analysis['recommendation']
@@ -375,6 +361,11 @@ class MarketScanner:
                     100
                 )
                 
+                # Only include stocks with positive opportunity scores
+                if opportunity_score <= 0:
+                    logger.info(f"  {symbol}: Skipped (score={opportunity_score:.1f} <= 0)")
+                    continue
+                
                 results.append({
                     'symbol': symbol,
                     'signal': rec['signal_type'],
@@ -392,11 +383,6 @@ class MarketScanner:
                     'technical_score': rec['technical_score'],
                     'sentiment': rec.get('news_sentiment', 0),
                     'opportunity_score': opportunity_score,
-                    'squeeze_active': candidate.get('squeeze_active', False),
-                    'squeeze_bars': candidate.get('squeeze_bars', 0),
-                    'squeeze_momentum': candidate.get('squeeze_momentum', 0.0),
-                    'squeeze_signal': candidate.get('squeeze_signal', 'none'),
-                    'expected_move_pct': candidate.get('expected_move_pct', 0.0),
                     'full_analysis': analysis
                 })
                 
@@ -459,12 +445,10 @@ class MarketScanner:
         if tier3_results:
             logger.info(f"\n🏆 TOP OPPORTUNITIES:")
             for i, opp in enumerate(tier3_results[:10], 1):
-                squeeze_info = f"Squeeze: {'ON' if opp.get('squeeze_active') else 'OFF'} ({opp.get('squeeze_bars', 0)} bars)" if opp.get('squeeze_active') is not None else "Squeeze: N/A"
                 logger.info(f"  {i}. {opp['symbol']:6s} - Score: {opp['opportunity_score']:6.1f} | "
                           f"Return: {opp['expected_return']:6.2f}% | "
                           f"Signal: {opp['signal']:4s} | "
-                          f"Confidence: {opp['confidence']:.1f}% | "
-                          f"{squeeze_info}")
+                          f"Confidence: {opp['confidence']:.1f}%")
         
         return {
             'timestamp': datetime.now().isoformat(),
@@ -483,15 +467,15 @@ if __name__ == "__main__":
     scanner = MarketScanner()
     results = scanner.scan_market(top_n=20)
     
-    # Save results
-    output_file = f"/home/ubuntu/quant_trading_system/logs/market_scan_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-    with open(output_file, 'w') as f:
-        # Remove full_analysis for file size
-        simplified = results.copy()
-        simplified['opportunities'] = [
-            {k: v for k, v in opp.items() if k != 'full_analysis'}
-            for opp in results['opportunities']
-        ]
-        json.dump(simplified, f, indent=2, default=str)
-    
-    print(f"\n✓ Results saved to: {output_file}")
+    # Save results (disabled for production)
+    # output_file = f"/home/ubuntu/quant_trading_system/logs/market_scan_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+    # with open(output_file, 'w') as f:
+    #     # Remove full_analysis for file size
+    #     simplified = results.copy()
+    #     simplified['opportunities'] = [
+    #         {k: v for k, v in opp.items() if k != 'full_analysis'}
+    #         for opp in results['opportunities']
+    #     ]
+    #     json.dump(simplified, f, indent=2, default=str)
+    # 
+    # print(f"\n✓ Results saved to: {output_file}")
