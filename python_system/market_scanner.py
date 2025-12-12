@@ -221,7 +221,7 @@ class MarketScanner:
                 complete_data = self.data_ingestion.get_complete_stock_data(symbol)
                 price_data = complete_data['price_data']
                 
-                if price_data.empty or len(price_data) < 100:
+                if price_data.empty or len(price_data) < 60:
                     return None
                 
                 # Calculate ALL 50+ technical indicators
