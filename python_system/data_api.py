@@ -23,43 +23,52 @@ class ApiClient:
         self.session.headers.update({
             'User-Agent': 'Quant-Trading-System/1.0'
         })
-        # DISABLED: yfinance doesn't work reliably - use Manus API Hub + Finnhub instead
-        self.use_yfinance_fallback = False
+        # Enable yfinance as fallback when Manus API Hub is unavailable
+        self.use_yfinance_fallback = True
     
     def call_api(self, endpoint: str, query: Optional[Dict[str, Any]] = None, method: str = 'GET') -> Dict[str, Any]:
         """
         Call a Manus API Hub endpoint with yfinance fallback
-        
+
         Args:
             endpoint: API endpoint path (e.g., 'YahooFinance/get_stock_chart')
             query: Query parameters as dictionary
             method: HTTP method (GET or POST)
-        
+
         Returns:
             API response as dictionary
         """
-        # Try yfinance directly for Yahoo Finance endpoints
-        if self.use_yfinance_fallback and 'YahooFinance' in endpoint:
-            if 'get_stock_chart' in endpoint:
-                return self._get_stock_chart_yfinance(query)
-            elif 'get_stock_insights' in endpoint:
-                return self._get_stock_insights_yfinance(query)
-        
+        # PRIORITY: Try Manus API Hub FIRST, then yfinance as fallback
         url = f"{self.base_url}/{endpoint}"
-        
+
         try:
             if method.upper() == 'GET':
                 response = self.session.get(url, params=query, timeout=30)
             else:
                 response = self.session.post(url, json=query, timeout=30)
-            
+
             response.raise_for_status()
-            return response.json()
-        
-        except requests.exceptions.RequestException as e:
-            print(f"API request failed: {e}")
-            # Fallback to yfinance for Yahoo Finance endpoints
+            data = response.json()
+
+            # Validate response based on endpoint type
+            if 'get_stock_chart' in endpoint:
+                # Chart endpoint needs chart.result data
+                if data and 'chart' in data and data['chart'].get('result'):
+                    return data
+                else:
+                    raise ValueError("Chart API returned empty or invalid data")
+            else:
+                # Other endpoints - just check for non-empty response
+                if data:
+                    return data
+                else:
+                    raise ValueError("API returned empty data")
+
+        except Exception as e:
+            print(f"Manus API Hub failed: {e}")
+            # FALLBACK to yfinance for Yahoo Finance endpoints
             if 'YahooFinance' in endpoint and self.use_yfinance_fallback:
+                print(f"Trying yfinance fallback...")
                 if 'get_stock_chart' in endpoint:
                     return self._get_stock_chart_yfinance(query)
                 elif 'get_stock_insights' in endpoint:
