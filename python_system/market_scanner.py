@@ -487,7 +487,7 @@ class MarketScanner:
                     'full_analysis': analysis
                 })
                 
-                logger.info(f"  ✓ {symbol}: Score={opportunity_score:.1f}, Signal={rec['signal_type']}, Return={expected_return*100:.2f}%")
+                logger.info(f"  ✓ {symbol}: Score={opportunity_score:.1f}, Signal={rec['signal_type']}, Return={expected_return*100:.2f}%, Confidence={confidence:.1f}%")
                 
             except Exception as e:
                 logger.error(f"  ✗ Error analyzing {candidate['symbol']}: {str(e)}")
@@ -496,16 +496,18 @@ class MarketScanner:
         # Sort by opportunity score
         results.sort(key=lambda x: x['opportunity_score'], reverse=True)
         
-        # Filter: Only show opportunities with reasonable scores (loosened threshold)
-        # Score > 10 = At least some potential (was implicitly higher before)
-        filtered_results = [r for r in results if r['opportunity_score'] > 10]
+        # Show ALL opportunities (no score filtering for now - let user decide)
+        filtered_results = results  # Show everything
         
         elapsed = time.time() - start_time
-        logger.info(f"\n✓ Tier 3 Complete: {len(results)} analyzed, {len(filtered_results)} passed threshold in {elapsed:.1f}s")
+        logger.info(f"\n✓ Tier 3 Complete: {len(results)} analyzed in {elapsed:.1f}s")
         
-        if len(filtered_results) == 0 and len(results) > 0:
-            logger.warning(f"⚠️ No opportunities passed score threshold (>10). Highest score: {results[0]['opportunity_score']:.1f}")
-            logger.warning(f"   Consider running scan during more volatile market conditions")
+        if len(results) > 0:
+            logger.info(f"\n🏆 TOP OPPORTUNITIES:")
+            for i, opp in enumerate(results[:10], 1):
+                logger.info(f"  {i}. {opp['symbol']:6s} - Score: {opp['opportunity_score']:8.1f} | Return: {opp['expected_return']:6.2f}% | Signal: {opp['signal']:4s} | Confidence: {opp['confidence']:5.1f}% | Squeeze: {('ON (' + str(opp['squeeze_bars']) + ' bars)') if opp['squeeze_active'] else 'OFF'}")
+        else:
+            logger.warning(f"⚠️ No stocks completed Tier 3 analysis successfully")
         
         return filtered_results[:top_n]
     
