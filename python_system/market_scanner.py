@@ -146,7 +146,7 @@ class MarketScanner:
                 avg_volume = df['volume'].mean()
                 
                 # Liquidity filter
-                if avg_volume < 100000:  # Min 100k shares/day (loosened for more opportunities)
+                if avg_volume < 500000:  # Min 500k shares/day
                     return None
                 
                 # Calculate quick technical score
@@ -318,7 +318,7 @@ class MarketScanner:
         logger.info(f"\n✓ Tier 2 Complete: {len(results)} candidates in {elapsed:.1f}s")
         logger.info(f"  Top 5: {', '.join([r['symbol'] for r in results[:5]])}")
         
-        return results[:100]  # Top 100 (increased for more opportunities)
+        return results[:50]  # Top 50
     
     def tier3_deep_analysis(self, candidates: List[Dict], top_n: int = 20) -> List[Dict]:
         """
@@ -409,10 +409,18 @@ class MarketScanner:
         # Sort by opportunity score
         results.sort(key=lambda x: x['opportunity_score'], reverse=True)
         
-        elapsed = time.time() - start_time
-        logger.info(f"\n✓ Tier 3 Complete: {len(results)} analyzed in {elapsed:.1f}s")
+        # Filter: Only show opportunities with reasonable scores (loosened threshold)
+        # Score > 10 = At least some potential (was implicitly higher before)
+        filtered_results = [r for r in results if r['opportunity_score'] > 10]
         
-        return results[:top_n]
+        elapsed = time.time() - start_time
+        logger.info(f"\n✓ Tier 3 Complete: {len(results)} analyzed, {len(filtered_results)} passed threshold in {elapsed:.1f}s")
+        
+        if len(filtered_results) == 0 and len(results) > 0:
+            logger.warning(f"⚠️ No opportunities passed score threshold (>10). Highest score: {results[0]['opportunity_score']:.1f}")
+            logger.warning(f"   Consider running scan during more volatile market conditions")
+        
+        return filtered_results[:top_n]
     
     def scan_market(self, top_n: int = 20) -> Dict:
         """
