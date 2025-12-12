@@ -23,7 +23,8 @@ class ApiClient:
         self.session.headers.update({
             'User-Agent': 'Quant-Trading-System/1.0'
         })
-        self.use_yfinance_fallback = True  # Enable yfinance fallback
+        # DISABLED: yfinance doesn't work reliably - use Manus API Hub + Finnhub instead
+        self.use_yfinance_fallback = False
     
     def call_api(self, endpoint: str, query: Optional[Dict[str, Any]] = None, method: str = 'GET') -> Dict[str, Any]:
         """

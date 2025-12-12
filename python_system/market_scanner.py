@@ -214,46 +214,101 @@ class MarketScanner:
     def tier2_medium_analysis(self, candidates: List[Dict], max_workers: int = 10) -> List[Dict]:
         """
         Tier 2: Medium analysis with full technical indicators
+        ROBUST VERSION - handles API failures gracefully
         """
         logger.info("\n" + "=" * 80)
         logger.info(f"TIER 2: MEDIUM ANALYSIS - Analyzing {len(candidates)} candidates")
         logger.info("=" * 80)
-        
+
         results = []
         start_time = time.time()
-        
+        failed_count = 0
+        success_count = 0
+
         def deep_analyze(candidate: Dict) -> Dict:
+            nonlocal failed_count, success_count
+            symbol = candidate['symbol']
             try:
-                symbol = candidate['symbol']
-                
-                # Get full price data
-                complete_data = self.data_ingestion.get_complete_stock_data(symbol)
-                price_data = complete_data['price_data']
-                
-                if price_data.empty or len(price_data) < 60:
+                # STRATEGY: Use 6-month Yahoo data via Manus API Hub (most reliable)
+                price_data = self.data_ingestion.get_stock_data_yahoo(symbol, period='6mo')
+
+                # If Yahoo fails, use Finnhub candle data as backup
+                if price_data is None or (hasattr(price_data, 'empty') and price_data.empty):
+                    logger.debug(f"  {symbol}: Yahoo failed, trying Finnhub candles...")
+                    try:
+                        from datetime import datetime, timedelta
+                        end_date = datetime.now()
+                        start_date = end_date - timedelta(days=180)  # 6 months
+                        candles = self.data_ingestion._finnhub_request('stock/candle', {
+                            'symbol': symbol,
+                            'resolution': 'D',
+                            'from': int(start_date.timestamp()),
+                            'to': int(end_date.timestamp())
+                        })
+                        if candles and candles.get('s') == 'ok' and candles.get('c'):
+                            price_data = pd.DataFrame({
+                                'open': candles['o'],
+                                'high': candles['h'],
+                                'low': candles['l'],
+                                'close': candles['c'],
+                                'volume': candles['v']
+                            })
+                            price_data.index = pd.to_datetime(candles['t'], unit='s')
+                    except Exception as e:
+                        logger.debug(f"  {symbol}: Finnhub candles also failed: {e}")
+
+                # Final check - do we have usable data?
+                if price_data is None or (hasattr(price_data, 'empty') and price_data.empty):
+                    failed_count += 1
                     return None
-                
-                # Calculate ALL 50+ technical indicators
+
+                if len(price_data) < 20:
+                    failed_count += 1
+                    return None
+
+                # Calculate technical indicators
                 df_with_indicators = self.technical_indicators.calculate_all_indicators(price_data)
                 latest = df_with_indicators.iloc[-1]
-                
-                # Technical scores
-                rsi = latest['rsi_14']
+
+                # Safe value extraction with NaN handling
+                def safe_get(series_or_val, key, default):
+                    try:
+                        val = series_or_val.get(key, default) if hasattr(series_or_val, 'get') else series_or_val[key]
+                        return default if pd.isna(val) else val
+                    except:
+                        return default
+
+                rsi = safe_get(latest, 'rsi_14', 50)
                 momentum_score = 100 - abs(rsi - 50)
-                
-                if latest['close'] > latest['sma_50'] > latest['sma_200']:
-                    trend_score = 80 + (latest['adx'] / 100 * 20)
-                elif latest['close'] < latest['sma_50'] < latest['sma_200']:
-                    trend_score = 20 - (latest['adx'] / 100 * 20)
+
+                close = safe_get(latest, 'close', candidate.get('current_price', 100))
+                sma_20 = safe_get(latest, 'sma_20', close)
+                sma_50 = safe_get(latest, 'sma_50', close)
+                adx = safe_get(latest, 'adx', 25)
+
+                # Use SMA 20 and 50 for trend (more reliable than 200 with 6-month data)
+                if close > sma_20 > sma_50:
+                    trend_score = 80 + (adx / 100 * 20)
+                elif close < sma_20 < sma_50:
+                    trend_score = 20 - (adx / 100 * 20)
                 else:
                     trend_score = 50
-                
-                volatility_score = 100 - (latest['hist_vol_20'] * 100)
+
+                hist_vol = safe_get(latest, 'hist_vol_20', 0.3)
+                volatility_score = max(0, min(100, 100 - (hist_vol * 100)))
                 technical_score = (momentum_score + trend_score + volatility_score) / 3
-                
-                # Gemini-powered sentiment analysis (institutional-grade)
-                news_articles = complete_data.get('news', [])
-                earnings_data = complete_data.get('earnings', [])
+
+                # Get optional sentiment data (fail gracefully)
+                news_articles = []
+                earnings_data = []
+                try:
+                    news_articles = self.data_ingestion.get_company_news_finnhub(symbol) or []
+                except:
+                    pass
+                try:
+                    earnings_data = self.data_ingestion.get_earnings_calendar_finnhub(symbol) or []
+                except:
+                    pass
                 
                 if self.gemini_intelligence:
                     # Get Gemini analysis
@@ -292,14 +347,18 @@ class MarketScanner:
                         'expected_move_pct': 0.0
                     }
                 
+                # Safe extraction of remaining indicators
+                macd_val = safe_get(latest, 'macd', 0)
+                adx_val = safe_get(latest, 'adx', 25)
+
                 candidate.update({
                     'technical_score': technical_score,
                     'momentum_score': momentum_score,
                     'trend_score': trend_score,
                     'volatility_score': volatility_score,
                     'rsi': rsi,
-                    'macd': latest['macd'],
-                    'adx': latest['adx'],
+                    'macd': macd_val,
+                    'adx': adx_val,
                     'sentiment': sentiment_score,
                     'sentiment_confidence': sentiment_confidence if self.gemini_intelligence else 0,
                     'earnings_quality': earnings_quality if self.gemini_intelligence else 50,
@@ -311,33 +370,40 @@ class MarketScanner:
                     'squeeze_signal': squeeze_data.get('signal', 'none'),
                     'expected_move_pct': squeeze_data.get('expected_move_pct', 0.0)
                 })
-                
+
+                success_count += 1
                 return candidate
-                
+
             except Exception as e:
-                logger.debug(f"  Error in tier 2 for {candidate['symbol']}: {str(e)}")
+                failed_count += 1
+                logger.warning(f"  {symbol}: Analysis failed - {str(e)[:80]}")
                 return None
-        
+
         # Parallel processing
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = {executor.submit(deep_analyze, cand): cand for cand in candidates}
-            
+
             completed = 0
             for future in as_completed(futures):
                 completed += 1
                 if completed % 20 == 0:
-                    logger.info(f"  Progress: {completed}/{len(candidates)} analyzed")
-                
+                    logger.info(f"  Progress: {completed}/{len(candidates)} analyzed ({len(results)} passed so far)")
+
                 result = future.result()
                 if result:
                     results.append(result)
-        
+
         # Sort by technical score
         results.sort(key=lambda x: x['technical_score'], reverse=True)
-        
+
         elapsed = time.time() - start_time
-        logger.info(f"\n✓ Tier 2 Complete: {len(results)} candidates in {elapsed:.1f}s")
-        logger.info(f"  Top 5: {', '.join([r['symbol'] for r in results[:5]])}")
+        logger.info(f"\n✓ Tier 2 Complete: {len(results)}/{len(candidates)} passed in {elapsed:.1f}s")
+        if failed_count > 0:
+            logger.warning(f"  ⚠️ {failed_count} stocks failed analysis (API issues or insufficient data)")
+        if results:
+            logger.info(f"  Top 5: {', '.join([r['symbol'] for r in results[:5]])}")
+        else:
+            logger.error(f"  ❌ NO STOCKS PASSED TIER 2! Check API connectivity.")
         
         return results[:50]  # Top 50
     
