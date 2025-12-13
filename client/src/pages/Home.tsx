@@ -831,6 +831,20 @@ export default function Home() {
                               <div className="text-lg font-bold">{opp.shares} shares</div>
                             </div>
                           </div>
+
+                          {/* TTM Squeeze Indicator */}
+                          {(opp.squeeze_active !== undefined || opp.expected_move_pct !== undefined) && (
+                            <div className="mt-3">
+                              <TTMSqueezeIndicator
+                                squeeze_active={opp.squeeze_active ?? false}
+                                squeeze_bars={opp.squeeze_bars ?? 0}
+                                squeeze_momentum={opp.squeeze_momentum ?? 0}
+                                squeeze_signal={opp.squeeze_signal ?? 'none'}
+                                expected_move_pct={opp.expected_move_pct}
+                                compact={false}
+                              />
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
