@@ -413,7 +413,7 @@ class MarketScanner:
         Complete Monte Carlo, GARCH, options, everything
         """
         # TEST MODE: Return fake opportunity to verify data flow
-        TEST_MODE = True
+        TEST_MODE = False  # FIXED! datetime bug resolved, using real analysis now
         
         if TEST_MODE and len(candidates) > 0:
             logger.info("\n🧪 TEST MODE: Returning fake opportunity to verify UI data flow")

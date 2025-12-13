@@ -426,7 +426,7 @@ class EnhancedDataIngestion:
             logger.warning(f"Yahoo Finance failed for {symbol}, trying Finnhub...")
             try:
                 # Get candles from Finnhub (last 2 years)
-                from datetime import datetime, timedelta
+                # datetime and timedelta already imported at module level
                 end_date = datetime.now()
                 start_date = end_date - timedelta(days=730)  # 2 years
                 
