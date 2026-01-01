@@ -17,6 +17,7 @@ import { ExpertReasoningDisplay } from "@/components/ExpertReasoningDisplay";
 import { QuantMLAnalysis } from "@/components/QuantMLAnalysis";
 import { GreeksHeatmap } from "@/components/GreeksHeatmap";
 import { InstitutionalOptionsAnalysis } from "@/components/InstitutionalOptionsAnalysis";
+import { UltimateOptionsAnalysis } from "@/components/UltimateOptionsAnalysis";
 
 export default function Home() {
   const [symbol, setSymbol] = useState("");
@@ -187,26 +188,18 @@ export default function Home() {
       {/* Main Content */}
       <div className="container py-8">
         <Tabs defaultValue="stock" className="w-full">
-          <TabsList className="grid w-full grid-cols-7 mb-8">
+          <TabsList className="grid w-full grid-cols-5 mb-8">
             <TabsTrigger value="stock" className="flex items-center gap-2">
               <TrendingUp className="h-4 w-4" />
               Stock Analysis
             </TabsTrigger>
-            <TabsTrigger value="options" className="flex items-center gap-2">
-              <BarChart3 className="h-4 w-4" />
-              Options Analyzer
-            </TabsTrigger>
-            <TabsTrigger value="institutional" className="flex items-center gap-2">
+            <TabsTrigger value="ultimate-options" className="flex items-center gap-2">
               <Zap className="h-4 w-4" />
-              Institutional Options
+              Ultimate Options
             </TabsTrigger>
             <TabsTrigger value="scanner" className="flex items-center gap-2">
               <Search className="h-4 w-4" />
               Market Scanner
-            </TabsTrigger>
-            <TabsTrigger value="options-scanner" className="flex items-center gap-2">
-              <Search className="h-4 w-4" />
-              Option Scanner
             </TabsTrigger>
             <TabsTrigger value="ml" className="flex items-center gap-2">
               <Brain className="h-4 w-4" />
@@ -410,8 +403,13 @@ export default function Home() {
             )}
           </TabsContent>
 
-          {/* Options Analyzer Tab */}
-          <TabsContent value="options" className="space-y-6">
+          {/* Ultimate Options Tab */}
+          <TabsContent value="ultimate-options" className="space-y-6">
+            <UltimateOptionsAnalysis />
+          </TabsContent>
+
+          {/* LEGACY: Options Analyzer Tab - Hidden */}
+          <TabsContent value="options-legacy-hidden" className="space-y-6 hidden">
             <Card>
               <CardHeader>
                 <CardTitle>Top 3 Options Chains Analyzer</CardTitle>
@@ -654,8 +652,8 @@ export default function Home() {
             )}
           </TabsContent>
 
-          {/* Institutional Options Tab */}
-          <TabsContent value="institutional" className="space-y-6">
+          {/* LEGACY: Institutional Options Tab - Hidden */}
+          <TabsContent value="institutional-legacy-hidden" className="space-y-6 hidden">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -854,8 +852,8 @@ export default function Home() {
             )}
           </TabsContent>
 
-          {/* Options Scanner Tab */}
-          <TabsContent value="options-scanner" className="space-y-6">
+          {/* LEGACY: Options Scanner Tab - Hidden */}
+          <TabsContent value="options-scanner-legacy-hidden" className="space-y-6 hidden">
             <Card>
               <CardHeader>
                 <CardTitle>Options Scanner - Best Long Call Opportunities</CardTitle>
