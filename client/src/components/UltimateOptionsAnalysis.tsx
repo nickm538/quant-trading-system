@@ -203,7 +203,7 @@ function OptionCard({ option, rank }: { option: any; rank: number }) {
       </div>
 
       {/* Risk Management */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-3 bg-muted/20 rounded-lg">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-3 bg-muted/20 rounded-lg mb-4">
         <div>
           <div className="text-xs text-muted-foreground">IV</div>
           <div className="text-lg font-bold">{option.key_metrics?.iv?.toFixed(1)}%</div>
@@ -223,6 +223,28 @@ function OptionCard({ option, rank }: { option: any; rank: number }) {
           <div className="text-lg font-bold text-purple-500">{option.risk_management?.max_position_size_pct?.toFixed(2)}%</div>
         </div>
       </div>
+
+      {/* AI Reasoning */}
+      {option.ai_reasoning && (
+        <div className="p-3 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-lg border border-blue-500/20 mb-3">
+          <div className="flex items-center gap-2 mb-1">
+            <Brain className="h-4 w-4 text-blue-500" />
+            <span className="text-xs font-semibold text-blue-500">AI/QUANTUM INSIGHT</span>
+          </div>
+          <p className="text-sm text-muted-foreground italic">"{option.ai_reasoning}"</p>
+        </div>
+      )}
+
+      {/* Legendary Trader Reasoning */}
+      {option.legendary_reasoning && (
+        <div className="p-3 bg-gradient-to-r from-yellow-500/10 to-orange-500/10 rounded-lg border border-yellow-500/20">
+          <div className="flex items-center gap-2 mb-1">
+            <Award className="h-4 w-4 text-yellow-500" />
+            <span className="text-xs font-semibold text-yellow-500">LEGENDARY TRADER INSIGHT</span>
+          </div>
+          <p className="text-sm text-muted-foreground italic">"{option.legendary_reasoning}"</p>
+        </div>
+      )}
     </div>
   );
 }
@@ -326,15 +348,39 @@ function ScanResultCard({ opp, rank }: { opp: any; rank: number }) {
         </div>
       </div>
 
-      {/* TTM Squeeze */}
-      {opp.squeeze_active !== undefined && (
-        <TTMSqueezeIndicator
-          squeeze_active={opp.squeeze_active}
-          squeeze_bars={opp.squeeze_bars}
-          squeeze_momentum={opp.squeeze_momentum}
-          squeeze_signal={opp.squeeze_signal}
-          compact={true}
-        />
+      {/* TTM Squeeze - Only show if there's meaningful data */}
+      {opp.squeeze_active !== undefined && opp.squeeze_momentum !== 0 && (
+        <div className="mb-3">
+          <TTMSqueezeIndicator
+            squeeze_active={opp.squeeze_active}
+            squeeze_bars={opp.squeeze_bars || 0}
+            squeeze_momentum={opp.squeeze_momentum || 0}
+            squeeze_signal={opp.squeeze_signal || 'none'}
+            compact={true}
+          />
+        </div>
+      )}
+
+      {/* AI Reasoning */}
+      {opp.ai_reasoning && (
+        <div className="p-3 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-lg border border-blue-500/20 mb-3">
+          <div className="flex items-center gap-2 mb-1">
+            <Brain className="h-4 w-4 text-blue-500" />
+            <span className="text-xs font-semibold text-blue-500">AI/QUANTUM INSIGHT</span>
+          </div>
+          <p className="text-sm text-muted-foreground italic">"{opp.ai_reasoning}"</p>
+        </div>
+      )}
+
+      {/* Legendary Trader Reasoning */}
+      {opp.legendary_reasoning && (
+        <div className="p-3 bg-gradient-to-r from-yellow-500/10 to-orange-500/10 rounded-lg border border-yellow-500/20">
+          <div className="flex items-center gap-2 mb-1">
+            <Award className="h-4 w-4 text-yellow-500" />
+            <span className="text-xs font-semibold text-yellow-500">LEGENDARY TRADER INSIGHT</span>
+          </div>
+          <p className="text-sm text-muted-foreground italic">"{opp.legendary_reasoning}"</p>
+        </div>
       )}
     </div>
   );

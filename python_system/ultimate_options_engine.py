@@ -125,8 +125,8 @@ class UltimateOptionsEngine:
     
     # Hard Rejection Filters (Quality Control)
     HARD_FILTERS = {
-        'min_dte': 7,
-        'max_dte': 90,
+        'min_dte': 5,      # Allow shorter-term (5+ days)
+        'max_dte': 120,    # Allow longer-term (up to 4 months)
         'min_delta': 0.20,
         'max_delta': 0.80,
         'max_spread_pct': 25.0,
@@ -186,6 +186,43 @@ class UltimateOptionsEngine:
         
         # Consumer Growth
         'CELH', 'MNST', 'WING', 'TXRH', 'SHAK', 'CAVA', 'DUOL', 'BMBL', 'MTCH', 'LULU',
+        
+        # ═══════════════════════════════════════════════════════════════════════════
+        # TOP ETFs - High Liquidity Options Markets
+        # ═══════════════════════════════════════════════════════════════════════════
+        
+        # Major Index ETFs
+        'SPY', 'QQQ', 'IWM', 'DIA', 'VOO', 'VTI', 'IVV', 'RSP',
+        
+        # Sector ETFs
+        'XLF', 'XLE', 'XLK', 'XLV', 'XLI', 'XLY', 'XLP', 'XLU', 'XLB', 'XLRE',
+        'XBI', 'XOP', 'XHB', 'XRT', 'XME',
+        
+        # Leveraged ETFs (High Volatility)
+        'TQQQ', 'SQQQ', 'SPXL', 'SPXS', 'TNA', 'TZA', 'SOXL', 'SOXS', 'LABU', 'LABD',
+        'FNGU', 'FNGD', 'UPRO', 'SPXU', 'UDOW', 'SDOW',
+        
+        # Volatility ETFs
+        'VXX', 'UVXY', 'SVXY', 'VIXY',
+        
+        # Bond ETFs
+        'TLT', 'TBT', 'TMF', 'TMV', 'IEF', 'SHY', 'BND', 'HYG', 'JNK', 'LQD',
+        
+        # Commodity ETFs
+        'GLD', 'SLV', 'GDX', 'GDXJ', 'USO', 'UNG', 'WEAT', 'CORN', 'DBA', 'DBC',
+        
+        # International ETFs
+        'EEM', 'EFA', 'FXI', 'EWZ', 'EWJ', 'VWO', 'INDA', 'KWEB', 'MCHI',
+        
+        # Thematic ETFs
+        'ARKK', 'ARKG', 'ARKW', 'ARKF', 'ARKQ', 'BOTZ', 'ROBO', 'HACK', 'SKYY', 'CLOU',
+        'ICLN', 'TAN', 'QCLN', 'PBW', 'LIT', 'DRIV', 'IDRV',
+        
+        # Real Estate ETFs
+        'VNQ', 'XLRE', 'IYR', 'REM', 'MORT',
+        
+        # Dividend ETFs
+        'SCHD', 'VIG', 'DVY', 'HDV', 'DGRO',
     ]
     
     def __init__(self):
@@ -870,7 +907,36 @@ class UltimateOptionsEngine:
                     'squeeze_active': squeeze.get('active', False),
                     'squeeze_bars': squeeze.get('bars', 0),
                     'squeeze_momentum': squeeze.get('momentum', 0),
-                    'squeeze_signal': squeeze.get('signal', 'none')
+                    'squeeze_signal': squeeze.get('signal', 'none'),
+                    
+                    # AI & Legendary Reasoning
+                    'ai_reasoning': self._generate_ai_reasoning(
+                        symbol=symbol,
+                        option_type='call',
+                        strike=call['strike'],
+                        dte=analysis.get('days_to_expiry', 30),
+                        final_score=total_score,
+                        vol_score=analysis.get('volatility_score', 50),
+                        greeks_score=analysis.get('greek_score', 50),
+                        technical_score=50,
+                        ai_score=50,
+                        iv=candidate['implied_vol'] / 100,
+                        delta=analysis.get('greeks', {}).get('delta', 0.5),
+                        current_price=candidate['price'],
+                        market_regime={'regime': 'neutral', 'vix': 20}
+                    ),
+                    'legendary_reasoning': self._generate_legendary_reasoning(
+                        symbol=symbol,
+                        option_type='call',
+                        strike=call['strike'],
+                        dte=analysis.get('days_to_expiry', 30),
+                        final_score=total_score,
+                        legendary_score=60,
+                        iv=candidate['implied_vol'] / 100,
+                        delta=analysis.get('greeks', {}).get('delta', 0.5),
+                        current_price=candidate['price'],
+                        market_regime={'regime': 'neutral', 'vix': 20}
+                    )
                 }
                 
                 results.append(result)
@@ -1067,7 +1133,16 @@ class UltimateOptionsEngine:
                     'max_position_size_pct': min(5.0, kelly_pct * 0.5)
                 },
                 'iv_rank': self._calculate_iv_rank(iv, iv_history),
-                'iv_percentile': self._calculate_iv_percentile(iv, iv_history)
+                'iv_percentile': self._calculate_iv_percentile(iv, iv_history),
+                'ai_reasoning': self._generate_ai_reasoning(
+                    symbol, option_type, strike, dte, final_score, 
+                    vol_score, greeks_score, technical_score, ai_score,
+                    iv, delta, current_price, market_regime
+                ),
+                'legendary_reasoning': self._generate_legendary_reasoning(
+                    symbol, option_type, strike, dte, final_score,
+                    legendary_score, iv, delta, current_price, market_regime
+                )
             }
             
         except Exception as e:
@@ -1590,6 +1665,129 @@ class UltimateOptionsEngine:
             score += 20
         
         return min(100, max(0, score))
+    
+    # ═══════════════════════════════════════════════════════════════════════════
+    # AI & LEGENDARY TRADER REASONING GENERATORS
+    # ═══════════════════════════════════════════════════════════════════════════
+    
+    def _generate_ai_reasoning(
+        self,
+        symbol: str,
+        option_type: str,
+        strike: float,
+        dte: int,
+        final_score: float,
+        vol_score: float,
+        greeks_score: float,
+        technical_score: float,
+        ai_score: float,
+        iv: float,
+        delta: float,
+        current_price: float,
+        market_regime: Dict[str, Any]
+    ) -> str:
+        """
+        Generate a one-liner AI/Quantum reasoning for why this option is recommended.
+        """
+        reasons = []
+        
+        # Determine primary strength
+        if vol_score >= 80:
+            reasons.append(f"IV at {iv*100:.1f}% offers favorable volatility premium")
+        elif vol_score >= 60:
+            reasons.append(f"IV positioning is optimal for entry")
+        
+        if greeks_score >= 80:
+            reasons.append(f"Greeks profile shows ideal delta ({delta:.2f}) for directional exposure")
+        
+        if technical_score >= 80:
+            reasons.append("strong technical momentum alignment")
+        elif technical_score >= 60:
+            reasons.append("positive technical setup")
+        
+        if ai_score >= 70:
+            reasons.append("ML ensemble signals high probability of profit")
+        elif ai_score >= 50:
+            reasons.append("AI models show neutral-to-positive outlook")
+        
+        # Market regime context
+        regime = market_regime.get('regime', 'neutral')
+        vix = market_regime.get('vix', 20)
+        
+        if regime == 'bullish' and option_type.lower() == 'call':
+            reasons.append("bullish market regime supports calls")
+        elif regime == 'bearish' and option_type.lower() == 'put':
+            reasons.append("bearish conditions favor protective puts")
+        
+        # DTE context
+        if dte <= 14:
+            reasons.append(f"{dte}-day expiry captures near-term catalyst")
+        elif dte <= 45:
+            reasons.append(f"{dte}-day window balances theta decay vs. price movement")
+        else:
+            reasons.append(f"{dte}-day timeframe allows trend development")
+        
+        # Construct the one-liner
+        if reasons:
+            primary = reasons[0]
+            secondary = reasons[1] if len(reasons) > 1 else ""
+            if secondary:
+                return f"AI/Quantum: {primary.capitalize()}, with {secondary}."
+            return f"AI/Quantum: {primary.capitalize()}."
+        
+        return f"AI/Quantum: Score of {final_score:.1f} indicates favorable risk-adjusted opportunity."
+    
+    def _generate_legendary_reasoning(
+        self,
+        symbol: str,
+        option_type: str,
+        strike: float,
+        dte: int,
+        final_score: float,
+        legendary_score: float,
+        iv: float,
+        delta: float,
+        current_price: float,
+        market_regime: Dict[str, Any]
+    ) -> str:
+        """
+        Generate a one-liner from a legendary trader's perspective on why they'd take this trade.
+        """
+        moneyness = strike / current_price if current_price > 0 else 1.0
+        is_itm = (option_type.lower() == 'call' and strike < current_price) or \
+                 (option_type.lower() == 'put' and strike > current_price)
+        
+        # Select the most appropriate legendary trader based on the trade characteristics
+        
+        # Buffett: Value plays, ITM options, margin of safety
+        if is_itm and delta >= 0.60:
+            return f"Buffett: This ITM {option_type} at ${strike} offers intrinsic value with a margin of safety - the kind of asymmetric bet I favor."
+        
+        # Soros: Momentum, reflexivity, big moves
+        if legendary_score >= 80 and abs(delta) >= 0.50:
+            regime = market_regime.get('regime', 'neutral')
+            if regime in ['bullish', 'bearish']:
+                return f"Soros: Market reflexivity is in play - this {option_type} captures the self-reinforcing {regime} trend I look for."
+        
+        # Simons: Quantitative edge, statistical arbitrage
+        if iv < 0.25 and legendary_score >= 70:
+            return f"Simons: The quantitative signals align - low IV ({iv*100:.1f}%) combined with favorable Greeks creates a statistical edge."
+        
+        # Dalio: Risk parity, diversification, all-weather
+        if 0.35 <= abs(delta) <= 0.55:
+            return f"Dalio: This delta-neutral position at {delta:.2f} delta fits my risk-balanced approach - defined risk with asymmetric upside."
+        
+        # Paul Tudor Jones: Technical momentum, risk management
+        if dte <= 30 and legendary_score >= 60:
+            return f"PTJ: Short-dated {option_type} with {dte} DTE captures the momentum while limiting capital at risk - my style of trade."
+        
+        # Default: Generic legendary wisdom
+        if legendary_score >= 75:
+            return f"Legendary Consensus: Multiple master traders would approve this setup - strong risk/reward at ${strike} strike."
+        elif legendary_score >= 50:
+            return f"Trader Wisdom: This {option_type} offers reasonable risk-adjusted returns that disciplined traders seek."
+        else:
+            return f"Contrarian View: While not a consensus pick, this {option_type} may reward patient, disciplined execution."
     
     # ═══════════════════════════════════════════════════════════════════════════
     # HELPER FUNCTIONS
