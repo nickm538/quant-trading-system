@@ -398,7 +398,8 @@ class GreeksCalculator:
         tolerance: float = 1e-5
     ) -> float:
         """
-        Calculate implied volatility from option price using Newton-Raphson method.
+        Calculate implied volatility from option price using Newton-Raphson method
+        with bisection fallback for robustness.
         
         Args:
             option_price: Market price of the option
@@ -418,62 +419,80 @@ class GreeksCalculator:
             if option_price <= 0 or spot <= 0 or strike <= 0 or time_to_expiry <= 0:
                 return 0.0
             
-            # Calculate intrinsic value
-            if option_type.lower() == 'call':
-                intrinsic = max(0, spot - strike)
-            else:
-                intrinsic = max(0, strike - spot)
+            # Calculate intrinsic value with proper discounting
+            discount_rate = np.exp(-self.risk_free_rate * time_to_expiry)
             
-            # Time value must be positive
+            if option_type.lower() == 'call':
+                intrinsic = max(0, spot * np.exp(-dividend_yield * time_to_expiry) - strike * discount_rate)
+            else:
+                intrinsic = max(0, strike * discount_rate - spot * np.exp(-dividend_yield * time_to_expiry))
+            
+            # For deep ITM options, time value can be very small but still valid
             time_value = option_price - intrinsic
-            if time_value <= 0:
-                return 0.0  # No time value means no IV to calculate
+            
+            # Only reject if option price is below intrinsic (arbitrage)
+            if option_price < intrinsic * 0.99:  # Allow 1% tolerance for bid-ask
+                return 0.0
             
             # Initial guess using Brenner-Subrahmanyam approximation
-            # IV ≈ sqrt(2π/T) * (time_value / spot)
-            iv = np.sqrt(2 * np.pi / time_to_expiry) * (time_value / spot)
-            iv = max(0.05, min(iv, 2.0))  # Clamp between 5% and 200%
+            # For deep ITM, use a more conservative initial guess
+            if time_value > 0:
+                iv = np.sqrt(2 * np.pi / time_to_expiry) * (time_value / spot)
+            else:
+                iv = 0.20  # Default 20% for deep ITM with minimal time value
             
-            for i in range(max_iterations):
-                # Calculate option price with current IV guess
-                d1, d2 = self._calculate_d1_d2(
-                    spot, strike, time_to_expiry, iv, dividend_yield
-                )
-                
-                discount_factor = np.exp(-dividend_yield * time_to_expiry)
+            iv = max(0.01, min(iv, 2.0))  # Clamp between 1% and 200%
+            
+            # Helper function to calculate option price for given IV
+            def calc_price(vol):
+                d1, d2 = self._calculate_d1_d2(spot, strike, time_to_expiry, vol, dividend_yield)
+                df = np.exp(-dividend_yield * time_to_expiry)
                 
                 if option_type.lower() == 'call':
-                    calculated_price = (
-                        spot * discount_factor * norm.cdf(d1) -
-                        strike * np.exp(-self.risk_free_rate * time_to_expiry) * norm.cdf(d2)
-                    )
-                else:  # put
-                    calculated_price = (
-                        strike * np.exp(-self.risk_free_rate * time_to_expiry) * norm.cdf(-d2) -
-                        spot * discount_factor * norm.cdf(-d1)
-                    )
+                    return spot * df * norm.cdf(d1) - strike * discount_rate * norm.cdf(d2)
+                else:
+                    return strike * discount_rate * norm.cdf(-d2) - spot * df * norm.cdf(-d1)
+            
+            # Newton-Raphson with bisection fallback
+            iv_low, iv_high = 0.001, 5.0
+            
+            for i in range(max_iterations):
+                calculated_price = calc_price(iv)
+                price_diff = calculated_price - option_price
                 
                 # Check convergence
-                price_diff = calculated_price - option_price
                 if abs(price_diff) < tolerance:
                     return iv
                 
+                # Update bounds for bisection fallback
+                if price_diff > 0:
+                    iv_high = iv
+                else:
+                    iv_low = iv
+                
                 # Calculate vega for Newton-Raphson update
-                # Vega from _calculate_vega is per 1%, so multiply by 100
+                d1, _ = self._calculate_d1_d2(spot, strike, time_to_expiry, iv, dividend_yield)
                 vega = self._calculate_vega(spot, d1, time_to_expiry, dividend_yield) * 100
                 
-                if abs(vega) < 1e-10:
-                    # Vega too small, can't converge
-                    break
+                if abs(vega) > 1e-10:
+                    # Newton-Raphson step
+                    new_iv = iv - price_diff / vega
+                    
+                    # If Newton step is within bounds, use it; otherwise bisect
+                    if iv_low < new_iv < iv_high:
+                        iv = new_iv
+                    else:
+                        iv = (iv_low + iv_high) / 2
+                else:
+                    # Vega too small, use bisection
+                    iv = (iv_low + iv_high) / 2
                 
-                # Newton-Raphson update
-                iv = iv - price_diff / vega
-                
-                # Keep IV in reasonable range
-                iv = max(0.01, min(iv, 3.0))
+                # Check if bounds have converged
+                if iv_high - iv_low < tolerance:
+                    return iv
             
-            # If we didn't converge but got reasonable value, return it
-            if 0.01 <= iv <= 3.0:
+            # Return best estimate if we didn't converge
+            if 0.001 <= iv <= 5.0:
                 return iv
             else:
                 return 0.0

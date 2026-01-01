@@ -3,7 +3,7 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router, protectedProcedure } from "./_core/trpc";
 import { z } from "zod";
-import { analyzeStock, analyzeOptions, scanMarket, checkPythonSystem, getGreeksHeatmap, analyzeInstitutionalOptions } from "./python_executor";
+import { analyzeStock, analyzeOptions, scanMarket, checkPythonSystem, getGreeksHeatmap, analyzeInstitutionalOptions, scanUltimateOptions, analyzeUltimateOptions } from "./python_executor";
 import { exec } from "child_process";
 import { promisify } from "util";
 import * as path from "path";
@@ -107,7 +107,31 @@ export const appRouter = router({
         return await scanMarket(input);
       }),
     
-    // Options scanner endpoint
+    // Ultimate Options Scanner - Market-wide scan for best opportunities
+    scanUltimateOptions: publicProcedure
+      .input(
+        z.object({
+          max_results: z.number().int().min(5).max(20).optional().default(10),
+          option_type: z.enum(['call', 'put', 'both']).optional().default('both'),
+        })
+      )
+      .mutation(async ({ input }) => {
+        return await scanUltimateOptions(input);
+      }),
+    
+    // Ultimate Options Analyzer - Deep analysis of a single symbol
+    analyzeUltimateOptions: publicProcedure
+      .input(
+        z.object({
+          symbol: z.string().min(1).max(10),
+          option_type: z.enum(['call', 'put', 'both']).optional().default('both'),
+        })
+      )
+      .mutation(async ({ input }) => {
+        return await analyzeUltimateOptions(input);
+      }),
+    
+    // Legacy Options scanner endpoint (redirects to Ultimate)
     scanOptions: publicProcedure
       .input(
         z.object({
@@ -115,43 +139,8 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ input }) => {
-        try {
-          const pythonPath = 'python3.11';
-          const scriptPath = path.join(process.cwd(), 'python_system/options_scanner.py');
-          
-          console.log(`🔍 Starting options scan for top ${input.max_results} opportunities...`);
-          
-          const { stdout, stderr } = await execAsync(
-            `${pythonPath} ${scriptPath} ${input.max_results}`,
-            { 
-              maxBuffer: 20 * 1024 * 1024, 
-              timeout: 600000, // 10min timeout (options scanning is intensive)
-              env: {
-                ...process.env,
-                PYTHONPATH: '',
-                PYTHONHOME: '',
-                LD_LIBRARY_PATH: process.env.LD_LIBRARY_PATH || '',
-              },
-            }
-          );
-          
-          if (stderr) {
-            console.log(`⚠️  Options scanner stderr: ${stderr}`);
-          }
-          
-          console.log(`✅ Options scanner completed`);
-          
-          // Parse JSON output from Python
-          const result = JSON.parse(stdout);
-          return result;
-        } catch (error: any) {
-          console.error('❌ Options scanner error:', error);
-          return {
-            success: false,
-            error: error.message,
-            opportunities: [],
-          };
-        }
+        // Redirect to Ultimate Options Scanner
+        return await scanUltimateOptions({ max_results: input.max_results, option_type: 'both' });
       }),
     
     healthCheck: publicProcedure.query(async () => {

@@ -262,6 +262,92 @@ export async function scanMarket(params: {
 /**
  * Quick health check for Python system
  */
+/**
+ * Ultimate Options Intelligence Engine - Market Scan
+ * Scans entire market for best options opportunities
+ */
+export async function scanUltimateOptions(params: {
+  max_results?: number;
+  option_type?: 'call' | 'put' | 'both';
+}): Promise<any> {
+  const { max_results = 10, option_type = 'both' } = params;
+
+  const ULTIMATE_SCRIPT = path.join(PYTHON_SYSTEM_PATH, 'run_ultimate_options.py');
+  const command = `${PYTHON_BIN} ${ULTIMATE_SCRIPT} scan --max-results ${max_results} --type ${option_type}`;
+
+  try {
+    console.log(`🚀 Starting Ultimate Options scan for top ${max_results} ${option_type} opportunities...`);
+    
+    const { stdout, stderr } = await execAsync(command, {
+      maxBuffer: 50 * 1024 * 1024, // 50MB buffer
+      timeout: 900000, // 15 minutes for full market scan
+      env: {
+        ...process.env,
+        PYTHONPATH: '',
+        PYTHONHOME: '',
+        LD_LIBRARY_PATH: process.env.LD_LIBRARY_PATH || '',
+      },
+    });
+
+    if (stderr && !stderr.includes('INFO') && !stderr.includes('WARNING')) {
+      console.error('Ultimate Options stderr:', stderr);
+    }
+
+    console.log(`✅ Ultimate Options scan completed`);
+    return JSON.parse(stdout);
+  } catch (error: any) {
+    console.error('Ultimate Options scan error:', error);
+    return {
+      success: false,
+      error: `Ultimate Options scan failed: ${error.message}`,
+      opportunities: [],
+    };
+  }
+}
+
+/**
+ * Ultimate Options Intelligence Engine - Symbol Analysis
+ * Deep analysis of a single stock's options
+ */
+export async function analyzeUltimateOptions(params: {
+  symbol: string;
+  option_type?: 'call' | 'put' | 'both';
+}): Promise<any> {
+  const { symbol, option_type = 'both' } = params;
+
+  const ULTIMATE_SCRIPT = path.join(PYTHON_SYSTEM_PATH, 'run_ultimate_options.py');
+  const command = `${PYTHON_BIN} ${ULTIMATE_SCRIPT} analyze ${symbol} --type ${option_type}`;
+
+  try {
+    console.log(`🔍 Starting Ultimate Options analysis for ${symbol}...`);
+    
+    const { stdout, stderr } = await execAsync(command, {
+      maxBuffer: 20 * 1024 * 1024, // 20MB buffer
+      timeout: 300000, // 5 minutes for single symbol analysis
+      env: {
+        ...process.env,
+        PYTHONPATH: '',
+        PYTHONHOME: '',
+        LD_LIBRARY_PATH: process.env.LD_LIBRARY_PATH || '',
+      },
+    });
+
+    if (stderr && !stderr.includes('INFO') && !stderr.includes('WARNING')) {
+      console.error('Ultimate Options stderr:', stderr);
+    }
+
+    console.log(`✅ Ultimate Options analysis completed for ${symbol}`);
+    return JSON.parse(stdout);
+  } catch (error: any) {
+    console.error('Ultimate Options analysis error:', error);
+    return {
+      success: false,
+      error: `Ultimate Options analysis failed for ${symbol}: ${error.message}`,
+      symbol,
+    };
+  }
+}
+
 export async function checkPythonSystem(): Promise<boolean> {
   try {
     const command = `${PYTHON_BIN} ${WRAPPER_SCRIPT} health_check`;
