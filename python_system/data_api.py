@@ -1,6 +1,11 @@
 """
 Data API Client for Manus API Hub
-Provides access to financial data through the Manus API Hub with yfinance fallback
+Provides access to financial data through the Manus API Hub with multi-source fallbacks.
+
+Data Source Priority:
+1. Manus API Hub (primary)
+2. yfinance (fallback #1)
+3. Twelve Data (fallback #2)
 """
 
 import os
@@ -11,10 +16,19 @@ import pandas as pd
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional
 
+# Import Twelve Data client for additional fallback
+try:
+    from twelvedata_client import TwelveDataClient
+    TWELVEDATA_AVAILABLE = True
+except ImportError:
+    TWELVEDATA_AVAILABLE = False
+
 
 class ApiClient:
     """
-    Client for accessing Manus API Hub endpoints with yfinance fallback
+    Client for accessing Manus API Hub endpoints with multi-source fallbacks.
+    
+    Fallback chain: Manus API Hub -> yfinance -> Twelve Data
     """
     
     def __init__(self):
@@ -24,8 +38,17 @@ class ApiClient:
         self.session.headers.update({
             'User-Agent': 'Quant-Trading-System/1.0'
         })
-        # Enable yfinance as fallback when Manus API Hub is unavailable
+        # Enable fallbacks when Manus API Hub is unavailable
         self.use_yfinance_fallback = True
+        
+        # Initialize Twelve Data client as additional fallback
+        self.twelvedata_client = None
+        if TWELVEDATA_AVAILABLE:
+            try:
+                self.twelvedata_client = TwelveDataClient()
+                print("✓ Twelve Data fallback initialized", file=sys.stderr)
+            except Exception as e:
+                print(f"Twelve Data fallback unavailable: {e}", file=sys.stderr)
     
     def call_api(self, endpoint: str, query: Optional[Dict[str, Any]] = None, method: str = 'GET') -> Dict[str, Any]:
         """
@@ -71,9 +94,21 @@ class ApiClient:
             if 'YahooFinance' in endpoint and self.use_yfinance_fallback:
                 print(f"Trying yfinance fallback...", file=sys.stderr)
                 if 'get_stock_chart' in endpoint:
-                    return self._get_stock_chart_yfinance(query)
+                    result = self._get_stock_chart_yfinance(query)
+                    if result:
+                        return result
                 elif 'get_stock_insights' in endpoint:
-                    return self._get_stock_insights_yfinance(query)
+                    result = self._get_stock_insights_yfinance(query)
+                    if result:
+                        return result
+                
+                # If yfinance also failed, try Twelve Data
+                if self.twelvedata_client:
+                    print(f"Trying Twelve Data fallback...", file=sys.stderr)
+                    if 'get_stock_chart' in endpoint:
+                        return self._get_stock_chart_twelvedata(query)
+                    elif 'get_stock_insights' in endpoint:
+                        return self._get_stock_insights_twelvedata(query)
             return {}
     
     def get_stock_chart(self, symbol: str, interval: str = '1d', range_period: str = '1y') -> Dict[str, Any]:
@@ -202,4 +237,103 @@ class ApiClient:
             
         except Exception as e:
             print(f"yfinance insights fallback failed: {e}", file=sys.stderr)
+            return {}
+    
+    def _get_stock_chart_twelvedata(self, query: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Get stock chart data using Twelve Data as fallback
+        """
+        try:
+            symbol = query.get('symbol')
+            interval = query.get('interval', '1d')
+            range_period = query.get('range', '1y')
+            
+            # Convert range to outputsize (approximate trading days)
+            range_to_days = {
+                '1d': 1, '5d': 5, '1mo': 22, '3mo': 66,
+                '6mo': 126, '1y': 252, '2y': 504, '5y': 1260
+            }
+            outputsize = range_to_days.get(range_period, 252)
+            
+            # Convert interval format
+            interval_map = {
+                '1m': '1min', '5m': '5min', '15m': '15min', '30m': '30min',
+                '1h': '1h', '1d': '1day', '1wk': '1week', '1mo': '1month'
+            }
+            td_interval = interval_map.get(interval, '1day')
+            
+            # Fetch from Twelve Data
+            df = self.twelvedata_client.get_time_series(
+                symbol, interval=td_interval, outputsize=outputsize
+            )
+            
+            if df.empty:
+                return {}
+            
+            # Get current quote for meta info
+            quote = self.twelvedata_client.get_quote(symbol)
+            
+            # Convert to Yahoo Finance API format
+            timestamps = [int(ts.timestamp()) for ts in df.index]
+            
+            result = {
+                'chart': {
+                    'result': [{
+                        'meta': {
+                            'currency': quote.get('currency', 'USD'),
+                            'symbol': symbol,
+                            'regularMarketPrice': float(df['close'].iloc[-1]),
+                            'previousClose': float(df['close'].iloc[-2]) if len(df) > 1 else float(df['close'].iloc[-1])
+                        },
+                        'timestamp': timestamps,
+                        'indicators': {
+                            'quote': [{
+                                'open': df['open'].tolist(),
+                                'high': df['high'].tolist(),
+                                'low': df['low'].tolist(),
+                                'close': df['close'].tolist(),
+                                'volume': df['volume'].tolist() if 'volume' in df.columns else [0] * len(df)
+                            }]
+                        }
+                    }]
+                }
+            }
+            
+            print(f"✓ Twelve Data chart fallback successful for {symbol}", file=sys.stderr)
+            return result
+            
+        except Exception as e:
+            print(f"Twelve Data chart fallback failed: {e}", file=sys.stderr)
+            return {}
+    
+    def _get_stock_insights_twelvedata(self, query: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Get stock insights using Twelve Data as fallback
+        """
+        try:
+            symbol = query.get('symbol')
+            quote = self.twelvedata_client.get_quote(symbol)
+            
+            if 'error' in quote:
+                return {}
+            
+            # Convert to insights format
+            result = {
+                'symbol': symbol,
+                'companyName': quote.get('name', symbol),
+                'sector': 'Unknown',  # Twelve Data basic plan doesn't include sector
+                'industry': 'Unknown',
+                'marketCap': 0,  # Would need fundamentals endpoint
+                'peRatio': 0,
+                'dividendYield': 0,
+                'beta': 1.0,
+                'fiftyTwoWeekHigh': quote.get('fifty_two_week', {}).get('high', 0),
+                'fiftyTwoWeekLow': quote.get('fifty_two_week', {}).get('low', 0)
+            }
+            
+            print(f"✓ Twelve Data insights fallback successful for {symbol}", file=sys.stderr)
+            return result
+            
+        except Exception as e:
+            print(f"Twelve Data insights fallback failed: {e}", file=sys.stderr)
             return {}
