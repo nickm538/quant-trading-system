@@ -366,3 +366,91 @@ export async function checkPythonSystem(): Promise<boolean> {
     return false;
   }
 }
+
+
+/**
+ * Get comprehensive fundamentals analysis with educational content
+ */
+export async function analyzeFundamentals(params: {
+  symbol: string;
+}): Promise<any> {
+  const { symbol } = params;
+
+  const command = `${PYTHON_BIN} -c "
+import json
+from fundamentals_analyzer import analyze_fundamentals
+result = analyze_fundamentals('${symbol}')
+print(json.dumps(result, default=str))
+"`;
+
+  try {
+    console.log(`📊 Analyzing fundamentals for ${symbol}...`);
+    const { stdout, stderr } = await execAsync(command, {
+      maxBuffer: 10 * 1024 * 1024,
+      timeout: 60000,
+      cwd: PYTHON_SYSTEM_PATH,
+      env: {
+        ...process.env,
+        PYTHONPATH: '',
+        PYTHONHOME: '',
+        LD_LIBRARY_PATH: process.env.LD_LIBRARY_PATH || '',
+      },
+    });
+
+    if (stderr && !stderr.includes('INFO') && !stderr.includes('WARNING')) {
+      console.error('Python stderr:', stderr);
+    }
+
+    return JSON.parse(stdout);
+  } catch (error: any) {
+    console.error('Fundamentals analysis error:', error);
+    return {
+      success: false,
+      error: `Failed to analyze fundamentals for ${symbol}: ${error.message}`,
+      symbol,
+    };
+  }
+}
+
+/**
+ * Get trading education content
+ */
+export async function getEducation(params: {
+  topic?: string;
+}): Promise<any> {
+  const { topic } = params;
+
+  const topicArg = topic ? `'${topic}'` : 'None';
+  const command = `${PYTHON_BIN} -c "
+import json
+from trading_education import get_education
+result = get_education(${topicArg})
+print(json.dumps(result, default=str))
+"`;
+
+  try {
+    console.log(`📚 Getting education content${topic ? ` for: ${topic}` : ''}...`);
+    const { stdout, stderr } = await execAsync(command, {
+      maxBuffer: 10 * 1024 * 1024,
+      timeout: 30000,
+      cwd: PYTHON_SYSTEM_PATH,
+      env: {
+        ...process.env,
+        PYTHONPATH: '',
+        PYTHONHOME: '',
+        LD_LIBRARY_PATH: process.env.LD_LIBRARY_PATH || '',
+      },
+    });
+
+    if (stderr && !stderr.includes('INFO') && !stderr.includes('WARNING')) {
+      console.error('Python stderr:', stderr);
+    }
+
+    return JSON.parse(stdout);
+  } catch (error: any) {
+    console.error('Education content error:', error);
+    return {
+      error: `Failed to get education content: ${error.message}`,
+    };
+  }
+}

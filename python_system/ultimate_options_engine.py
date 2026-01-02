@@ -127,8 +127,8 @@ class UltimateOptionsEngine:
     HARD_FILTERS = {
         'min_dte': 5,      # Allow shorter-term (5+ days)
         'max_dte': 120,    # Allow longer-term (up to 4 months)
-        'min_delta': 0.20,
-        'max_delta': 0.80,
+        'min_delta': 0.10,  # Allow OTM options (10 delta)
+        'max_delta': 0.95,  # Allow ITM options (95 delta)
         'max_spread_pct': 25.0,
         'min_open_interest': 10,
         'min_volume': 1,
@@ -388,7 +388,8 @@ class UltimateOptionsEngine:
                         earnings_data=earnings_data,
                         sentiment_data=sentiment_data,
                         squeeze_data=squeeze_data,
-                        market_regime=market_regime
+                        market_regime=market_regime,
+                        symbol=symbol
                     )
                     if score_result:
                         scored_calls.append(score_result)
@@ -405,7 +406,8 @@ class UltimateOptionsEngine:
                         earnings_data=earnings_data,
                         sentiment_data=sentiment_data,
                         squeeze_data=squeeze_data,
-                        market_regime=market_regime
+                        market_regime=market_regime,
+                        symbol=symbol
                     )
                     if score_result:
                         scored_puts.append(score_result)
@@ -433,12 +435,23 @@ class UltimateOptionsEngine:
             
             scan_duration = (datetime.now() - start_time).total_seconds()
             
+            # Combine top calls and puts into opportunities for frontend
+            opportunities = []
+            for call in top_calls:
+                call['symbol'] = symbol
+                opportunities.append(call)
+            for put in top_puts:
+                put['symbol'] = symbol
+                opportunities.append(put)
+            opportunities.sort(key=lambda x: x.get('final_score', 0), reverse=True)
+            
             return {
                 'success': True,
                 'symbol': symbol,
                 'current_price': current_price,
                 
                 # Top Recommendations
+                'opportunities': opportunities,  # Combined for frontend
                 'top_calls': top_calls,
                 'top_puts': top_puts,
                 'total_calls_analyzed': len(options_data.get('calls', [])),
@@ -558,7 +571,8 @@ class UltimateOptionsEngine:
                 earnings_data=earnings_data,
                 sentiment_data=sentiment_data,
                 squeeze_data=squeeze_data,
-                market_regime=market_regime
+                market_regime=market_regime,
+                symbol=symbol
             )
             
             if not result:
@@ -963,7 +977,8 @@ class UltimateOptionsEngine:
         earnings_data: Dict[str, Any],
         sentiment_data: Dict[str, Any],
         squeeze_data: Dict[str, Any],
-        market_regime: Dict[str, Any]
+        market_regime: Dict[str, Any],
+        symbol: str = 'UNKNOWN'
     ) -> Optional[Dict[str, Any]]:
         """
         Score a single option using 12-factor institutional methodology.
@@ -1918,7 +1933,7 @@ class UltimateOptionsEngine:
             all_calls = []
             all_puts = []
             
-            for exp_date in expirations[:6]:  # First 6 expirations
+            for exp_date in expirations[:12]:  # First 12 expirations (covers ~4 months)
                 try:
                     opt_chain = ticker.option_chain(exp_date)
                     
@@ -1932,7 +1947,7 @@ class UltimateOptionsEngine:
                         exp_datetime = datetime.strptime(exp_date, '%Y-%m-%d')
                         dte = (exp_datetime - datetime.now()).days
                         
-                        if dte < 7 or dte > 90:
+                        if dte < self.HARD_FILTERS['min_dte'] or dte > self.HARD_FILTERS['max_dte']:
                             continue
                         
                         all_calls.append({
@@ -1956,7 +1971,7 @@ class UltimateOptionsEngine:
                         exp_datetime = datetime.strptime(exp_date, '%Y-%m-%d')
                         dte = (exp_datetime - datetime.now()).days
                         
-                        if dte < 7 or dte > 90:
+                        if dte < self.HARD_FILTERS['min_dte'] or dte > self.HARD_FILTERS['max_dte']:
                             continue
                         
                         all_puts.append({

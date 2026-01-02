@@ -3,7 +3,7 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router, protectedProcedure } from "./_core/trpc";
 import { z } from "zod";
-import { analyzeStock, analyzeOptions, scanMarket, checkPythonSystem, getGreeksHeatmap, analyzeInstitutionalOptions, scanUltimateOptions, analyzeUltimateOptions } from "./python_executor";
+import { analyzeStock, analyzeOptions, scanMarket, checkPythonSystem, getGreeksHeatmap, analyzeInstitutionalOptions, scanUltimateOptions, analyzeUltimateOptions, analyzeFundamentals, getEducation } from "./python_executor";
 import { exec } from "child_process";
 import { promisify } from "util";
 import * as path from "path";
@@ -313,6 +313,28 @@ export const appRouter = router({
         };
       }
     }),
+    
+    // Comprehensive fundamentals analysis with educational content
+    analyzeFundamentals: publicProcedure
+      .input(
+        z.object({
+          symbol: z.string().min(1).max(10),
+        })
+      )
+      .mutation(async ({ input }) => {
+        return await analyzeFundamentals({ symbol: input.symbol.toUpperCase() });
+      }),
+    
+    // Get trading education content
+    getEducation: publicProcedure
+      .input(
+        z.object({
+          topic: z.string().optional(),
+        })
+      )
+      .query(async ({ input }) => {
+        return await getEducation({ topic: input.topic });
+      }),
   }),
 });
 
