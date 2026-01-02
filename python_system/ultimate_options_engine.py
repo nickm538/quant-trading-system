@@ -278,8 +278,8 @@ class UltimateOptionsEngine:
         if not tier1_candidates:
             return self._empty_scan_result("No candidates passed Tier 1 filter")
         
-        # Phase 2: Medium Analysis (Tier 2)
-        tier2_candidates = self._tier2_medium_analysis(tier1_candidates[:100])
+        # Phase 2: Medium Analysis (Tier 2) - Limit to top 30 for speed
+        tier2_candidates = self._tier2_medium_analysis(tier1_candidates[:30])
         
         if not tier2_candidates:
             return self._empty_scan_result("No candidates passed Tier 2 analysis")
@@ -631,23 +631,25 @@ class UltimateOptionsEngine:
                 if not expirations:
                     return None
                 
-                # Check for valid expirations (2-12 weeks)
+                # Check for valid expirations (use HARD_FILTERS for consistency)
                 today = datetime.now()
                 valid_expirations = []
                 for exp_str in expirations:
                     exp_date = datetime.strptime(exp_str, '%Y-%m-%d')
                     days_to_exp = (exp_date - today).days
-                    if 14 <= days_to_exp <= 84:
+                    if self.HARD_FILTERS['min_dte'] <= days_to_exp <= self.HARD_FILTERS['max_dte']:
                         valid_expirations.append(exp_str)
                 
                 if not valid_expirations:
                     return None
                 
-                # Check options volume
+                # Check options activity (relaxed for low-volume periods like holidays)
                 opt_chain = ticker.option_chain(valid_expirations[0])
                 total_volume = opt_chain.calls['volume'].fillna(0).sum()
+                total_oi = opt_chain.calls['openInterest'].fillna(0).sum()
                 
-                if total_volume < 300:
+                # Accept if either volume > 50 OR open interest > 500
+                if total_volume < 50 and total_oi < 500:
                     return None
                 
                 return {
@@ -717,7 +719,7 @@ class UltimateOptionsEngine:
                 best_call = None
                 best_score = -999
                 
-                for exp_date in candidate['valid_expirations'][:3]:
+                for exp_date in candidate['valid_expirations'][:2]:  # Limit to 2 for speed
                     try:
                         opt_chain = ticker.option_chain(exp_date)
                         calls = opt_chain.calls
@@ -725,10 +727,10 @@ class UltimateOptionsEngine:
                         if calls.empty:
                             continue
                         
-                        # Filter for valid options
+                        # Filter for valid options (very relaxed for low-data periods like holidays)
                         valid_calls = calls[
-                            (calls['volume'].fillna(0) >= 1) &
-                            (calls['openInterest'].fillna(0) >= 10)
+                            (calls['openInterest'].fillna(0) >= 1) |  # Any OI
+                            (calls['volume'].fillna(0) >= 1)  # Or any volume
                         ].copy()
                         
                         if valid_calls.empty:
@@ -814,6 +816,11 @@ class UltimateOptionsEngine:
                 candidate['ttm_squeeze'] = squeeze_data
                 
                 qualified.append(candidate)
+                
+                # Early exit if we have enough candidates
+                if len(qualified) >= 15:
+                    logger.info(f"Tier 2: Early exit with {len(qualified)} qualified candidates")
+                    break
                 
             except Exception:
                 continue
