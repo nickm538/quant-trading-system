@@ -188,8 +188,60 @@ class UltimateOptionsEngine:
         'CELH', 'MNST', 'WING', 'TXRH', 'SHAK', 'CAVA', 'DUOL', 'BMBL', 'MTCH', 'LULU',
         
         # ═══════════════════════════════════════════════════════════════════════════
+        # MID-CAP STOCKS - Growth Opportunities ($2B - $10B market cap)
+        # ═══════════════════════════════════════════════════════════════════════════
+        
+        # Mid-Cap Tech
+        'PATH', 'GTLB', 'CFLT', 'ESTC', 'DOCN', 'BRZE', 'TOST', 'SMAR', 'APPF', 'PCTY',
+        'ASAN', 'FROG', 'MNDY', 'HUBS', 'WDAY', 'VEEV', 'PAYC', 'PCOR', 'CWAN', 'TENB',
+        
+        # Mid-Cap Healthcare/Biotech
+        'EXAS', 'HALO', 'RARE', 'SRPT', 'ALNY', 'BMRN', 'INCY', 'SGEN', 'UTHR', 'NBIX',
+        'JAZZ', 'TECH', 'BIO', 'HOLX', 'ALGN', 'DXCM', 'PODD', 'IRTC', 'NVST', 'SWAV',
+        
+        # Mid-Cap Consumer
+        'DECK', 'CROX', 'SKECHERS', 'GRMN', 'POOL', 'WSM', 'RH', 'ETSY', 'W', 'CHWY',
+        'BROS', 'CARG', 'CVNA', 'SFM', 'OLLI', 'PLAY', 'EAT', 'CAKE', 'DINE', 'JACK',
+        
+        # Mid-Cap Industrials
+        'GNRC', 'TTC', 'SWK', 'HUBB', 'RBC', 'AGCO', 'OSK', 'SITE', 'BLDR', 'TREX',
+        
+        # Mid-Cap Financials
+        'LPLA', 'IBKR', 'MKTX', 'CBOE', 'CME', 'ICE', 'NDAQ', 'VIRT', 'HOOD', 'SOFI',
+        
+        # ═══════════════════════════════════════════════════════════════════════════
+        # SMALL-CAP STOCKS - High Growth Potential ($500M - $2B market cap)
+        # ═══════════════════════════════════════════════════════════════════════════
+        
+        # Small-Cap Tech
+        'IONQ', 'RGTI', 'QUBT', 'ARQQ', 'SOUN', 'BBAI', 'PRCT', 'AI', 'UPST', 'AFRM',
+        'OPEN', 'RDFN', 'REAL', 'COMP', 'SMCI', 'VRT', 'AEHR', 'ONTO', 'ACLS', 'FORM',
+        
+        # Small-Cap Biotech (High Volatility)
+        'MRNA', 'BNTX', 'NVAX', 'SAVA', 'RETA', 'KRTX', 'IMVT', 'KRYS', 'RCKT', 'BEAM',
+        'CRSP', 'EDIT', 'NTLA', 'VERV', 'PRME', 'RXRX', 'DNA', 'SDGR', 'TWST', 'CDNA',
+        
+        # Small-Cap Energy
+        'NEXT', 'ARRY', 'NOVA', 'MAXN', 'SPWR', 'CSIQ', 'JKS', 'DQ', 'STEM', 'ENVX',
+        
+        # Small-Cap Consumer
+        'BIRD', 'PRPL', 'LOVE', 'LE', 'CURV', 'RENT', 'POSH', 'FTCH',
+        
+        # Small-Cap Cannabis (High Volatility)
+        'TLRY', 'CGC', 'ACB', 'SNDL', 'CRON', 'HEXO', 'OGI', 'VFF', 'GRWG', 'CURLF',
+        
+        # Small-Cap Gaming/Entertainment
+        'SKLZ', 'RSI', 'GENI', 'BETZ', 'PENN', 'DKNG', 'WYNN', 'LVS', 'MGM', 'CZR',
+        
+        # Meme Stocks (High Retail Interest)
+        'GME', 'AMC', 'BBBY', 'BB', 'NOK', 'EXPR', 'KOSS', 'NAKD', 'CLOV', 'WISH',
+        
+        # ═══════════════════════════════════════════════════════════════════════════
         # TOP ETFs - High Liquidity Options Markets
         # ═══════════════════════════════════════════════════════════════════════════
+        
+        # Small/Mid-Cap ETFs
+        'IJR', 'IJH', 'VB', 'VO', 'VBK', 'VBR', 'SCHA', 'SCHM', 'MDY', 'SLY',
         
         # Major Index ETFs
         'SPY', 'QQQ', 'IWM', 'DIA', 'VOO', 'VTI', 'IVV', 'RSP',
