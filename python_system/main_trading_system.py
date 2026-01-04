@@ -566,13 +566,18 @@ class InstitutionalTradingSystem:
             options_score * OPTIONS_WEIGHT
         )
         
-        # Determine signal type
-        if confidence >= 65:
+        # Determine signal type - 5-tier system matching Stock Analysis
+        # Uses confidence score which directly reflects overall analysis quality
+        if confidence >= 75:
+            signal_type = 'STRONG_BUY'
+        elif confidence >= 60:
             signal_type = 'BUY'
-        elif confidence <= 35:
+        elif confidence >= 40:
+            signal_type = 'HOLD'
+        elif confidence >= 25:
             signal_type = 'SELL'
         else:
-            signal_type = 'HOLD'
+            signal_type = 'STRONG_SELL'
         
         # OPTIMIZED: Adaptive targets/stops based on GARCH volatility
         # Get current volatility from GARCH or technical analysis
@@ -583,10 +588,18 @@ class InstitutionalTradingSystem:
         atr = current_vol * current_price
         
         # Adaptive targets based on signal type and volatility
-        if signal_type == 'BUY':
+        if signal_type == 'STRONG_BUY':
+            # STRONG_BUY = More aggressive targets (3.5x upside, 1.5x downside)
+            target_price = current_price + (3.5 * atr)
+            stop_loss = current_price - (1.5 * atr)
+        elif signal_type == 'BUY':
             # Target = 2.5x volatility upside, Stop = 1.5x volatility downside
             target_price = current_price + (2.5 * atr)
             stop_loss = current_price - (1.5 * atr)
+        elif signal_type == 'STRONG_SELL':
+            # STRONG_SELL = More aggressive targets (3.5x downside, 1.5x upside)
+            target_price = current_price - (3.5 * atr)
+            stop_loss = current_price + (1.5 * atr)
         elif signal_type == 'SELL':
             # Target = 2.5x volatility downside, Stop = 1.5x volatility upside
             target_price = current_price - (2.5 * atr)
@@ -605,9 +618,9 @@ class InstitutionalTradingSystem:
                 stop_loss = current_price - (0.5 * atr)
         
         # Risk/reward ratio
-        if signal_type == 'BUY':
+        if signal_type in ['BUY', 'STRONG_BUY']:
             risk_reward_ratio = (target_price - current_price) / (current_price - stop_loss) if (current_price - stop_loss) > 0 else 0
-        elif signal_type == 'SELL':
+        elif signal_type in ['SELL', 'STRONG_SELL']:
             risk_reward_ratio = (current_price - target_price) / (stop_loss - current_price) if (stop_loss - current_price) > 0 else 0
         else:  # HOLD
             # Calculate risk/reward even for HOLD to enable position sizing
