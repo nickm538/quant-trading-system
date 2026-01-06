@@ -53,7 +53,7 @@ COPY patches ./patches
 # Install Node dependencies
 RUN pnpm install --frozen-lockfile
 
-# Copy application files
+# Copy application files - Cache bust: 2026-01-06-v2
 COPY . .
 
 # Build the application
