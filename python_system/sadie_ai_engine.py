@@ -200,6 +200,266 @@ When analyzing any stock/ETF, ALWAYS provide:
 
 Remember: Real money is at stake. Your analysis should be so thorough and insightful that it feels like you can see the future. Make smart connections others miss. Go above and beyond EVERY time."""
 
+    # NUKE MODE - Maximum Overdrive Analysis
+    NUKE_CONTEXT = """🔥☢️ NUKE MODE ACTIVATED - MAXIMUM OVERDRIVE ANALYSIS ☢️🔥
+
+You are now operating at MAXIMUM CAPABILITY. This is a NUKE request - the user wants the most comprehensive, detailed, and insightful analysis possible. Leave NO stone unturned. Use EVERY tool, technique, and insight available.
+
+=== NUKE MODE REQUIREMENTS ===
+You MUST provide ALL of the following in EXTREME DETAIL with full sentence explanations:
+
+## 1. EXECUTIVE NUCLEAR SUMMARY
+- Clear BUY/SELL/HOLD verdict with conviction level (1-10)
+- One-paragraph thesis explaining WHY in plain English
+- The single most important thing the user needs to know
+
+## 2. COMPLETE PRICE ACTION ANALYSIS
+- Current price with exact 52-week high/low and where we are in that range
+- All-time high and how far from it
+- Key psychological price levels ($round numbers)
+- Fibonacci retracement levels (23.6%, 38.2%, 50%, 61.8%, 78.6%) with exact prices
+- Fibonacci extension targets for upside
+- Volume-weighted average price (VWAP) analysis
+- Point of Control (POC) from volume profile
+- Value Area High (VAH) and Value Area Low (VAL)
+
+## 3. SUPPORT & RESISTANCE FORTRESS
+- Primary support level with FULL explanation of why it matters
+- Secondary support level with reasoning
+- Tertiary (emergency) support level
+- Primary resistance level with FULL explanation
+- Secondary resistance level with reasoning
+- Breakout target if resistance breaks
+- Each level should include: price, reasoning, and what happens if it breaks
+
+## 4. COMPLETE TECHNICAL ANALYSIS
+**Trend Analysis:**
+- Short-term trend (1-5 days) with reasoning
+- Medium-term trend (1-4 weeks) with reasoning  
+- Long-term trend (1-6 months) with reasoning
+- Trend strength assessment
+
+**Moving Averages:**
+- 10 SMA/EMA position and slope
+- 20 SMA/EMA position and slope (key short-term)
+- 50 SMA/EMA position and slope (key medium-term)
+- 100 SMA/EMA position and slope
+- 200 SMA/EMA position and slope (key long-term)
+- Golden Cross / Death Cross status
+- Price position relative to all MAs
+
+**Momentum Indicators (with exact values and interpretation):**
+- RSI (14): Value, overbought/oversold, divergences
+- MACD: Line, Signal, Histogram, crossover status
+- Stochastic (14,3,3): %K, %D, overbought/oversold
+- Williams %R: Value and interpretation
+- CCI: Value and interpretation
+- MFI (Money Flow Index): Value and interpretation
+- ROC (Rate of Change): Value and interpretation
+
+**Volatility Indicators:**
+- Bollinger Bands: Upper, Middle, Lower, Bandwidth, %B
+- ATR (14): Value and what it means for stop placement
+- Keltner Channels: Position relative to bands
+- TTM Squeeze: SQUEEZE ON or SQUEEZE OFF, momentum direction
+- Historical Volatility vs Implied Volatility
+
+**Volume Analysis:**
+- Current volume vs 20-day average
+- On-Balance Volume (OBV) trend
+- Accumulation/Distribution Line trend
+- Chaikin Money Flow value
+- Volume Price Trend (VPT)
+- Is smart money accumulating or distributing?
+
+**Pattern Recognition:**
+- Current chart pattern forming (with confidence %)
+- Recent completed patterns
+- Candlestick patterns (last 5 days)
+- NR4/NR7 status (Narrow Range)
+- Inside/Outside bar status
+
+## 5. SMART MONEY & DARK POOL ANALYSIS 🕵️
+**Institutional Activity:**
+- Recent 13F filing changes (who's buying/selling)
+- Top institutional holders and recent changes
+- Institutional ownership percentage trend
+- Are institutions accumulating or distributing?
+
+**Dark Pool Activity:**
+- Recent dark pool print analysis
+- Large block trade activity
+- Hidden accumulation/distribution signals
+- Dark pool sentiment (bullish/bearish/neutral)
+
+**Options Flow (Smart Money Signals):**
+- Unusual options activity detected
+- Large premium trades (>$1M)
+- Put/Call ratio and what it signals
+- Options max pain level
+- Gamma exposure and implications
+- Are whales betting bullish or bearish?
+
+**Insider Trading:**
+- Recent insider buys (last 90 days) - names, amounts, prices
+- Recent insider sells (last 90 days) - names, amounts, prices
+- Insider sentiment score
+- Are insiders buying their own stock?
+
+## 6. FUNDAMENTAL DEEP DIVE
+**Valuation Metrics:**
+- P/E Ratio vs sector vs 5-year average
+- Forward P/E and growth expectations
+- PEG Ratio (is growth priced in?)
+- P/S Ratio vs sector
+- P/B Ratio vs sector
+- EV/EBITDA vs sector
+- DCF Fair Value estimate
+- Is the stock OVERVALUED, FAIRLY VALUED, or UNDERVALUED?
+
+**Profitability:**
+- Gross Margin trend
+- Operating Margin trend
+- Net Profit Margin trend
+- ROE vs sector
+- ROIC vs WACC (creating value?)
+- Free Cash Flow yield
+
+**Growth:**
+- Revenue growth (YoY, QoQ)
+- EPS growth (YoY, QoQ)
+- Forward growth estimates
+- Earnings surprise history
+
+**Balance Sheet Health:**
+- Debt/Equity ratio
+- Current Ratio
+- Quick Ratio
+- Interest Coverage
+- Cash position
+- Bankruptcy risk assessment
+
+## 7. SECTOR & CORRELATION ANALYSIS
+- Sector performance (XLK, XLF, XLE, etc.)
+- Is this stock leading or lagging its sector?
+- Correlation with SPY (beta)
+- Correlation with QQQ
+- Related stocks performance (peers)
+- Supply chain impacts
+- Sector rotation signals
+
+## 8. MACRO & CATALYST ANALYSIS
+**Macro Factors:**
+- Fed policy impact on this stock
+- Interest rate sensitivity
+- Inflation impact
+- Dollar strength (DXY) impact
+- Geopolitical risks
+
+**Upcoming Catalysts:**
+- Next earnings date and expectations
+- Analyst day/investor day
+- Product launches
+- FDA dates (if applicable)
+- Conference presentations
+- Ex-dividend date
+- Stock split potential
+
+## 9. HISTORICAL PATTERN MATCHING
+- "This setup is similar to [SPECIFIC DATE] when..."
+- What happened after similar setups historically?
+- Seasonal patterns for this stock
+- Election year patterns
+- January effect / Santa rally relevance
+
+## 10. MULTI-TIMEFRAME PRICE FORECASTS 🎯
+
+**1-DAY FORECAST:**
+- Expected range (low - high)
+- Most likely closing price
+- Probability of up day: X%
+- Key intraday levels to watch
+- Catalyst for tomorrow
+
+**1-WEEK FORECAST:**
+- Expected range (low - high)
+- Target price by end of week
+- Probability of positive week: X%
+- Key events this week
+- Technical levels to watch
+
+**1-MONTH FORECAST:**
+- Expected range (low - high)
+- Base case target: $X.XX (X% probability)
+- Bull case target: $X.XX (X% probability)
+- Bear case target: $X.XX (X% probability)
+- Key catalysts this month
+
+**6-MONTH FORECAST:**
+- Expected range (low - high)
+- Base case target: $X.XX
+- Bull case scenario and target
+- Bear case scenario and target
+- Major catalysts in next 6 months
+- Probability distribution
+
+**1-YEAR FORECAST:**
+- Expected range (low - high)
+- 12-month price target (base case)
+- Bull case scenario: $X.XX (+X%)
+- Bear case scenario: $X.XX (-X%)
+- Long-term thesis
+- What needs to happen for each scenario
+
+## 11. RISK ASSESSMENT
+- Maximum drawdown risk
+- VaR (Value at Risk) 95%
+- Key risks that could destroy the thesis
+- Black swan scenarios
+- What would make you WRONG?
+
+## 12. THE NUCLEAR TRADE RECOMMENDATION 💣
+**Position:**
+- Direction: LONG / SHORT / AVOID
+- Conviction: X/10
+- Timeframe: Swing / Position / Investment
+
+**Entry Strategy:**
+- Ideal entry zone: $X.XX - $X.XX
+- Aggressive entry: $X.XX
+- Conservative entry: $X.XX
+- Entry trigger (what confirms the trade)
+
+**Risk Management:**
+- Stop loss: $X.XX (X% risk)
+- Why this stop level?
+- Position size: X% of portfolio
+- Maximum loss in dollars on $10K position
+
+**Profit Targets:**
+- Target 1: $X.XX (X:1 R/R) - Take X% profit
+- Target 2: $X.XX (X:1 R/R) - Take X% profit  
+- Target 3: $X.XX (X:1 R/R) - Let rest ride
+- Trailing stop strategy
+
+**Options Play (if applicable):**
+- Recommended options strategy
+- Specific contract suggestion
+- Greeks analysis
+- Risk/reward on options
+
+## 13. LEGENDARY TRADER VALIDATION
+- Would Buffett buy this? Why/why not?
+- Would Soros trade this? Why/why not?
+- Would PTJ take this trade? Why/why not?
+- Does this pass the Druckenmiller test?
+
+## 14. FINAL NUCLEAR VERDICT 🎯
+One comprehensive paragraph that synthesizes EVERYTHING above into a clear, actionable conclusion. What should the user DO and WHY? Be specific, be confident, be thorough.
+
+---
+This is NUKE MODE. Maximum detail. Maximum insight. Maximum value. Leave NOTHING out."""
+
     def __init__(self):
         """Initialize the Sadie AI Engine with all components."""
         self.analyzer = None
@@ -530,11 +790,38 @@ Remember: Real money is at stake. Your analysis should be so thorough and insigh
         
         return None
     
+    def _is_nuke_mode(self, message: str) -> bool:
+        """Check if the user is requesting NUKE mode analysis."""
+        message_upper = message.upper()
+        nuke_triggers = ['NUKE ', 'NUKE$', '☢️', '💣', 'NUCLEAR ', 'MAXIMUM OVERDRIVE']
+        return any(trigger in message_upper for trigger in nuke_triggers)
+    
+    def _extract_nuke_symbol(self, message: str) -> Optional[str]:
+        """Extract symbol from a NUKE command."""
+        import re
+        message_upper = message.upper()
+        
+        # Pattern: NUKE $SYMBOL or NUKE SYMBOL
+        patterns = [
+            r'NUKE\s*\$([A-Z]{1,5})\b',
+            r'NUKE\s+([A-Z]{1,5})\b',
+            r'☢️\s*\$?([A-Z]{1,5})\b',
+            r'💣\s*\$?([A-Z]{1,5})\b',
+        ]
+        
+        for pattern in patterns:
+            match = re.search(pattern, message_upper)
+            if match:
+                return match.group(1)
+        
+        return None
+    
     def chat(self, user_message: str) -> Dict[str, Any]:
         """
         Process a user message and return Sadie's response.
         
         This is the main entry point for the chatbot.
+        Supports NUKE mode for maximum overdrive analysis.
         """
         response = {
             "success": False,
@@ -544,32 +831,63 @@ Remember: Real money is at stake. Your analysis should be so thorough and insigh
         }
         
         try:
-            # Extract symbol if mentioned
-            symbol = self._extract_symbol_from_query(user_message)
+            # Check for NUKE mode
+            is_nuke = self._is_nuke_mode(user_message)
+            
+            # Extract symbol - use NUKE-specific extraction if in NUKE mode
+            if is_nuke:
+                symbol = self._extract_nuke_symbol(user_message)
+                if not symbol:
+                    symbol = self._extract_symbol_from_query(user_message)
+            else:
+                symbol = self._extract_symbol_from_query(user_message)
             
             # Build context with real-time data
             context = self._build_context_message(symbol)
             
             # Prepare messages for GPT
-            messages = [
-                {
-                    "role": "system",
-                    "content": self.SYSTEM_CONTEXT
-                },
-                {
-                    "role": "system", 
-                    "content": f"REAL-TIME MARKET DATA:\n{context}"
-                }
-            ]
+            if is_nuke:
+                # NUKE MODE - Use enhanced system context
+                messages = [
+                    {
+                        "role": "system",
+                        "content": self.SYSTEM_CONTEXT
+                    },
+                    {
+                        "role": "system",
+                        "content": self.NUKE_CONTEXT
+                    },
+                    {
+                        "role": "system", 
+                        "content": f"REAL-TIME MARKET DATA FOR NUKE ANALYSIS:\n{context}"
+                    }
+                ]
+            else:
+                # Normal mode
+                messages = [
+                    {
+                        "role": "system",
+                        "content": self.SYSTEM_CONTEXT
+                    },
+                    {
+                        "role": "system", 
+                        "content": f"REAL-TIME MARKET DATA:\n{context}"
+                    }
+                ]
             
             # Add conversation history (last 10 exchanges)
             for msg in self.conversation_history[-20:]:
                 messages.append(msg)
             
-            # Add current user message
+            # Add current user message with NUKE indicator
+            if is_nuke and symbol:
+                enhanced_message = f"☢️ NUKE MODE ACTIVATED ☢️\n\nPerform MAXIMUM OVERDRIVE analysis on ${symbol}. Follow the NUKE MODE REQUIREMENTS exactly. Provide ALL 14 sections with EXTREME DETAIL. Include multi-timeframe forecasts (1-day, 1-week, 1-month, 6-month, 1-year). Analyze dark pools, smart money, insider activity, and institutional flows. Leave NOTHING out.\n\nOriginal request: {user_message}"
+            else:
+                enhanced_message = user_message
+            
             messages.append({
                 "role": "user",
-                "content": user_message
+                "content": enhanced_message
             })
             
             # Call OpenRouter API with GPT-5/o1 thinking mode
@@ -580,23 +898,33 @@ Remember: Real money is at stake. Your analysis should be so thorough and insigh
                 "X-Title": "SadieAI Financial Assistant"
             }
             
+            # NUKE mode gets more tokens for comprehensive analysis
+            max_tokens = 16384 if is_nuke else 4096
+            
             payload = {
                 "model": self.MODELS[0],  # Use o1 (GPT-5 thinking mode)
                 "messages": messages,
-                "max_tokens": 4096,
+                "max_tokens": max_tokens,
                 "temperature": 1,  # o1 models require temperature=1
             }
+            
+            # NUKE mode gets longer timeout for comprehensive analysis
+            timeout = 300 if is_nuke else 120  # 5 min for NUKE, 2 min normal
             
             api_response = requests.post(
                 self.OPENROUTER_URL,
                 headers=headers,
                 json=payload,
-                timeout=120  # Longer timeout for thinking mode
+                timeout=timeout
             )
             
             if api_response.status_code == 200:
                 result = api_response.json()
                 assistant_message = result['choices'][0]['message']['content']
+                
+                # Add NUKE mode header if applicable
+                if is_nuke:
+                    assistant_message = f"☢️ **NUKE MODE ANALYSIS** ☢️\n\n{assistant_message}"
                 
                 # Update conversation history
                 self.conversation_history.append({
@@ -613,7 +941,8 @@ Remember: Real money is at stake. Your analysis should be so thorough and insigh
                 response["data"] = {
                     "symbol_detected": symbol,
                     "model_used": result.get('model', self.MODELS[0]),
-                    "tokens_used": result.get('usage', {})
+                    "tokens_used": result.get('usage', {}),
+                    "nuke_mode": is_nuke
                 }
                 
             else:
@@ -634,6 +963,10 @@ Remember: Real money is at stake. Your analysis should be so thorough and insigh
                         result = api_response.json()
                         assistant_message = result['choices'][0]['message']['content']
                         
+                        # Add NUKE mode header if applicable
+                        if is_nuke:
+                            assistant_message = f"☢️ **NUKE MODE ANALYSIS** ☢️\n\n{assistant_message}"
+                        
                         self.conversation_history.append({"role": "user", "content": user_message})
                         self.conversation_history.append({"role": "assistant", "content": assistant_message})
                         
@@ -642,7 +975,8 @@ Remember: Real money is at stake. Your analysis should be so thorough and insigh
                         response["data"] = {
                             "symbol_detected": symbol,
                             "model_used": model,
-                            "tokens_used": result.get('usage', {})
+                            "tokens_used": result.get('usage', {}),
+                            "nuke_mode": is_nuke
                         }
                         break
                 
