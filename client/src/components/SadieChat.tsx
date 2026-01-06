@@ -2,10 +2,10 @@ import { useState, useRef, useEffect } from 'react';
 import { trpc } from '@/lib/trpc';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Send, Trash2, Sparkles, Brain, TrendingUp, AlertTriangle, Zap, Bot, User } from 'lucide-react';
+import { Loader2, Send, Trash2, Brain, TrendingUp, Bot, User, Sparkles } from 'lucide-react';
 
 interface Message {
   id: string;
@@ -23,25 +23,11 @@ export function SadieChat() {
     {
       id: 'welcome',
       role: 'system',
-      content: `👋 **Welcome to Sadie AI** - Your Ultimate Financial Intelligence Assistant
+      content: `🐿️ **Welcome to Sadie AI** - Your Ultimate Financial Intelligence Assistant
 
-I'm powered by **GPT-5 Thinking Mode** and integrated with the complete SadieAI financial engine suite:
+I'm powered by **GPT o1 Thinking Mode** with deep pattern recognition and smart connections.
 
-🎯 **What I Can Do:**
-• Deep stock & ETF analysis with 50+ technical indicators
-• Monte Carlo simulations (20,000 paths) for price forecasting
-• Options analysis with 12-factor institutional scoring
-• Pattern recognition (TTM Squeeze, NR patterns, chart patterns)
-• Risk management with Kelly Criterion position sizing
-• Real-time market data and sentiment analysis
-
-💡 **Try asking me:**
-• "Analyze NVDA for a potential entry"
-• "What's the best options play for AAPL right now?"
-• "Scan the market for TTM Squeeze setups"
-• "Is CVX a good buy after the Venezuela news?"
-
-I think deeply about every question to give you gold-standard financial advice. Let's make some money! 🚀`,
+**Ask me anything:** "Analyze NVDA", "Best options for AAPL", "Market overview", "TTM Squeeze setups"`,
       timestamp: new Date(),
     },
   ]);
@@ -128,74 +114,40 @@ I think deeply about every question to give you gold-standard financial advice. 
     }
   };
 
-  // Quick action buttons
-  const quickActions = [
-    { label: 'Market Overview', query: 'Give me a quick market overview for today' },
-    { label: 'Top Opportunities', query: 'What are the top trading opportunities right now?' },
-    { label: 'Analyze SPY', query: 'Analyze SPY for a potential trade' },
-    { label: 'Options Scan', query: 'Scan for the best options plays today' },
-  ];
-
   return (
-    <div className="flex flex-col h-[calc(100vh-200px)] max-h-[800px]">
-      {/* Header */}
-      <Card className="mb-4 bg-gradient-to-r from-orange-500/10 via-amber-500/10 to-yellow-500/10 border-orange-500/20">
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="relative">
-                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center shadow-lg">
-                  <span className="text-2xl">🐿️</span>
-                </div>
-                <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-background animate-pulse" />
-              </div>
-              <div>
-                <CardTitle className="text-xl flex items-center gap-2">
-                  Sadie AI
-                  <Badge variant="secondary" className="bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs">
-                    <Brain className="w-3 h-3 mr-1" />
-                    GPT-5 Thinking
-                  </Badge>
-                </CardTitle>
-                <CardDescription className="text-sm">
-                  Strategic Analysis & Dynamic Investment Engine
-                </CardDescription>
-              </div>
+    <div className="flex flex-col h-[calc(100vh-180px)]">
+      {/* Compact Header */}
+      <div className="flex items-center justify-between mb-3 px-1">
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center shadow-md">
+              <span className="text-lg">🐿️</span>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleClearHistory}
-              className="text-muted-foreground hover:text-destructive"
-            >
-              <Trash2 className="w-4 h-4 mr-1" />
-              Clear
-            </Button>
+            <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-500 rounded-full border border-background animate-pulse" />
           </div>
-        </CardHeader>
-      </Card>
-
-      {/* Quick Actions */}
-      <div className="flex flex-wrap gap-2 mb-4">
-        {quickActions.map((action, index) => (
-          <Button
-            key={index}
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              setInput(action.query);
-              inputRef.current?.focus();
-            }}
-            className="text-xs hover:bg-orange-500/10 hover:border-orange-500/50"
-          >
-            <Zap className="w-3 h-3 mr-1 text-orange-500" />
-            {action.label}
-          </Button>
-        ))}
+          <div>
+            <h2 className="text-base font-semibold flex items-center gap-2">
+              Sadie AI
+              <Badge variant="secondary" className="bg-gradient-to-r from-purple-500 to-pink-500 text-white text-[10px] px-1.5 py-0">
+                <Brain className="w-2.5 h-2.5 mr-0.5" />
+                o1 Thinking
+              </Badge>
+            </h2>
+          </div>
+        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleClearHistory}
+          className="text-muted-foreground hover:text-destructive h-7 px-2"
+        >
+          <Trash2 className="w-3.5 h-3.5 mr-1" />
+          Clear
+        </Button>
       </div>
 
-      {/* Messages Area */}
-      <Card className="flex-1 overflow-hidden">
+      {/* Messages Area - Takes up most of the space */}
+      <Card className="flex-1 overflow-hidden border-orange-500/20">
         <ScrollArea className="h-full p-4" ref={scrollAreaRef}>
           <div className="space-y-4">
             {messages.map((message) => (
@@ -204,7 +156,7 @@ I think deeply about every question to give you gold-standard financial advice. 
                 className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
                 <div
-                  className={`max-w-[85%] rounded-2xl px-4 py-3 ${
+                  className={`max-w-[90%] rounded-2xl px-4 py-3 ${
                     message.role === 'user'
                       ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white'
                       : message.role === 'system'
@@ -213,11 +165,11 @@ I think deeply about every question to give you gold-standard financial advice. 
                   }`}
                 >
                   {/* Message Header */}
-                  <div className="flex items-center gap-2 mb-2">
+                  <div className="flex items-center gap-2 mb-1.5">
                     {message.role === 'user' ? (
-                      <User className="w-4 h-4" />
+                      <User className="w-3.5 h-3.5" />
                     ) : (
-                      <Bot className="w-4 h-4 text-orange-500" />
+                      <Bot className="w-3.5 h-3.5 text-orange-500" />
                     )}
                     <span className="text-xs opacity-70">
                       {message.role === 'user' ? 'You' : 'Sadie'}
@@ -225,24 +177,24 @@ I think deeply about every question to give you gold-standard financial advice. 
                       {message.timestamp.toLocaleTimeString()}
                     </span>
                     {message.data?.symbol_detected && (
-                      <Badge variant="outline" className="text-xs">
-                        <TrendingUp className="w-3 h-3 mr-1" />
+                      <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                        <TrendingUp className="w-2.5 h-2.5 mr-0.5" />
                         {message.data.symbol_detected}
                       </Badge>
                     )}
                   </div>
 
                   {/* Message Content */}
-                  <div className="prose prose-sm dark:prose-invert max-w-none">
+                  <div className="prose prose-sm dark:prose-invert max-w-none text-sm">
                     <MessageContent content={message.content} />
                   </div>
 
                   {/* Model Info */}
                   {message.data?.model_used && (
-                    <div className="mt-2 pt-2 border-t border-border/50">
-                      <span className="text-xs opacity-50 flex items-center gap-1">
-                        <Sparkles className="w-3 h-3" />
-                        Powered by {message.data.model_used}
+                    <div className="mt-2 pt-1.5 border-t border-border/50">
+                      <span className="text-[10px] opacity-50 flex items-center gap-1">
+                        <Sparkles className="w-2.5 h-2.5" />
+                        {message.data.model_used}
                       </span>
                     </div>
                   )}
@@ -262,7 +214,7 @@ I think deeply about every question to give you gold-standard financial advice. 
                     <div>
                       <p className="text-sm font-medium">Sadie is thinking deeply...</p>
                       <p className="text-xs text-muted-foreground">
-                        Analyzing data, running models, validating signals
+                        Running pattern analysis, smart connections, forecasting models
                       </p>
                     </div>
                   </div>
@@ -274,65 +226,57 @@ I think deeply about every question to give you gold-standard financial advice. 
       </Card>
 
       {/* Input Area */}
-      <Card className="mt-4">
-        <CardContent className="p-3">
-          <div className="flex gap-2">
-            <Input
-              ref={inputRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder="Ask Sadie anything about stocks, options, or market analysis..."
-              className="flex-1"
-              disabled={isLoading}
-            />
-            <Button
-              onClick={handleSend}
-              disabled={!input.trim() || isLoading}
-              className="bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600"
-            >
-              {isLoading ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Send className="w-4 h-4" />
-              )}
-            </Button>
-          </div>
-          <p className="text-xs text-muted-foreground mt-2 text-center">
-            💡 Tip: Ask about specific stocks like "$AAPL" or request analysis like "TTM Squeeze scan"
-          </p>
-        </CardContent>
-      </Card>
+      <div className="mt-3 flex gap-2">
+        <Input
+          ref={inputRef}
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyPress={handleKeyPress}
+          placeholder="Ask Sadie about stocks, options, patterns, or market analysis..."
+          className="flex-1 h-11"
+          disabled={isLoading}
+        />
+        <Button
+          onClick={handleSend}
+          disabled={!input.trim() || isLoading}
+          className="bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 h-11 px-5"
+        >
+          {isLoading ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <Send className="w-4 h-4" />
+          )}
+        </Button>
+      </div>
     </div>
   );
 }
 
 // Helper component to render markdown-like content
 function MessageContent({ content }: { content: string }) {
-  // Simple markdown-like rendering
   const lines = content.split('\n');
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-1.5">
       {lines.map((line, index) => {
         // Headers
         if (line.startsWith('###')) {
           return (
-            <h4 key={index} className="font-semibold text-base mt-3">
+            <h4 key={index} className="font-semibold text-sm mt-2">
               {line.replace(/^###\s*/, '')}
             </h4>
           );
         }
         if (line.startsWith('##')) {
           return (
-            <h3 key={index} className="font-semibold text-lg mt-4">
+            <h3 key={index} className="font-semibold text-base mt-3">
               {line.replace(/^##\s*/, '')}
             </h3>
           );
         }
         if (line.startsWith('#')) {
           return (
-            <h2 key={index} className="font-bold text-xl mt-4">
+            <h2 key={index} className="font-bold text-lg mt-3">
               {line.replace(/^#\s*/, '')}
             </h2>
           );
@@ -345,7 +289,7 @@ function MessageContent({ content }: { content: string }) {
         if (line.trim().startsWith('•') || line.trim().startsWith('-') || line.trim().startsWith('*')) {
           return (
             <div key={index} className="flex items-start gap-2 ml-2">
-              <span className="text-orange-500 mt-1">•</span>
+              <span className="text-orange-500 mt-0.5">•</span>
               <span dangerouslySetInnerHTML={{ __html: processed.replace(/^[\s•\-\*]+/, '') }} />
             </div>
           );
@@ -362,7 +306,7 @@ function MessageContent({ content }: { content: string }) {
 
         // Empty lines
         if (!line.trim()) {
-          return <div key={index} className="h-2" />;
+          return <div key={index} className="h-1.5" />;
         }
 
         // Regular paragraphs
