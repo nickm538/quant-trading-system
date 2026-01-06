@@ -3,7 +3,7 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router, protectedProcedure } from "./_core/trpc";
 import { z } from "zod";
-import { analyzeStock, analyzeOptions, scanMarket, checkPythonSystem, getGreeksHeatmap, analyzeInstitutionalOptions, scanUltimateOptions, analyzeUltimateOptions, analyzeFundamentals, getEducation } from "./python_executor";
+import { analyzeStock, analyzeOptions, scanMarket, checkPythonSystem, getGreeksHeatmap, analyzeInstitutionalOptions, scanUltimateOptions, analyzeUltimateOptions, analyzeFundamentals, getEducation, sadieChat, sadieAnalyze, sadieClearHistory } from "./python_executor";
 import { exec } from "child_process";
 import { promisify } from "util";
 import * as path from "path";
@@ -334,6 +334,36 @@ export const appRouter = router({
       )
       .query(async ({ input }) => {
         return await getEducation({ topic: input.topic });
+      }),
+    
+    // Sadie AI Chatbot - The Ultimate Financial Intelligence Assistant
+    sadieChat: publicProcedure
+      .input(
+        z.object({
+          message: z.string().min(1).max(10000),
+        })
+      )
+      .mutation(async ({ input }) => {
+        console.log('🐿️ Sadie AI chat request:', input.message.substring(0, 100) + '...');
+        return await sadieChat({ message: input.message });
+      }),
+    
+    // Sadie AI Quick Analysis
+    sadieAnalyze: publicProcedure
+      .input(
+        z.object({
+          symbol: z.string().min(1).max(10),
+        })
+      )
+      .mutation(async ({ input }) => {
+        console.log('🐿️ Sadie AI analyzing:', input.symbol);
+        return await sadieAnalyze({ symbol: input.symbol.toUpperCase() });
+      }),
+    
+    // Clear Sadie conversation history
+    sadieClearHistory: publicProcedure
+      .mutation(async () => {
+        return await sadieClearHistory();
       }),
   }),
 });

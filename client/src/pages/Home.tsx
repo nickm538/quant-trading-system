@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { TTMSqueezeIndicator } from "@/components/TTMSqueezeIndicator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, TrendingUp, BarChart3, Search, AlertCircle, Brain, Zap } from "lucide-react";
+import { Loader2, TrendingUp, BarChart3, Search, AlertCircle, Brain, Zap, MessageCircle } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { APP_TITLE } from "@/const";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -18,6 +18,7 @@ import { QuantMLAnalysis } from "@/components/QuantMLAnalysis";
 import { GreeksHeatmap } from "@/components/GreeksHeatmap";
 import { InstitutionalOptionsAnalysis } from "@/components/InstitutionalOptionsAnalysis";
 import { UltimateOptionsAnalysis } from "@/components/UltimateOptionsAnalysis";
+import { SadieChat } from "@/components/SadieChat";
 
 export default function Home() {
   const [symbol, setSymbol] = useState("");
@@ -188,7 +189,7 @@ export default function Home() {
       {/* Main Content */}
       <div className="container py-8">
         <Tabs defaultValue="stock" className="w-full">
-          <TabsList className="grid w-full grid-cols-5 mb-8">
+          <TabsList className="grid w-full grid-cols-6 mb-8">
             <TabsTrigger value="stock" className="flex items-center gap-2">
               <TrendingUp className="h-4 w-4" />
               Stock Analysis
@@ -208,6 +209,10 @@ export default function Home() {
             <TabsTrigger value="train" className="flex items-center gap-2">
               <Brain className="h-4 w-4" />
               Train Models
+            </TabsTrigger>
+            <TabsTrigger value="sadie" className="flex items-center gap-2 bg-gradient-to-r from-orange-500/10 to-amber-500/10 hover:from-orange-500/20 hover:to-amber-500/20">
+              <MessageCircle className="h-4 w-4 text-orange-500" />
+              <span className="bg-gradient-to-r from-orange-500 to-amber-500 bg-clip-text text-transparent font-semibold">Sadie AI</span>
             </TabsTrigger>
           </TabsList>
 
@@ -1190,6 +1195,11 @@ export default function Home() {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Sadie AI Chatbot Tab */}
+          <TabsContent value="sadie" className="space-y-6">
+            <SadieChat />
           </TabsContent>
         </Tabs>
       </div>

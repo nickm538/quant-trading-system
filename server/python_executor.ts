@@ -454,3 +454,122 @@ print(json.dumps(result, default=str))
     };
   }
 }
+
+
+/**
+ * Sadie AI Chatbot - The Ultimate Financial Intelligence Assistant
+ */
+export interface SadieChatParams {
+  message: string;
+}
+
+export interface SadieChatResult {
+  success: boolean;
+  message: string;
+  data: {
+    symbol_detected?: string;
+    model_used?: string;
+    tokens_used?: any;
+  };
+  timestamp: string;
+}
+
+/**
+ * Chat with Sadie AI - GPT-5 powered financial assistant
+ */
+export async function sadieChat(params: SadieChatParams): Promise<SadieChatResult> {
+  const { message } = params;
+  
+  // Escape the message for shell
+  const escapedMessage = message.replace(/'/g, "'\\''");
+  const command = `${PYTHON_BIN} run_sadie_chat.py chat '${escapedMessage}'`;
+  
+  try {
+    console.log('🐿️ Sadie AI is thinking...');
+    const { stdout, stderr } = await execAsync(command, {
+      maxBuffer: 20 * 1024 * 1024, // 20MB buffer for long responses
+      timeout: 180000, // 3 minute timeout for thinking mode
+      cwd: PYTHON_SYSTEM_PATH,
+      env: {
+        ...process.env,
+        PYTHONPATH: '',
+        PYTHONHOME: '',
+        LD_LIBRARY_PATH: process.env.LD_LIBRARY_PATH || '',
+        OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY || '',
+        KEY: process.env.KEY || '', // Finnhub
+      },
+    });
+    
+    if (stderr && !stderr.includes('INFO') && !stderr.includes('WARNING')) {
+      console.error('Sadie stderr:', stderr);
+    }
+    
+    return JSON.parse(stdout);
+  } catch (error: any) {
+    console.error('Sadie chat error:', error);
+    return {
+      success: false,
+      message: `Sadie encountered an error: ${error.message}`,
+      data: {},
+      timestamp: new Date().toISOString(),
+    };
+  }
+}
+
+/**
+ * Get quick analysis from Sadie AI
+ */
+export async function sadieAnalyze(params: { symbol: string }): Promise<any> {
+  const { symbol } = params;
+  const command = `${PYTHON_BIN} run_sadie_chat.py analyze ${symbol}`;
+  
+  try {
+    console.log(`🐿️ Sadie analyzing ${symbol}...`);
+    const { stdout, stderr } = await execAsync(command, {
+      maxBuffer: 20 * 1024 * 1024,
+      timeout: 120000,
+      cwd: PYTHON_SYSTEM_PATH,
+      env: {
+        ...process.env,
+        PYTHONPATH: '',
+        PYTHONHOME: '',
+        LD_LIBRARY_PATH: process.env.LD_LIBRARY_PATH || '',
+      },
+    });
+    
+    if (stderr && !stderr.includes('INFO') && !stderr.includes('WARNING')) {
+      console.error('Sadie analyze stderr:', stderr);
+    }
+    
+    return JSON.parse(stdout);
+  } catch (error: any) {
+    console.error('Sadie analyze error:', error);
+    return {
+      success: false,
+      message: `Analysis failed: ${error.message}`,
+      data: {},
+    };
+  }
+}
+
+/**
+ * Clear Sadie's conversation history
+ */
+export async function sadieClearHistory(): Promise<any> {
+  const command = `${PYTHON_BIN} run_sadie_chat.py clear`;
+  
+  try {
+    const { stdout } = await execAsync(command, {
+      maxBuffer: 1024 * 1024,
+      timeout: 10000,
+      cwd: PYTHON_SYSTEM_PATH,
+    });
+    
+    return JSON.parse(stdout);
+  } catch (error: any) {
+    return {
+      success: false,
+      message: `Failed to clear history: ${error.message}`,
+    };
+  }
+}
