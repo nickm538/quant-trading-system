@@ -45,7 +45,8 @@ try:
     from robust_data_fetcher import RobustDataFetcher
     HAS_ENGINES = True
 except ImportError as e:
-    print(f"Warning: Some engines not available: {e}")
+    import sys as _sys
+    print(f"Warning: Some engines not available: {e}", file=_sys.stderr)
     HAS_ENGINES = False
 
 
