@@ -50,8 +50,8 @@ I think deeply about every question to give you gold-standard financial advice. 
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const chatMutation = trpc.trading.sadieChat.useMutation();
-  const clearHistoryMutation = trpc.trading.sadieClearHistory.useMutation();
+  const chatMutation = trpc.ml.sadieChat.useMutation();
+  const clearHistoryMutation = trpc.ml.sadieClearHistory.useMutation();
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
