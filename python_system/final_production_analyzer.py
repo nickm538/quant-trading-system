@@ -122,15 +122,35 @@ class FinalProductionAnalyzer:
         logger.info("Calculating technical indicators...")
         technical_indicators = self._calculate_technical_indicators(hist)
         
-        # 4. NEWS SENTIMENT (from volume/activity)
-        news_count = 0  # Placeholder - would need separate news API
+        # 4. NEWS SENTIMENT (from real news data)
+        news_count = 0
+        sentiment_score = 50.0  # Default neutral
+        try:
+            news = ticker.news
+            if news:
+                news_count = len(news)
+                # Analyze news sentiment from titles
+                positive_words = ['beat', 'surge', 'rally', 'gain', 'up', 'rise', 'high', 'strong', 'growth', 'profit', 'upgrade', 'buy', 'bullish']
+                negative_words = ['miss', 'fall', 'drop', 'down', 'decline', 'low', 'weak', 'loss', 'downgrade', 'sell', 'bearish', 'cut', 'warning']
+                
+                pos_count = 0
+                neg_count = 0
+                for article in news[:10]:  # Analyze last 10 articles
+                    title = article.get('title', '').lower()
+                    pos_count += sum(1 for word in positive_words if word in title)
+                    neg_count += sum(1 for word in negative_words if word in title)
+                
+                if pos_count + neg_count > 0:
+                    sentiment_score = 50 + ((pos_count - neg_count) / (pos_count + neg_count)) * 50
+                    sentiment_score = max(0, min(100, sentiment_score))
+        except Exception as e:
+            logger.warning(f"Could not fetch news sentiment: {e}")
         
         # 5. CALCULATE SCORES
         logger.info("Calculating comprehensive scores...")
         
         fundamental_score = self._calculate_fundamental_score(fundamentals)
         technical_score = self._calculate_technical_score(technical_indicators, hist)
-        sentiment_score = 50.0  # Neutral when no news data
         
         analysis['fundamental_score'] = fundamental_score
         analysis['technical_score'] = technical_score

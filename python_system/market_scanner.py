@@ -412,38 +412,7 @@ class MarketScanner:
         Tier 3: Full institutional-grade analysis
         Complete Monte Carlo, GARCH, options, everything
         """
-        # TEST MODE: Return fake opportunity to verify data flow
-        TEST_MODE = False  # FIXED! datetime bug resolved, using real analysis now
-        
-        if TEST_MODE and len(candidates) > 0:
-            logger.info("\n🧪 TEST MODE: Returning fake opportunity to verify UI data flow")
-            test_opp = {
-                'symbol': candidates[0]['symbol'],
-                'signal': 'BUY',
-                'confidence': 75.5,
-                'current_price': 150.00,
-                'target_price': 165.00,
-                'expected_return': 10.0,
-                'var_95': -3.5,
-                'cvar_95': -5.2,
-                'position_size': 15.0,
-                'shares': 10,
-                'dollar_risk': 350.0,
-                'dollar_reward': 1500.0,
-                'risk_reward_ratio': 4.29,
-                'technical_score': 72.3,
-                'sentiment': 0.65,
-                'opportunity_score': 45.8,
-                'squeeze_active': True,
-                'squeeze_bars': 7,
-                'squeeze_momentum': 2.34,
-                'squeeze_signal': 'LONG',
-                'expected_move_pct': 4.2,
-                'full_analysis': {'test': True}
-            }
-            logger.info(f"🧪 Returning test opportunity: {test_opp['symbol']}")
-            return [test_opp]
-        
+        # PRODUCTION MODE: ALL REAL DATA - NO TEST MODE
         print(f"\n{'='*80}")
         print(f"TIER 3: DEEP INSTITUTIONAL ANALYSIS - {len(candidates)} candidates")
         print(f"{'='*80}")

@@ -6,6 +6,7 @@ Uses AlphaVantage for fundamentals + Manus API Hub for prices
 
 import sys
 import json
+import time
 import numpy as np
 import talib
 from perfect_production_analyzer import PerfectProductionAnalyzer
@@ -28,15 +29,18 @@ def generate_monte_carlo_forecast(current_price, volatility, forecast_days=30, n
         fat_tail_df: Degrees of freedom for Student-t (from GARCH model)
     """
     dt = 1/252  # Daily time step
-    drift = 0.0  # Assume zero drift for conservative forecast
+    drift = 0.0  # Zero drift for conservative, unbiased forecast (standard practice)
     
     # Generate simulations with fat tails (Student's t-distribution)
-    df = fat_tail_df  # Use GARCH-estimated degrees of freedom
+    # Using time-based seed for reproducibility within same second, randomness across runs
+    np.random.seed(int(time.time()) % 2**31)
+    
+    df = fat_tail_df  # Use GARCH-estimated degrees of freedom from real data
     paths = np.zeros((num_simulations, forecast_days + 1))
     paths[:, 0] = current_price
     
     for t in range(1, forecast_days + 1):
-        # Use Student's t-distribution for fat tails
+        # Use Student's t-distribution for fat tails (captures real market behavior)
         z = np.random.standard_t(df, size=num_simulations)
         # Scale to match volatility
         z = z * np.sqrt((df - 2) / df)  # Adjust for t-distribution variance

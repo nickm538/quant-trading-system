@@ -142,6 +142,9 @@ class OptionsRecommendationEngine:
         try:
             strike = option.get('strike', 0)
             last_price = option.get('lastPrice', 0)
+            bid = option.get('bid', 0)
+            ask = option.get('ask', 0)
+            bid_ask_spread = ask - bid if ask and bid else 0
             iv = option.get('impliedVolatility', 0)
             volume = option.get('volume', 0)
             open_interest = option.get('openInterest', 0)
@@ -182,11 +185,12 @@ class OptionsRecommendationEngine:
                 expected_move_pct=expected_move_pct
             )
             
-            # 3. Liquidity Score
+            # 3. Liquidity Score (includes real bid/ask spread)
             liq_score = self._calculate_liquidity_score(
                 volume=volume,
                 open_interest=open_interest,
-                last_price=last_price
+                last_price=last_price,
+                bid_ask_spread=bid_ask_spread
             )
             
             # 4. IV Rank (relative cheapness)
@@ -248,7 +252,7 @@ class OptionsRecommendationEngine:
                 'expiration': self._format_expiration(dte),
                 'days_to_expiry': dte,
                 'last_price': last_price,
-                'bid_ask_spread': 0,  # TODO: Calculate from bid/ask if available
+                'bid_ask_spread': round(bid_ask_spread, 2),  # Real bid/ask spread from options data
                 'delta': delta,
                 'gamma': gamma,
                 'theta': theta,
@@ -342,7 +346,7 @@ class OptionsRecommendationEngine:
         except:
             return 0.0, {'risk_reward_ratio': 0, 'expected_return_pct': 0}
     
-    def _calculate_liquidity_score(self, volume: int, open_interest: int, last_price: float) -> float:
+    def _calculate_liquidity_score(self, volume: int, open_interest: int, last_price: float, bid_ask_spread: float = 0) -> float:
         """Score based on volume, open interest, and bid-ask spread."""
         try:
             # Volume score (0-0.4)
@@ -351,8 +355,14 @@ class OptionsRecommendationEngine:
             # Open interest score (0-0.4)
             oi_score = min(open_interest / 5000, 1.0) * 0.4
             
-            # Bid-ask spread score (0-0.2) - assume tight spread for now
-            spread_score = 0.2  # TODO: Calculate from actual bid/ask
+            # Bid-ask spread score (0-0.2) - calculated from real bid/ask data
+            # Tighter spread = better score. Spread as % of last price
+            if last_price > 0 and bid_ask_spread >= 0:
+                spread_pct = bid_ask_spread / last_price
+                # Score: 0.2 for <1% spread, scales down to 0 for >10% spread
+                spread_score = max(0, 0.2 * (1 - min(spread_pct / 0.10, 1.0)))
+            else:
+                spread_score = 0.1  # Neutral if no spread data
             
             return vol_score + oi_score + spread_score
         except:

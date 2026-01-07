@@ -872,15 +872,72 @@ One comprehensive paragraph that synthesizes EVERYTHING above - BOTH MACRO AND M
         return results
     
     def _get_congress_trades(self, symbol: str = None) -> List[Dict]:
-        """Get recent Congress trading data."""
-        # This would integrate with a Congress trading API
-        # For now, return placeholder indicating feature
-        return [{"note": "Congress trading data integration available"}]
+        """Get insider trading data (includes institutional and insider transactions)."""
+        trades = []
+        try:
+            if symbol:
+                ticker = yf.Ticker(symbol)
+                # Get insider transactions (real data from SEC filings)
+                insider_txns = ticker.insider_transactions
+                if insider_txns is not None and not insider_txns.empty:
+                    for _, row in insider_txns.head(10).iterrows():
+                        trades.append({
+                            'insider': row.get('Insider', 'Unknown'),
+                            'relation': row.get('Relation', 'Unknown'),
+                            'transaction': row.get('Transaction', 'Unknown'),
+                            'shares': row.get('Shares', 0),
+                            'value': row.get('Value', 0),
+                            'date': str(row.get('Start Date', 'Unknown'))
+                        })
+                
+                # Get institutional holders
+                inst_holders = ticker.institutional_holders
+                if inst_holders is not None and not inst_holders.empty:
+                    for _, row in inst_holders.head(5).iterrows():
+                        trades.append({
+                            'holder': row.get('Holder', 'Unknown'),
+                            'shares': row.get('Shares', 0),
+                            'value': row.get('Value', 0),
+                            'pct_held': row.get('% Out', 0),
+                            'type': 'INSTITUTIONAL'
+                        })
+        except Exception as e:
+            pass
+        return trades if trades else []
     
     def _get_dark_pool_data(self, symbol: str) -> Dict[str, Any]:
-        """Get dark pool activity data."""
-        # This would integrate with dark pool data providers
-        return {"note": "Dark pool data integration available"}
+        """Get institutional activity indicators (proxy for dark pool activity)."""
+        dark_pool = {}
+        try:
+            ticker = yf.Ticker(symbol)
+            info = ticker.info
+            hist = ticker.history(period="5d")
+            
+            # Institutional ownership percentage
+            inst_ownership = info.get('heldPercentInstitutions', 0)
+            insider_ownership = info.get('heldPercentInsiders', 0)
+            
+            # Volume analysis (high volume with small price move = potential dark pool)
+            if not hist.empty:
+                avg_volume = hist['Volume'].mean()
+                last_volume = hist['Volume'].iloc[-1]
+                price_change = abs(hist['Close'].iloc[-1] - hist['Close'].iloc[-2]) / hist['Close'].iloc[-2] * 100 if len(hist) > 1 else 0
+                
+                # High volume with low price change suggests institutional accumulation
+                volume_ratio = last_volume / avg_volume if avg_volume > 0 else 1
+                
+                dark_pool = {
+                    'institutional_ownership': round(inst_ownership * 100, 2) if inst_ownership else 0,
+                    'insider_ownership': round(insider_ownership * 100, 2) if insider_ownership else 0,
+                    'volume_ratio': round(volume_ratio, 2),
+                    'price_change_pct': round(price_change, 2),
+                    'accumulation_signal': 'ACCUMULATION' if volume_ratio > 1.5 and price_change < 1 else ('DISTRIBUTION' if volume_ratio > 1.5 and price_change > 2 else 'NEUTRAL'),
+                    'float_short': info.get('shortPercentOfFloat', 0),
+                    'shares_short': info.get('sharesShort', 0)
+                }
+        except Exception as e:
+            dark_pool = {'error': str(e)}
+        return dark_pool
     
     def _detect_catalysts(self, symbol: str) -> List[Dict]:
         """Detect upcoming catalysts for a symbol."""

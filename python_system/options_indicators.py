@@ -141,33 +141,35 @@ class OptionsIndicators:
     
     def get_prepost_market(self, symbol):
         """
-        Get pre-market and post-market data
+        Get pre-market and post-market data from yfinance
         Pre-market: 4:00 AM - 9:30 AM ET
         Post-market: 4:00 PM - 8:00 PM ET
         """
         try:
-            # Note: Yahoo Finance API doesn't provide pre/post market data directly
-            # This would require a different data source like IEX Cloud or Polygon.io
-            # For now, return placeholder structure
+            import yfinance as yf
+            ticker = yf.Ticker(symbol)
+            info = ticker.info
+            
+            # Get pre/post market prices from yfinance info
+            pre_market_price = info.get('preMarketPrice')
+            pre_market_change = info.get('preMarketChangePercent')
+            post_market_price = info.get('postMarketPrice')
+            post_market_change = info.get('postMarketChangePercent')
+            regular_price = info.get('regularMarketPrice', info.get('currentPrice'))
             
             return {
                 'pre_market': {
-                    'open': None,
-                    'high': None,
-                    'low': None,
-                    'close': None,
-                    'volume': None,
-                    'change_pct': None
+                    'price': pre_market_price,
+                    'change_pct': round(pre_market_change * 100, 2) if pre_market_change else None,
+                    'vs_close': round((pre_market_price / regular_price - 1) * 100, 2) if pre_market_price and regular_price else None
                 },
                 'post_market': {
-                    'open': None,
-                    'high': None,
-                    'low': None,
-                    'close': None,
-                    'volume': None,
-                    'change_pct': None
+                    'price': post_market_price,
+                    'change_pct': round(post_market_change * 100, 2) if post_market_change else None,
+                    'vs_close': round((post_market_price / regular_price - 1) * 100, 2) if post_market_price and regular_price else None
                 },
-                'note': 'Pre/post market data requires premium data source (IEX Cloud, Polygon.io)'
+                'regular_market_price': regular_price,
+                'data_source': 'yfinance'
             }
             
         except Exception as e:
