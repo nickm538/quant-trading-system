@@ -50,6 +50,7 @@ try:
     from indicators.ttm_squeeze import TTMSqueezeAnalyzer
     from twelvedata_client import TwelveDataClient
     from robust_data_fetcher import RobustDataFetcher
+    from smart_money_detector import SmartMoneyDetector
     HAS_ENGINES = True
 except ImportError as e:
     import sys as _sys
@@ -652,6 +653,7 @@ One comprehensive paragraph that synthesizes EVERYTHING above - BOTH MACRO AND M
         self.data_fetcher = None
         self.twelve_data = None
         self.financial_datasets = None
+        self.smart_money = None
         
         # Initialize engines if available
         if HAS_ENGINES:
@@ -664,6 +666,7 @@ One comprehensive paragraph that synthesizes EVERYTHING above - BOTH MACRO AND M
                 self.ttm_analyzer = TTMSqueezeAnalyzer()
                 self.data_fetcher = RobustDataFetcher()
                 self.twelve_data = TwelveDataClient()
+                self.smart_money = SmartMoneyDetector()
             except Exception as e:
                 import sys as _sys
                 print(f"Warning: Could not initialize all engines: {e}", file=_sys.stderr)
@@ -906,32 +909,55 @@ One comprehensive paragraph that synthesizes EVERYTHING above - BOTH MACRO AND M
         return trades if trades else []
     
     def _get_dark_pool_data(self, symbol: str) -> Dict[str, Any]:
-        """Get institutional activity indicators (proxy for dark pool activity)."""
+        """
+        Get comprehensive smart money / institutional activity analysis.
+        Uses SmartMoneyDetector for sophisticated dark pool proxy analysis.
+        """
+        # Use the enhanced SmartMoneyDetector if available
+        if self.smart_money:
+            try:
+                smart_money_analysis = self.smart_money.analyze(symbol)
+                return {
+                    'smart_money_score': smart_money_analysis.get('smart_money_score', 50),
+                    'signal': smart_money_analysis.get('signal', 'NEUTRAL'),
+                    'confidence': smart_money_analysis.get('confidence', 0),
+                    'summary': smart_money_analysis.get('summary', ''),
+                    'volume_analysis': smart_money_analysis.get('analysis', {}).get('volume', {}),
+                    'accumulation': smart_money_analysis.get('analysis', {}).get('accumulation', {}),
+                    'institutional': smart_money_analysis.get('analysis', {}).get('institutional', {}),
+                    'insider_activity': smart_money_analysis.get('analysis', {}).get('insider', {}),
+                    'short_interest': smart_money_analysis.get('analysis', {}).get('short_interest', {}),
+                    'options_flow': smart_money_analysis.get('analysis', {}).get('options_flow', {}),
+                    'block_trades': smart_money_analysis.get('analysis', {}).get('block_trades', {}),
+                    'money_flow': smart_money_analysis.get('analysis', {}).get('money_flow', {})
+                }
+            except Exception as e:
+                import sys as _sys
+                print(f"SmartMoneyDetector error: {e}", file=_sys.stderr)
+        
+        # Fallback to basic analysis if SmartMoneyDetector not available
         dark_pool = {}
         try:
             ticker = yf.Ticker(symbol)
             info = ticker.info
             hist = ticker.history(period="5d")
             
-            # Institutional ownership percentage
             inst_ownership = info.get('heldPercentInstitutions', 0)
             insider_ownership = info.get('heldPercentInsiders', 0)
             
-            # Volume analysis (high volume with small price move = potential dark pool)
             if not hist.empty:
                 avg_volume = hist['Volume'].mean()
                 last_volume = hist['Volume'].iloc[-1]
                 price_change = abs(hist['Close'].iloc[-1] - hist['Close'].iloc[-2]) / hist['Close'].iloc[-2] * 100 if len(hist) > 1 else 0
-                
-                # High volume with low price change suggests institutional accumulation
                 volume_ratio = last_volume / avg_volume if avg_volume > 0 else 1
                 
                 dark_pool = {
+                    'smart_money_score': 50,
+                    'signal': 'ACCUMULATION' if volume_ratio > 1.5 and price_change < 1 else ('DISTRIBUTION' if volume_ratio > 1.5 and price_change > 2 else 'NEUTRAL'),
                     'institutional_ownership': round(inst_ownership * 100, 2) if inst_ownership else 0,
                     'insider_ownership': round(insider_ownership * 100, 2) if insider_ownership else 0,
                     'volume_ratio': round(volume_ratio, 2),
                     'price_change_pct': round(price_change, 2),
-                    'accumulation_signal': 'ACCUMULATION' if volume_ratio > 1.5 and price_change < 1 else ('DISTRIBUTION' if volume_ratio > 1.5 and price_change > 2 else 'NEUTRAL'),
                     'float_short': info.get('shortPercentOfFloat', 0),
                     'shares_short': info.get('sharesShort', 0)
                 }
@@ -1235,6 +1261,91 @@ One comprehensive paragraph that synthesizes EVERYTHING above - BOTH MACRO AND M
                         context_parts.append(f"Industry: {cf.get('industry')}")
                     if cf.get("exchange"):
                         context_parts.append(f"Exchange: {cf.get('exchange')}")
+            
+            # SMART MONEY / DARK POOL ANALYSIS (Critical for institutional activity)
+            smart_money_data = self._get_dark_pool_data(symbol)
+            if smart_money_data and not smart_money_data.get('error'):
+                context_parts.append(f"\n=== 🕵️ SMART MONEY ANALYSIS (Dark Pool Proxy) ===")
+                context_parts.append(f"Smart Money Score: {smart_money_data.get('smart_money_score', 'N/A')}/100")
+                context_parts.append(f"Signal: {smart_money_data.get('signal', 'N/A')}")
+                context_parts.append(f"Confidence: {smart_money_data.get('confidence', 'N/A')}%")
+                
+                # Summary
+                if smart_money_data.get('summary'):
+                    context_parts.append(f"\nSummary:\n{smart_money_data['summary']}")
+                
+                # Volume Analysis
+                vol = smart_money_data.get('volume_analysis', {})
+                if vol and not vol.get('error'):
+                    context_parts.append(f"\n--- Volume Analysis ---")
+                    context_parts.append(f"Volume Ratio (vs 20d): {vol.get('volume_ratio_20d', 'N/A')}x")
+                    context_parts.append(f"Unusual Volume Days (10d): {vol.get('unusual_volume_days_10d', 0)}")
+                    context_parts.append(f"Volume Signal: {vol.get('signal', 'N/A')}")
+                
+                # Accumulation/Distribution
+                acc = smart_money_data.get('accumulation', {})
+                if acc and not acc.get('error'):
+                    context_parts.append(f"\n--- Accumulation/Distribution ---")
+                    context_parts.append(f"Accumulation Days (10d): {acc.get('accumulation_days_10d', 0)}")
+                    context_parts.append(f"Distribution Days (10d): {acc.get('distribution_days_10d', 0)}")
+                    context_parts.append(f"A/D Line Trend: {acc.get('ad_line_trend', 'N/A')}")
+                    context_parts.append(f"Chaikin Money Flow: {acc.get('chaikin_money_flow', 'N/A')}")
+                    context_parts.append(f"Signal: {acc.get('signal', 'N/A')}")
+                
+                # Institutional Ownership
+                inst = smart_money_data.get('institutional', {})
+                if inst and not inst.get('error'):
+                    context_parts.append(f"\n--- Institutional Ownership ---")
+                    context_parts.append(f"Institutional: {inst.get('institutional_ownership_pct', 0)}%")
+                    context_parts.append(f"Insider: {inst.get('insider_ownership_pct', 0)}%")
+                    context_parts.append(f"Concentration: {inst.get('concentration', 'N/A')}")
+                    if inst.get('top_5_holders'):
+                        context_parts.append(f"Top Holders: {', '.join([h['name'] for h in inst['top_5_holders'][:3]])}")
+                
+                # Insider Activity
+                insider = smart_money_data.get('insider_activity', {})
+                if insider and not insider.get('error'):
+                    context_parts.append(f"\n--- Insider Activity ---")
+                    context_parts.append(f"Net Activity: {insider.get('net_activity', 'N/A')}")
+                    context_parts.append(f"Buy Value: ${insider.get('total_buy_value', 0):,.0f}")
+                    context_parts.append(f"Sell Value: ${insider.get('total_sell_value', 0):,.0f}")
+                    context_parts.append(f"Signal: {insider.get('signal', 'N/A')}")
+                
+                # Short Interest
+                short = smart_money_data.get('short_interest', {})
+                if short and not short.get('error'):
+                    context_parts.append(f"\n--- Short Interest ---")
+                    context_parts.append(f"Short % of Float: {short.get('short_percent_float', 0)}%")
+                    context_parts.append(f"Days to Cover: {short.get('days_to_cover', 'N/A')}")
+                    context_parts.append(f"Short Change vs Prior Month: {short.get('short_change_vs_prior_month', 0):+.1f}%")
+                    context_parts.append(f"Squeeze Potential: {short.get('squeeze_potential', 'N/A')}")
+                
+                # Options Flow
+                options = smart_money_data.get('options_flow', {})
+                if options and not options.get('error') and options.get('signal') != 'NO_OPTIONS_DATA':
+                    context_parts.append(f"\n--- Options Flow ---")
+                    context_parts.append(f"Put/Call Ratio (Volume): {options.get('put_call_ratio_volume', 'N/A')}")
+                    context_parts.append(f"Put/Call Ratio (OI): {options.get('put_call_ratio_oi', 'N/A')}")
+                    context_parts.append(f"Unusual Call Strikes: {options.get('unusual_call_strikes', 0)}")
+                    context_parts.append(f"Unusual Put Strikes: {options.get('unusual_put_strikes', 0)}")
+                    context_parts.append(f"Signal: {options.get('signal', 'N/A')}")
+                
+                # Block Trades
+                blocks = smart_money_data.get('block_trades', {})
+                if blocks and not blocks.get('error'):
+                    context_parts.append(f"\n--- Block Trade Detection ---")
+                    context_parts.append(f"Potential Block Days (20d): {blocks.get('potential_block_days_20d', 0)}")
+                    context_parts.append(f"Accumulation Blocks: {blocks.get('accumulation_blocks', 0)}")
+                    context_parts.append(f"Momentum Blocks: {blocks.get('momentum_blocks', 0)}")
+                    context_parts.append(f"Signal: {blocks.get('signal', 'N/A')}")
+                
+                # Money Flow
+                mf = smart_money_data.get('money_flow', {})
+                if mf and not mf.get('error'):
+                    context_parts.append(f"\n--- Money Flow ---")
+                    context_parts.append(f"MFI (14): {mf.get('mfi_14', 'N/A')}")
+                    context_parts.append(f"Net Flow (5d): ${mf.get('net_money_flow_5d', 0):,.0f}")
+                    context_parts.append(f"Interpretation: {mf.get('interpretation', 'N/A')}")
             
             # Run full analysis if engines available
             if HAS_ENGINES:
