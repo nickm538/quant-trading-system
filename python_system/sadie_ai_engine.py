@@ -1,17 +1,24 @@
 """
-SADIE AI ENGINE v1.0
+SADIE AI ENGINE v1.1
 =====================
 The Ultimate Financial Intelligence Chatbot
 
 Powered by:
 - OpenAI GPT-5.x Thinking Mode (via OpenRouter)
 - Complete SadieAI Financial Engine Suite
+- FinancialDatasets.ai Premium Data (financial statements, metrics, SEC filings, news)
 - Real-time market data (yfinance, Twelve Data, Finnhub)
 - 50+ Technical Indicators
 - Monte Carlo Simulations (20,000 paths)
 - GARCH Volatility Modeling
 - Kelly Criterion Position Sizing
 - Legendary Trader Wisdom (Buffett, Soros, Simons, Dalio, PTJ)
+
+Data Sources:
+- FinancialDatasets.ai: Premium financial statements, metrics, SEC filings, company facts, news
+- yFinance: Real-time quotes, options chains, insider transactions
+- TwelveData: Technical indicators, time series
+- Finnhub: Additional market data
 
 Expert Strategies Integrated:
 - TTM Squeeze
@@ -49,6 +56,15 @@ except ImportError as e:
     print(f"Warning: Some engines not available: {e}", file=_sys.stderr)
     HAS_ENGINES = False
 
+# Import FinancialDatasets.ai client
+try:
+    from financial_datasets_client import FinancialDatasetsClient, get_ai_context
+    HAS_FINANCIAL_DATASETS = True
+except ImportError as e:
+    import sys as _sys
+    print(f"Warning: FinancialDatasets client not available: {e}", file=_sys.stderr)
+    HAS_FINANCIAL_DATASETS = False
+
 
 class SadieAIEngine:
     """
@@ -76,14 +92,24 @@ class SadieAIEngine:
     # System prompt that defines Sadie's personality and capabilities
     SYSTEM_CONTEXT = """You are SADIE (Strategic Analysis & Dynamic Investment Engine), the world's most advanced financial AI assistant. You GO ABOVE AND BEYOND on every single query - providing the most detailed, accurate, and insightful analysis possible.
 
+=== DATA SOURCES ===
+You have access to PREMIUM financial data from multiple institutional-grade sources:
+- **FinancialDatasets.ai**: Real-time prices, financial statements (income, balance sheet, cash flow), financial metrics (P/E, EV/EBITDA, ROIC, margins), SEC filings, company facts, segmented revenues, and news
+- **yFinance**: Real-time quotes, historical data, options chains, insider transactions, analyst ratings
+- **TwelveData**: Technical indicators, time series data
+- **Finnhub**: Additional market data and company information
+
+When you see data labeled "FINANCIALDATASETS.AI" in the context, this is PREMIUM institutional-quality data - use it with high confidence.
+
 === CORE CAPABILITIES ===
 1. TECHNICAL ANALYSIS: 50+ indicators (RSI, MACD, Bollinger Bands, Stochastic, ADX, OBV, MFI, Williams %R, CCI, ATR, Parabolic SAR, Ichimoku Cloud, VWAP, Keltner Channels, Donchian Channels, Elder Ray, Force Index, Chaikin Money Flow)
-2. FUNDAMENTAL ANALYSIS: P/E, PEG, EV/EBITDA, DCF valuation, FCF yield, ROE, ROIC, profit margins, debt ratios, working capital, inventory turnover
+2. FUNDAMENTAL ANALYSIS: P/E, PEG, EV/EBITDA, DCF valuation, FCF yield, ROE, ROIC, profit margins, debt ratios, working capital, inventory turnover - ENHANCED with FinancialDatasets.ai premium metrics
 3. MONTE CARLO SIMULATIONS: 20,000 path simulations with Student-t fat-tail distributions for realistic price forecasting
 4. GARCH VOLATILITY: GARCH(1,1) and EGARCH for asymmetric volatility modeling
 5. OPTIONS ANALYSIS: Full Greeks suite (Delta, Gamma, Theta, Vega, Rho), IV surface analysis, 12-factor institutional scoring, put/call ratio analysis
 6. PATTERN RECOGNITION: TTM Squeeze, NR4/NR7 patterns, 35+ chart patterns (head & shoulders, double tops/bottoms, triangles, flags, wedges, cups), Fibonacci retracements/extensions
 7. RISK MANAGEMENT: Kelly Criterion, optimal f, Van Tharp position sizing, dynamic stop-loss placement
+8. SEC FILINGS: Access to 10-K, 10-Q, 8-K filings and extracted items via FinancialDatasets.ai
 
 === SMART CONNECTIONS & PATTERN RECOGNITION ===
 You MUST identify and explain these connections:
@@ -470,6 +496,7 @@ This is NUKE MODE. Maximum detail. Maximum insight. Maximum value. Leave NOTHING
         self.ttm_analyzer = None
         self.data_fetcher = None
         self.twelve_data = None
+        self.financial_datasets = None
         
         # Initialize engines if available
         if HAS_ENGINES:
@@ -483,7 +510,16 @@ This is NUKE MODE. Maximum detail. Maximum insight. Maximum value. Leave NOTHING
                 self.data_fetcher = RobustDataFetcher()
                 self.twelve_data = TwelveDataClient()
             except Exception as e:
-                print(f"Warning: Could not initialize all engines: {e}")
+                import sys as _sys
+                print(f"Warning: Could not initialize all engines: {e}", file=_sys.stderr)
+        
+        # Initialize FinancialDatasets.ai client for premium data
+        if HAS_FINANCIAL_DATASETS:
+            try:
+                self.financial_datasets = FinancialDatasetsClient()
+            except Exception as e:
+                import sys as _sys
+                print(f"Warning: Could not initialize FinancialDatasets client: {e}", file=_sys.stderr)
         
         # Conversation history for context
         self.conversation_history = []
@@ -591,6 +627,46 @@ This is NUKE MODE. Maximum detail. Maximum insight. Maximum value. Leave NOTHING
                 
         except Exception as e:
             data["error"] = str(e)
+        
+        # Enhance with FinancialDatasets.ai premium data
+        if self.financial_datasets:
+            try:
+                fd_data = self.financial_datasets.get_comprehensive_stock_data(symbol)
+                data["financial_datasets"] = fd_data
+                
+                # Merge premium metrics if available
+                if "financial_metrics" in fd_data:
+                    fm = fd_data["financial_metrics"].get("financial_metrics", {})
+                    if fm:
+                        data["premium_metrics"] = {
+                            "ev_to_ebitda": fm.get("ev_to_ebitda"),
+                            "ev_to_revenue": fm.get("ev_to_revenue"),
+                            "price_to_fcf": fm.get("price_to_free_cash_flow"),
+                            "roic": fm.get("roic"),
+                            "revenue_per_share": fm.get("revenue_per_share"),
+                            "earnings_yield": fm.get("earnings_yield"),
+                            "fcf_yield": fm.get("free_cash_flow_yield"),
+                            "gross_margin": fm.get("gross_margin"),
+                            "operating_margin": fm.get("operating_margin"),
+                            "net_margin": fm.get("net_margin"),
+                            "asset_turnover": fm.get("asset_turnover"),
+                            "inventory_turnover": fm.get("inventory_turnover"),
+                            "receivables_turnover": fm.get("receivables_turnover"),
+                            "current_ratio": fm.get("current_ratio"),
+                            "quick_ratio": fm.get("quick_ratio"),
+                            "debt_to_equity": fm.get("debt_to_equity"),
+                            "interest_coverage": fm.get("interest_coverage")
+                        }
+                
+                # Get premium news
+                if "recent_news" in fd_data:
+                    news_data = fd_data["recent_news"].get("news", [])
+                    if news_data:
+                        data["premium_news"] = news_data[:10]
+                        
+            except Exception as e:
+                import sys as _sys
+                print(f"Warning: FinancialDatasets fetch failed: {e}", file=_sys.stderr)
         
         return data
     
@@ -730,6 +806,51 @@ This is NUKE MODE. Maximum detail. Maximum insight. Maximum value. Leave NOTHING
                 context_parts.append(f"\n=== UPCOMING CATALYSTS ===")
                 for cat in catalysts:
                     context_parts.append(f"- {cat['type']}: {cat.get('date', 'TBD')} ({cat['importance']})")
+            
+            # Add premium metrics from FinancialDatasets.ai
+            if data.get("premium_metrics"):
+                pm = data["premium_metrics"]
+                context_parts.append(f"\n=== FINANCIALDATASETS.AI PREMIUM METRICS ===")
+                if pm.get("ev_to_ebitda"):
+                    context_parts.append(f"EV/EBITDA: {pm.get('ev_to_ebitda')}")
+                if pm.get("roic"):
+                    context_parts.append(f"ROIC: {pm.get('roic')}%")
+                if pm.get("fcf_yield"):
+                    context_parts.append(f"FCF Yield: {pm.get('fcf_yield')}%")
+                if pm.get("gross_margin"):
+                    context_parts.append(f"Gross Margin: {pm.get('gross_margin')}%")
+                if pm.get("operating_margin"):
+                    context_parts.append(f"Operating Margin: {pm.get('operating_margin')}%")
+                if pm.get("net_margin"):
+                    context_parts.append(f"Net Margin: {pm.get('net_margin')}%")
+                if pm.get("current_ratio"):
+                    context_parts.append(f"Current Ratio: {pm.get('current_ratio')}")
+                if pm.get("quick_ratio"):
+                    context_parts.append(f"Quick Ratio: {pm.get('quick_ratio')}")
+                if pm.get("interest_coverage"):
+                    context_parts.append(f"Interest Coverage: {pm.get('interest_coverage')}")
+            
+            # Add premium news from FinancialDatasets.ai
+            if data.get("premium_news"):
+                context_parts.append(f"\n=== PREMIUM NEWS (FinancialDatasets.ai) ===")
+                for i, news in enumerate(data["premium_news"][:5], 1):
+                    title = news.get("title", "N/A")
+                    date = news.get("date", "N/A")
+                    context_parts.append(f"{i}. {title} ({date})")
+            
+            # Add company facts from FinancialDatasets.ai
+            if data.get("financial_datasets") and data["financial_datasets"].get("company_facts"):
+                cf = data["financial_datasets"]["company_facts"].get("company_facts", {})
+                if cf:
+                    context_parts.append(f"\n=== COMPANY FACTS (FinancialDatasets.ai) ===")
+                    if cf.get("employees"):
+                        context_parts.append(f"Employees: {cf.get('employees'):,}")
+                    if cf.get("sector"):
+                        context_parts.append(f"Sector: {cf.get('sector')}")
+                    if cf.get("industry"):
+                        context_parts.append(f"Industry: {cf.get('industry')}")
+                    if cf.get("exchange"):
+                        context_parts.append(f"Exchange: {cf.get('exchange')}")
             
             # Run full analysis if engines available
             if HAS_ENGINES:
