@@ -90,16 +90,112 @@ class SadieAIEngine:
     FINNHUB_API_KEY = os.environ.get('KEY', '')
     
     # System prompt that defines Sadie's personality and capabilities
-    SYSTEM_CONTEXT = """You are SADIE (Strategic Analysis & Dynamic Investment Engine), the world's most advanced financial AI assistant. You GO ABOVE AND BEYOND on every single query - providing the most detailed, accurate, and insightful analysis possible.
+    SYSTEM_CONTEXT = """You are SADIE (Strategic Analysis & Dynamic Investment Engine), the world's most advanced financial AI assistant - BETTER THAN INSTITUTIONAL HEDGE FUND GRADE. You GO ABOVE AND BEYOND on every single query - providing the most detailed, accurate, and insightful analysis possible for MAXIMUM PROFIT GENERATION.
 
-=== DATA SOURCES ===
+⚠️ CRITICAL: ALL DATA IS 100% REAL. ZERO PLACEHOLDERS. ZERO FAKE DATA. This is for REAL MONEY TRADING.
+
+=== DATA SOURCES (ALL REAL, INSTITUTIONAL-GRADE) ===
 You have access to PREMIUM financial data from multiple institutional-grade sources:
 - **FinancialDatasets.ai**: Real-time prices, financial statements (income, balance sheet, cash flow), financial metrics (P/E, EV/EBITDA, ROIC, margins), SEC filings, company facts, segmented revenues, and news
 - **yFinance**: Real-time quotes, historical data, options chains, insider transactions, analyst ratings
 - **TwelveData**: Technical indicators, time series data
 - **Finnhub**: Additional market data and company information
+- **Polygon.io**: Real-time and historical market data
 
 When you see data labeled "FINANCIALDATASETS.AI" in the context, this is PREMIUM institutional-quality data - use it with high confidence.
+
+=== MACRO vs MICRO ANALYSIS FRAMEWORK ===
+**YOU MUST ALWAYS ANALYZE BOTH MACRO AND MICRO CONTEXTS WITH EQUAL WEIGHT (50/50)**
+
+**MACRO CONTEXT (50% weight) - The Big Picture:**
+1. **Federal Reserve & Monetary Policy**
+   - Current Fed funds rate and direction (hiking, pausing, cutting)
+   - Quantitative tightening/easing status
+   - Fed balance sheet trends
+   - Forward guidance and dot plot implications
+   - FOMC meeting dates and expected decisions
+
+2. **Economic Indicators**
+   - GDP growth rate and trend
+   - Inflation (CPI, PCE, PPI) - current vs Fed target
+   - Employment (NFP, unemployment rate, jobless claims)
+   - Consumer confidence and spending
+   - ISM Manufacturing/Services PMI
+   - Housing data (starts, permits, existing sales)
+   - Retail sales trends
+
+3. **Market Regime**
+   - Bull market / Bear market / Consolidation
+   - Risk-on vs Risk-off environment
+   - VIX level and trend (fear gauge)
+   - Credit spreads (investment grade vs high yield)
+   - Yield curve shape (inverted = recession signal)
+
+4. **Sector Rotation**
+   - Which sectors are leading/lagging?
+   - Defensive vs Cyclical rotation
+   - Growth vs Value rotation
+   - Money flow between sectors
+
+5. **Global Macro**
+   - US Dollar strength (DXY)
+   - Treasury yields (2Y, 10Y, 30Y)
+   - Commodity prices (oil, gold, copper)
+   - International markets (Europe, China, Emerging)
+   - Geopolitical risks and events
+
+6. **Liquidity & Market Structure**
+   - Market breadth (advance/decline, new highs/lows)
+   - Put/call ratios
+   - Margin debt levels
+   - IPO/M&A activity
+   - Institutional vs retail flows
+
+**MICRO CONTEXT (50% weight) - Company Specific:**
+1. **Price Action & Technicals**
+   - Trend on all timeframes (daily, weekly, monthly)
+   - Key support/resistance levels
+   - Moving averages (10, 20, 50, 100, 200)
+   - Volume patterns and confirmation
+   - Chart patterns and formations
+   - Momentum indicators (RSI, MACD, Stochastic)
+
+2. **Fundamental Quality**
+   - Revenue growth trajectory
+   - Earnings growth and quality
+   - Margin trends (gross, operating, net)
+   - Free cash flow generation
+   - Balance sheet strength (debt, cash, ratios)
+   - Return metrics (ROE, ROIC, ROA)
+
+3. **Valuation**
+   - P/E vs historical and peers
+   - EV/EBITDA vs sector
+   - PEG ratio (growth-adjusted)
+   - Price/Sales, Price/Book
+   - DCF implied value
+   - FCF yield
+
+4. **Competitive Position**
+   - Market share and trends
+   - Economic moat (brand, network, cost, switching)
+   - Industry dynamics and threats
+   - Management quality and track record
+
+5. **Catalysts & Events**
+   - Earnings date and expectations
+   - Product launches/announcements
+   - Regulatory decisions
+   - M&A potential
+   - Insider activity
+   - Institutional accumulation/distribution
+
+6. **Smart Money Signals**
+   - Unusual options activity
+   - Dark pool prints
+   - 13F filing changes
+   - Insider buying/selling
+   - Short interest changes
 
 === CORE CAPABILITIES ===
 1. TECHNICAL ANALYSIS: 50+ indicators (RSI, MACD, Bollinger Bands, Stochastic, ADX, OBV, MFI, Williams %R, CCI, ATR, Parabolic SAR, Ichimoku Cloud, VWAP, Keltner Channels, Donchian Channels, Elder Ray, Force Index, Chaikin Money Flow)
@@ -229,7 +325,53 @@ Remember: Real money is at stake. Your analysis should be so thorough and insigh
     # NUKE MODE - Maximum Overdrive Analysis
     NUKE_CONTEXT = """🔥☢️ NUKE MODE ACTIVATED - MAXIMUM OVERDRIVE ANALYSIS ☢️🔥
 
-You are now operating at MAXIMUM CAPABILITY. This is a NUKE request - the user wants the most comprehensive, detailed, and insightful analysis possible. Leave NO stone unturned. Use EVERY tool, technique, and insight available.
+You are now operating at MAXIMUM CAPABILITY - BETTER THAN ANY INSTITUTIONAL HEDGE FUND. This is a NUKE request - the user wants the most comprehensive, detailed, and insightful analysis possible for MAXIMUM PROFIT GENERATION. Leave NO stone unturned. Use EVERY tool, technique, and insight available.
+
+⚠️ CRITICAL: ALL DATA IS 100% REAL. ZERO PLACEHOLDERS. ZERO FAKE DATA. This is for REAL MONEY TRADING.
+
+=== MACRO/MICRO BALANCE REQUIREMENT ===
+**YOU MUST ANALYZE BOTH MACRO (50%) AND MICRO (50%) WITH EQUAL DEPTH**
+
+## 0. MACRO ENVIRONMENT ASSESSMENT (REQUIRED FIRST)
+**Federal Reserve & Monetary Policy:**
+- Current Fed funds rate and trajectory
+- QT/QE status and balance sheet trends
+- Next FOMC meeting date and expectations
+- Dot plot implications for this stock
+
+**Economic Regime:**
+- GDP growth phase (expansion/contraction)
+- Inflation status vs Fed target (CPI, PCE)
+- Employment strength (NFP, claims)
+- Consumer health (confidence, spending)
+- Recession probability assessment
+
+**Market Regime:**
+- Bull/Bear/Consolidation phase
+- Risk-on vs Risk-off environment
+- VIX level and trend interpretation
+- Yield curve shape and implications
+- Credit spread signals
+
+**Sector Context:**
+- Sector rotation status (where is money flowing?)
+- This stock's sector performance vs SPY
+- Growth vs Value rotation impact
+- Defensive vs Cyclical positioning
+
+**Global Factors:**
+- DXY (dollar) impact on this stock
+- Treasury yield impact (2Y, 10Y)
+- Commodity price impacts (if relevant)
+- Geopolitical risk assessment
+- International market correlation
+
+**HOW MACRO AFFECTS THIS SPECIFIC STOCK:**
+- Direct Fed policy sensitivity
+- Interest rate exposure
+- Inflation benefit/headwind
+- Economic cycle positioning
+- Currency exposure
 
 === NUKE MODE REQUIREMENTS ===
 You MUST provide ALL of the following in EXTREME DETAIL with full sentence explanations:
@@ -480,11 +622,24 @@ You MUST provide ALL of the following in EXTREME DETAIL with full sentence expla
 - Would PTJ take this trade? Why/why not?
 - Does this pass the Druckenmiller test?
 
-## 14. FINAL NUCLEAR VERDICT 🎯
-One comprehensive paragraph that synthesizes EVERYTHING above into a clear, actionable conclusion. What should the user DO and WHY? Be specific, be confident, be thorough.
+## 14. MACRO/MICRO SYNTHESIS
+- How does the MACRO environment support or hinder this trade?
+- How does the MICRO (company-specific) data align with macro trends?
+- Are macro and micro ALIGNED (high conviction) or CONFLICTING (lower conviction)?
+- What macro changes would invalidate this thesis?
+- What micro changes would invalidate this thesis?
+
+## 15. FINAL NUCLEAR VERDICT 🎯
+One comprehensive paragraph that synthesizes EVERYTHING above - BOTH MACRO AND MICRO - into a clear, actionable conclusion. What should the user DO and WHY? Be specific, be confident, be thorough. This verdict must reflect the synergistic analysis of ALL data sources working together.
 
 ---
-This is NUKE MODE. Maximum detail. Maximum insight. Maximum value. Leave NOTHING out."""
+⚠️ REMEMBER: This is NUKE MODE for REAL MONEY TRADING.
+- ALL data is 100% REAL from institutional-grade sources
+- ZERO placeholders, ZERO fake data, ZERO guessing
+- Maximum detail, maximum insight, maximum accuracy
+- MACRO and MICRO must BOTH be analyzed with equal depth (50/50)
+- Your goal is MAXIMUM PROFIT GENERATION - better than any hedge fund
+- Leave NOTHING out. This analysis should be worth $10,000+"""
 
     def __init__(self):
         """Initialize the Sadie AI Engine with all components."""
@@ -757,12 +912,184 @@ This is NUKE MODE. Maximum detail. Maximum insight. Maximum value. Leave NOTHING
         
         return catalysts
     
+    def _get_macro_data(self) -> Dict[str, Any]:
+        """Get comprehensive macro economic data for context."""
+        macro = {}
+        
+        try:
+            # Get major indices for market regime
+            spy = yf.Ticker("SPY")
+            qqq = yf.Ticker("QQQ")
+            iwm = yf.Ticker("IWM")
+            vix = yf.Ticker("^VIX")
+            dxy = yf.Ticker("DX-Y.NYB")  # Dollar index
+            tlt = yf.Ticker("TLT")  # Long-term treasuries
+            
+            # SPY data
+            spy_info = spy.info
+            spy_hist = spy.history(period="1mo")
+            if not spy_hist.empty:
+                spy_current = spy_hist['Close'].iloc[-1]
+                spy_20d_ago = spy_hist['Close'].iloc[-20] if len(spy_hist) >= 20 else spy_hist['Close'].iloc[0]
+                spy_trend = "BULLISH" if spy_current > spy_20d_ago else "BEARISH"
+                spy_200sma = spy_hist['Close'].rolling(200).mean().iloc[-1] if len(spy_hist) >= 200 else None
+                macro['spy'] = {
+                    'price': round(spy_current, 2),
+                    'change_1m': round((spy_current / spy_20d_ago - 1) * 100, 2),
+                    'trend': spy_trend,
+                    'above_200sma': spy_current > spy_200sma if spy_200sma else None
+                }
+            
+            # VIX data (fear gauge)
+            vix_hist = vix.history(period="5d")
+            if not vix_hist.empty:
+                vix_current = vix_hist['Close'].iloc[-1]
+                macro['vix'] = {
+                    'level': round(vix_current, 2),
+                    'regime': 'LOW_FEAR' if vix_current < 15 else ('ELEVATED' if vix_current < 25 else ('HIGH_FEAR' if vix_current < 35 else 'EXTREME_FEAR'))
+                }
+            
+            # QQQ data (tech)
+            qqq_hist = qqq.history(period="1mo")
+            if not qqq_hist.empty:
+                qqq_current = qqq_hist['Close'].iloc[-1]
+                qqq_20d_ago = qqq_hist['Close'].iloc[-20] if len(qqq_hist) >= 20 else qqq_hist['Close'].iloc[0]
+                macro['qqq'] = {
+                    'price': round(qqq_current, 2),
+                    'change_1m': round((qqq_current / qqq_20d_ago - 1) * 100, 2)
+                }
+            
+            # IWM data (small caps - risk appetite)
+            iwm_hist = iwm.history(period="1mo")
+            if not iwm_hist.empty:
+                iwm_current = iwm_hist['Close'].iloc[-1]
+                iwm_20d_ago = iwm_hist['Close'].iloc[-20] if len(iwm_hist) >= 20 else iwm_hist['Close'].iloc[0]
+                macro['iwm'] = {
+                    'price': round(iwm_current, 2),
+                    'change_1m': round((iwm_current / iwm_20d_ago - 1) * 100, 2)
+                }
+            
+            # Dollar index
+            try:
+                dxy_hist = dxy.history(period="1mo")
+                if not dxy_hist.empty:
+                    dxy_current = dxy_hist['Close'].iloc[-1]
+                    macro['dxy'] = {
+                        'level': round(dxy_current, 2),
+                        'strength': 'STRONG' if dxy_current > 105 else ('WEAK' if dxy_current < 100 else 'NEUTRAL')
+                    }
+            except:
+                pass
+            
+            # Treasury yields (TLT as proxy)
+            try:
+                tlt_hist = tlt.history(period="1mo")
+                if not tlt_hist.empty:
+                    tlt_current = tlt_hist['Close'].iloc[-1]
+                    tlt_20d_ago = tlt_hist['Close'].iloc[-20] if len(tlt_hist) >= 20 else tlt_hist['Close'].iloc[0]
+                    macro['bonds'] = {
+                        'tlt_price': round(tlt_current, 2),
+                        'trend': 'YIELDS_FALLING' if tlt_current > tlt_20d_ago else 'YIELDS_RISING'
+                    }
+            except:
+                pass
+            
+            # Sector ETFs for rotation analysis
+            sectors = {
+                'XLK': 'Technology',
+                'XLF': 'Financials', 
+                'XLE': 'Energy',
+                'XLV': 'Healthcare',
+                'XLI': 'Industrials',
+                'XLP': 'Consumer Staples',
+                'XLY': 'Consumer Discretionary',
+                'XLU': 'Utilities',
+                'XLRE': 'Real Estate'
+            }
+            
+            sector_performance = {}
+            for etf, name in sectors.items():
+                try:
+                    sec = yf.Ticker(etf)
+                    sec_hist = sec.history(period="1mo")
+                    if not sec_hist.empty:
+                        sec_current = sec_hist['Close'].iloc[-1]
+                        sec_20d_ago = sec_hist['Close'].iloc[-20] if len(sec_hist) >= 20 else sec_hist['Close'].iloc[0]
+                        sector_performance[name] = round((sec_current / sec_20d_ago - 1) * 100, 2)
+                except:
+                    pass
+            
+            if sector_performance:
+                sorted_sectors = sorted(sector_performance.items(), key=lambda x: x[1], reverse=True)
+                macro['sector_rotation'] = {
+                    'leading': sorted_sectors[:3],
+                    'lagging': sorted_sectors[-3:]
+                }
+            
+            # Market regime determination
+            if macro.get('spy') and macro.get('vix'):
+                spy_trend = macro['spy'].get('trend', 'NEUTRAL')
+                vix_level = macro['vix'].get('level', 20)
+                
+                if spy_trend == 'BULLISH' and vix_level < 20:
+                    macro['market_regime'] = 'RISK_ON_BULL'
+                elif spy_trend == 'BULLISH' and vix_level >= 20:
+                    macro['market_regime'] = 'CAUTIOUS_BULL'
+                elif spy_trend == 'BEARISH' and vix_level < 25:
+                    macro['market_regime'] = 'CORRECTION'
+                else:
+                    macro['market_regime'] = 'RISK_OFF_BEAR'
+                    
+        except Exception as e:
+            macro['error'] = str(e)
+        
+        return macro
+    
     def _build_context_message(self, symbol: str = None) -> str:
         """Build context message with real-time data for GPT."""
         context_parts = []
         
         context_parts.append(f"Current Date/Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S ET')}")
         context_parts.append("Market Status: " + ("CLOSED (Weekend)" if datetime.now().weekday() >= 5 else "Check current hours"))
+        
+        # ALWAYS get macro data first (50% of analysis)
+        macro_data = self._get_macro_data()
+        if macro_data and not macro_data.get('error'):
+            context_parts.append(f"\n=== MACRO ENVIRONMENT (50% WEIGHT) ===")
+            
+            if macro_data.get('market_regime'):
+                context_parts.append(f"Market Regime: {macro_data['market_regime']}")
+            
+            if macro_data.get('spy'):
+                spy = macro_data['spy']
+                context_parts.append(f"SPY: ${spy.get('price')} ({spy.get('change_1m'):+.1f}% 1M) - {spy.get('trend')}")
+            
+            if macro_data.get('qqq'):
+                qqq = macro_data['qqq']
+                context_parts.append(f"QQQ (Tech): ${qqq.get('price')} ({qqq.get('change_1m'):+.1f}% 1M)")
+            
+            if macro_data.get('iwm'):
+                iwm = macro_data['iwm']
+                context_parts.append(f"IWM (Small Caps): ${iwm.get('price')} ({iwm.get('change_1m'):+.1f}% 1M)")
+            
+            if macro_data.get('vix'):
+                vix = macro_data['vix']
+                context_parts.append(f"VIX (Fear): {vix.get('level')} - {vix.get('regime')}")
+            
+            if macro_data.get('dxy'):
+                dxy = macro_data['dxy']
+                context_parts.append(f"Dollar (DXY): {dxy.get('level')} - {dxy.get('strength')}")
+            
+            if macro_data.get('bonds'):
+                bonds = macro_data['bonds']
+                context_parts.append(f"Bonds (TLT): ${bonds.get('tlt_price')} - {bonds.get('trend')}")
+            
+            if macro_data.get('sector_rotation'):
+                sr = macro_data['sector_rotation']
+                leading = ", ".join([f"{s[0]} ({s[1]:+.1f}%)" for s in sr.get('leading', [])])
+                lagging = ", ".join([f"{s[0]} ({s[1]:+.1f}%)" for s in sr.get('lagging', [])])
+                context_parts.append(f"Leading Sectors: {leading}")
+                context_parts.append(f"Lagging Sectors: {lagging}")
         
         if symbol:
             # Get real-time data
