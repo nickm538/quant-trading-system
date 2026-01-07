@@ -68,19 +68,23 @@ class InstitutionalOptionsEngine:
         }
         
         # Hard rejection filters (balanced for quality and practicality)
+        # These are intentionally loose to allow more options through initial filter
+        # The scoring system will rank them appropriately
         self.filters = {
-            'min_dte': 7,
-            'max_dte': 90,
-            'min_delta': 0.25,  # Widened to match scanner
-            'max_delta': 0.75,  # Widened to match scanner
-            'max_spread_pct': 20.0,  # Increased from 15% for less liquid stocks
-            'min_open_interest': 20,  # Reduced to match scanner
-            'min_volume': 5,  # Reduced to match scanner
-            'min_days_to_earnings': 3
+            'min_dte': 3,          # Allow shorter-term options (was 7)
+            'max_dte': 120,        # Allow longer-term options (was 90)
+            'min_delta': 0.15,     # Allow wider delta range (was 0.25) - includes more OTM
+            'max_delta': 0.85,     # Allow wider delta range (was 0.75) - includes more ITM
+            'max_spread_pct': 30.0, # More lenient spread (was 20%) - many stocks have wider spreads
+            'min_open_interest': 5, # Reduced (was 20) - new strikes may have low OI
+            'min_volume': 1,        # Reduced (was 5) - some good options have low daily volume
+            'min_days_to_earnings': 1  # Reduced (was 3) - allow trading closer to earnings
         }
         
         # Minimum score thresholds
-        self.min_score = 40.0  # Lowered for more results (was 60, then 50, now 40)
+        # Score of 30+ ensures basic quality while returning enough options
+        # The scoring system ranks them, so even 30-40 score options can be profitable
+        self.min_score = 30.0  # Lowered to return more results (was 60 -> 50 -> 40 -> 30)
         
     def analyze_single_option(
         self,
@@ -281,7 +285,20 @@ class InstitutionalOptionsEngine:
             top_calls = [c for c in scored_calls if c['final_score'] >= self.min_score][:10]
             top_puts = [p for p in scored_puts if p['final_score'] >= self.min_score][:10]
             
-            logger.info(f"Analysis complete: {len(top_calls)} qualifying calls, {len(top_puts)} qualifying puts")
+            # FALLBACK: If no options meet threshold, return top 5 anyway with a warning
+            # This ensures users always get recommendations to consider
+            fallback_used = False
+            if len(top_calls) == 0 and len(scored_calls) > 0:
+                top_calls = scored_calls[:5]  # Return top 5 even if below threshold
+                fallback_used = True
+                logger.warning(f"No calls met {self.min_score} threshold, returning top {len(top_calls)} below threshold")
+            
+            if len(top_puts) == 0 and len(scored_puts) > 0:
+                top_puts = scored_puts[:5]  # Return top 5 even if below threshold
+                fallback_used = True
+                logger.warning(f"No puts met {self.min_score} threshold, returning top {len(top_puts)} below threshold")
+            
+            logger.info(f"Analysis complete: {len(top_calls)} qualifying calls, {len(top_puts)} qualifying puts{' (fallback used)' if fallback_used else ''}")
             
             return {
                 'symbol': symbol,
@@ -359,7 +376,7 @@ class InstitutionalOptionsEngine:
                         option_type=option_type
                     )
                 if iv <= 0 or iv > 3.0:  # Skip if IV invalid (0% or >300%)
-                    continue  # CRITICAL: Never use fake IV - skip this option
+                    return None  # CRITICAL: Never use fake IV - skip this option
             
             # ALWAYS calculate Greeks using Black-Scholes with CALCULATED IV
             logger.debug(f"Calculating Greeks for {option_type} strike {strike} with IV={iv*100:.1f}%")

@@ -142,7 +142,8 @@ export async function analyzeOptions(params: {
   max_delta?: number;
   min_days?: number;
 }): Promise<any> {
-  const { symbol, min_delta = 0.3, max_delta = 0.6, min_days = 7 } = params;
+  // Widened default filters to return more results
+  const { symbol, min_delta = 0.15, max_delta = 0.85, min_days = 3 } = params;
 
   const command = `${PYTHON_BIN} ${WRAPPER_SCRIPT} analyze_options ${symbol} ${min_delta} ${max_delta} ${min_days}`;
 

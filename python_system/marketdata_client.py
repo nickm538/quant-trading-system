@@ -351,12 +351,12 @@ class MarketDataClient:
     def get_filtered_options(
         self,
         symbol: str,
-        min_dte: int = 7,
-        max_dte: int = 90,
-        min_delta: float = 0.3,
-        max_delta: float = 0.6,
-        min_volume: int = 10,
-        min_oi: int = 50
+        min_dte: int = 3,       # Reduced from 7 - allow shorter term
+        max_dte: int = 120,     # Extended from 90 - allow longer term
+        min_delta: float = 0.15, # Widened from 0.3 - include more OTM
+        max_delta: float = 0.85, # Widened from 0.6 - include more ITM
+        min_volume: int = 1,     # Reduced from 10 - some good options have low volume
+        min_oi: int = 10         # Reduced from 50 - allow newer strikes
     ) -> Dict[str, List[Dict[str, Any]]]:
         """
         Get filtered options for both calls and puts with institutional-grade criteria.
@@ -415,8 +415,8 @@ class MarketDataClient:
                 current_price = None
                 logger.warning(f"⚠ Could not fetch current price for {symbol}, strike filtering disabled")
         
-        # Fetch calls and puts for each expiration (LIMIT TO 3 FOR SPEED)
-        for exp_date in filtered_expirations[:3]:  # OPTIMIZED: Only 3 nearest expirations
+        # Fetch calls and puts for each expiration (LIMIT TO 5 FOR BETTER COVERAGE)
+        for exp_date in filtered_expirations[:5]:  # Increased from 3 to 5 expirations
             logger.info(f"\nFetching options for expiration: {exp_date}")
             
             # Get calls (with current_price for strike filtering)

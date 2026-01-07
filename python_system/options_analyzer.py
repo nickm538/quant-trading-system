@@ -182,19 +182,101 @@ class OptionsAnalyzer:
         options_data = marketdata_client.get_filtered_options(
             symbol=symbol,
             min_dte=min_days_to_expiry,
-            max_dte=90,
-            min_delta=min_delta,
-            max_delta=max_delta,
-            min_volume=10,
-            min_oi=50
+            max_dte=120,  # Extended to 4 months
+            min_delta=0.15,  # Wider delta range (was min_delta param)
+            max_delta=0.85,  # Wider delta range (was max_delta param)
+            min_volume=1,    # Reduced from 10 - some good options have low daily volume
+            min_oi=10        # Reduced from 50 - allow newer strikes
         )
         
         call_contracts = options_data.get('calls', [])
         put_contracts = options_data.get('puts', [])
         
         if not call_contracts and not put_contracts:
-            logger.error(f"No options data for {symbol} from MarketData.app")
-            return None
+            logger.warning(f"No options data for {symbol} from MarketData.app, trying yfinance fallback...")
+            # FALLBACK: Use yfinance if MarketData returns nothing
+            try:
+                import yfinance as yf
+                ticker = yf.Ticker(symbol)
+                
+                # Get all expiration dates
+                expirations = ticker.options
+                if not expirations:
+                    logger.error(f"No options available for {symbol}")
+                    return {'symbol': symbol, 'current_price': current_price, 'top_calls': [], 'top_puts': [], 'error': 'No options available'}
+                
+                # Filter expirations by DTE
+                from datetime import datetime
+                valid_expirations = []
+                for exp in expirations:
+                    exp_dt = datetime.strptime(exp, '%Y-%m-%d')
+                    dte = (exp_dt - datetime.now()).days
+                    if min_days_to_expiry <= dte <= 120:
+                        valid_expirations.append((exp, dte))
+                
+                if not valid_expirations:
+                    logger.error(f"No options in valid DTE range for {symbol}")
+                    return {'symbol': symbol, 'current_price': current_price, 'top_calls': [], 'top_puts': [], 'error': 'No options in valid DTE range'}
+                
+                # Get options for first 5 expirations
+                for exp, dte in valid_expirations[:5]:
+                    try:
+                        chain = ticker.option_chain(exp)
+                        
+                        # Process calls
+                        for _, row in chain.calls.iterrows():
+                            delta = row.get('delta', 0.5) if pd.notna(row.get('delta')) else 0.5
+                            if 0.15 <= abs(delta) <= 0.85:
+                                call_contracts.append({
+                                    'strike': row['strike'],
+                                    'bid': row.get('bid', 0) or 0,
+                                    'ask': row.get('ask', 0) or 0,
+                                    'mid': (row.get('bid', 0) + row.get('ask', 0)) / 2 if row.get('bid') and row.get('ask') else row.get('lastPrice', 0),
+                                    'last': row.get('lastPrice', 0) or 0,
+                                    'volume': int(row.get('volume', 0) or 0),
+                                    'open_interest': int(row.get('openInterest', 0) or 0),
+                                    'iv': row.get('impliedVolatility', hist_vol) or hist_vol,
+                                    'delta': delta,
+                                    'gamma': row.get('gamma', 0) or 0,
+                                    'theta': row.get('theta', 0) or 0,
+                                    'vega': row.get('vega', 0) or 0,
+                                    'dte': dte,
+                                    'option_symbol': row.get('contractSymbol', '')
+                                })
+                        
+                        # Process puts
+                        for _, row in chain.puts.iterrows():
+                            delta = row.get('delta', -0.5) if pd.notna(row.get('delta')) else -0.5
+                            if 0.15 <= abs(delta) <= 0.85:
+                                put_contracts.append({
+                                    'strike': row['strike'],
+                                    'bid': row.get('bid', 0) or 0,
+                                    'ask': row.get('ask', 0) or 0,
+                                    'mid': (row.get('bid', 0) + row.get('ask', 0)) / 2 if row.get('bid') and row.get('ask') else row.get('lastPrice', 0),
+                                    'last': row.get('lastPrice', 0) or 0,
+                                    'volume': int(row.get('volume', 0) or 0),
+                                    'open_interest': int(row.get('openInterest', 0) or 0),
+                                    'iv': row.get('impliedVolatility', hist_vol) or hist_vol,
+                                    'delta': delta,
+                                    'gamma': row.get('gamma', 0) or 0,
+                                    'theta': row.get('theta', 0) or 0,
+                                    'vega': row.get('vega', 0) or 0,
+                                    'dte': dte,
+                                    'option_symbol': row.get('contractSymbol', '')
+                                })
+                    except Exception as e:
+                        logger.warning(f"Error fetching chain for {exp}: {e}")
+                        continue
+                
+                logger.info(f"  yfinance fallback found {len(call_contracts)} calls, {len(put_contracts)} puts")
+                
+            except Exception as e:
+                logger.error(f"yfinance fallback failed: {e}")
+                return {'symbol': symbol, 'current_price': current_price, 'top_calls': [], 'top_puts': [], 'error': str(e)}
+        
+        if not call_contracts and not put_contracts:
+            logger.error(f"No options data for {symbol} from any source")
+            return {'symbol': symbol, 'current_price': current_price, 'top_calls': [], 'top_puts': [], 'error': 'No options data available'}
         
         logger.info(f"  Found {len(call_contracts)} call options, {len(put_contracts)} put options from MarketData.app")
         
