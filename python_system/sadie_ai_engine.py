@@ -80,12 +80,13 @@ class SadieAIEngine:
     OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY', '')
     OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
     
-    # Model selection - prefer GPT-5 thinking mode
+    # Model selection - prefer GPT-5 thinking mode, with reliable fallbacks
     MODELS = [
-        "openai/o1",  # GPT-5 / o1 thinking mode
-        "openai/o1-preview",
-        "openai/gpt-4-turbo",
-        "openai/gpt-4"
+        "openai/o1",  # GPT-5 / o1 thinking mode (best for complex analysis)
+        "openai/gpt-4o",  # GPT-4o (fast, reliable, great for general queries)
+        "openai/gpt-4-turbo",  # GPT-4 Turbo (good fallback)
+        "anthropic/claude-3.5-sonnet",  # Claude 3.5 Sonnet (excellent alternative)
+        "openai/gpt-4"  # GPT-4 (final fallback)
     ]
     
     # Finnhub API for additional data
@@ -1576,7 +1577,58 @@ One comprehensive paragraph that synthesizes EVERYTHING above - BOTH MACRO AND M
             
             if api_response.status_code == 200:
                 result = api_response.json()
-                assistant_message = result['choices'][0]['message']['content']
+                assistant_message = result.get('choices', [{}])[0].get('message', {}).get('content', '')
+                
+                # Check if response is empty - if so, try fallback models
+                if not assistant_message or not assistant_message.strip():
+                    import sys as _sys
+                    print(f"Warning: o1 returned empty response, trying fallback models...", file=_sys.stderr)
+                    
+                    # Try fallback models for empty response
+                    for fallback_model in self.MODELS[1:]:
+                        try:
+                            fallback_payload = {
+                                "model": fallback_model,
+                                "messages": messages,
+                                "max_tokens": max_tokens,
+                                "temperature": 0.7 if fallback_model not in ["openai/o1", "openai/o1-preview"] else 1,
+                            }
+                            
+                            fallback_response = requests.post(
+                                self.OPENROUTER_URL,
+                                headers=headers,
+                                json=fallback_payload,
+                                timeout=90
+                            )
+                            
+                            if fallback_response.status_code == 200:
+                                fallback_result = fallback_response.json()
+                                assistant_message = fallback_result.get('choices', [{}])[0].get('message', {}).get('content', '')
+                                
+                                if assistant_message and assistant_message.strip():
+                                    # Add NUKE mode header if applicable
+                                    if is_nuke:
+                                        assistant_message = f"☢️ **NUKE MODE ANALYSIS** ☢️\n\n{assistant_message}"
+                                    
+                                    self.conversation_history.append({"role": "user", "content": user_message})
+                                    self.conversation_history.append({"role": "assistant", "content": assistant_message})
+                                    
+                                    response["success"] = True
+                                    response["message"] = assistant_message
+                                    response["data"] = {
+                                        "symbol_detected": symbol,
+                                        "model_used": fallback_model,
+                                        "tokens_used": fallback_result.get('usage', {}),
+                                        "nuke_mode": is_nuke
+                                    }
+                                    return response
+                        except Exception as fallback_error:
+                            print(f"Warning: Fallback model {fallback_model} failed: {fallback_error}", file=_sys.stderr)
+                            continue
+                    
+                    # If all fallbacks failed, return error
+                    response["message"] = "I apologize, but I'm having trouble generating a response right now. Please try again or rephrase your question."
+                    return response
                 
                 # Add NUKE mode header if applicable
                 if is_nuke:
