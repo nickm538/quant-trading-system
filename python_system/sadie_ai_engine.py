@@ -48,6 +48,7 @@ try:
     from trading_education import TradingEducation
     from market_scanner import MarketScanner
     from indicators.ttm_squeeze import TTMSqueezeAnalyzer
+    from indicators.bohen_5to1 import Bohen5to1Scanner
     from twelvedata_client import TwelveDataClient
     from robust_data_fetcher import RobustDataFetcher
     from smart_money_detector import SmartMoneyDetector
@@ -667,6 +668,7 @@ One comprehensive paragraph that synthesizes EVERYTHING above - BOTH MACRO AND M
                 self.data_fetcher = RobustDataFetcher()
                 self.twelve_data = TwelveDataClient()
                 self.smart_money = SmartMoneyDetector()
+                self.bohen_scanner = Bohen5to1Scanner()
             except Exception as e:
                 import sys as _sys
                 print(f"Warning: Could not initialize all engines: {e}", file=_sys.stderr)
@@ -1346,6 +1348,44 @@ One comprehensive paragraph that synthesizes EVERYTHING above - BOTH MACRO AND M
                     context_parts.append(f"MFI (14): {mf.get('mfi_14', 'N/A')}")
                     context_parts.append(f"Net Flow (5d): ${mf.get('net_money_flow_5d', 0):,.0f}")
                     context_parts.append(f"Interpretation: {mf.get('interpretation', 'N/A')}")
+            
+            # TIM BOHEN 5:1 RISK/REWARD ANALYSIS
+            if hasattr(self, 'bohen_scanner') and self.bohen_scanner:
+                try:
+                    bohen_analysis = self.bohen_scanner.analyze(symbol)
+                    if bohen_analysis and not bohen_analysis.get('error'):
+                        context_parts.append(f"\n=== 🎯 TIM BOHEN 5:1 RISK/REWARD ANALYSIS ===")
+                        context_parts.append(f"Current Price: ${bohen_analysis.get('current_price', 'N/A')}")
+                        context_parts.append(f"ATR: ${bohen_analysis.get('atr', 'N/A')} ({bohen_analysis.get('atr_pct', 'N/A')}%)")
+                        context_parts.append(f"Volume: {bohen_analysis.get('volume_signal', 'N/A')} ({bohen_analysis.get('volume_ratio', 'N/A')}x avg)")
+                        
+                        trend = bohen_analysis.get('trend', {})
+                        context_parts.append(f"\n--- Trend Analysis ---")
+                        context_parts.append(f"Direction: {trend.get('direction', 'N/A')}")
+                        context_parts.append(f"Trend Score: {trend.get('score', 'N/A')}/100")
+                        context_parts.append(f"EMA Alignment: {trend.get('ema_alignment', 'N/A')}")
+                        
+                        context_parts.append(f"\n--- Key Levels ---")
+                        context_parts.append(f"Support Levels: {bohen_analysis.get('support_levels', [])}")
+                        context_parts.append(f"Resistance Levels: {bohen_analysis.get('resistance_levels', [])}")
+                        
+                        best_setup = bohen_analysis.get('best_setup')
+                        if best_setup:
+                            context_parts.append(f"\n--- BEST 5:1 SETUP ({best_setup.get('direction', 'N/A')}) ---")
+                            context_parts.append(f"Entry: ${best_setup.get('entry', 'N/A')}")
+                            context_parts.append(f"Stop Loss: ${best_setup.get('stop_loss', 'N/A')} (Risk: {best_setup.get('risk_pct', 'N/A')}%)")
+                            context_parts.append(f"Target: ${best_setup.get('target', 'N/A')} (Reward: {best_setup.get('reward_pct', 'N/A')}%)")
+                            context_parts.append(f"R/R Ratio: {best_setup.get('rr_ratio', 'N/A')}:1")
+                            context_parts.append(f"Meets 5:1 Criteria: {'✅ YES' if best_setup.get('meets_5to1') else '❌ NO'}")
+                        else:
+                            context_parts.append(f"\n--- NO 5:1 SETUP FOUND ---")
+                            context_parts.append("Cannot find entry/stop/target combination that meets 5:1 R/R criteria.")
+                        
+                        context_parts.append(f"\n--- BOHEN VERDICT ---")
+                        context_parts.append(bohen_analysis.get('bohen_verdict', 'N/A'))
+                except Exception as e:
+                    import sys as _sys
+                    print(f"Warning: Bohen 5:1 analysis failed: {e}", file=_sys.stderr)
             
             # Run full analysis if engines available
             if HAS_ENGINES:
