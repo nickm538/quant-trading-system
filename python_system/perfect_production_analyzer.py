@@ -26,6 +26,13 @@ import requests
 import time
 import yfinance as yf
 
+# Import FinancialDatasets.ai for premium data
+try:
+    from financial_datasets_client import FinancialDatasetsClient
+    HAS_FINANCIAL_DATASETS = True
+except ImportError:
+    HAS_FINANCIAL_DATASETS = False
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -40,6 +47,8 @@ class PerfectProductionAnalyzer:
         self.api_client = ApiClient()
         self.finnhub_base_url = "https://finnhub.io/api/v1"
         self.cache = {}  # Simple cache
+        self.fd_client = None
+        
         # Initialize TAAPI.io client for backup/validation
         try:
             from taapi_client import TaapiClient
@@ -49,6 +58,14 @@ class PerfectProductionAnalyzer:
             self.taapi = None
             logger.warning(f"TAAPI.io client not available: {e}")
             logger.info("Perfect Production Analyzer V2 initialized with Finnhub + yfinance")
+        
+        # Initialize FinancialDatasets.ai client for premium data
+        if HAS_FINANCIAL_DATASETS:
+            try:
+                self.fd_client = FinancialDatasetsClient()
+                logger.info("FinancialDatasets.ai client initialized for premium data")
+            except Exception as e:
+                logger.warning(f"Could not initialize FinancialDatasets client: {e}")
     
     def _call_finnhub(self, endpoint: str, symbol: str) -> Optional[Dict]:
         """Call Finnhub API - NO CACHING for real-money trading"""
@@ -210,6 +227,21 @@ class PerfectProductionAnalyzer:
         # Add details
         analysis['fundamentals'] = fundamentals
         analysis['technical_indicators'] = technical_indicators
+        
+        # Enhance with FinancialDatasets.ai premium data
+        if self.fd_client:
+            try:
+                fd_data = self.fd_client.get_comprehensive_stock_data(symbol)
+                if 'error' not in fd_data:
+                    analysis['premium_data'] = {
+                        'source': 'FinancialDatasets.ai',
+                        'financial_metrics': fd_data.get('financial_metrics', {}),
+                        'company_facts': fd_data.get('company_facts', {}),
+                        'recent_news': fd_data.get('recent_news', {})
+                    }
+                    logger.info("✓ Enhanced with FinancialDatasets.ai premium data")
+            except Exception as e:
+                logger.warning(f"Could not fetch FinancialDatasets premium data: {e}")
         
         logger.info(f"✓ Analysis complete: {recommendation} (score: {overall_score:.1f}/100)")
         return analysis

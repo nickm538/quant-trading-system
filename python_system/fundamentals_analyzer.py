@@ -21,6 +21,13 @@ import yfinance as yf
 from typing import Dict, Any, Optional
 from datetime import datetime
 
+# Import FinancialDatasets.ai for premium data
+try:
+    from financial_datasets_client import FinancialDatasetsClient
+    HAS_FINANCIAL_DATASETS = True
+except ImportError:
+    HAS_FINANCIAL_DATASETS = False
+
 logger = logging.getLogger(__name__)
 
 
@@ -165,6 +172,15 @@ class FundamentalsAnalyzer:
     def __init__(self):
         """Initialize the Fundamentals Analyzer."""
         logger.info("FundamentalsAnalyzer initialized - LIVE DATA ONLY")
+        
+        # Initialize FinancialDatasets.ai client for premium data
+        self.fd_client = None
+        if HAS_FINANCIAL_DATASETS:
+            try:
+                self.fd_client = FinancialDatasetsClient()
+                logger.info("FinancialDatasets.ai client initialized")
+            except Exception as e:
+                logger.warning(f"Could not initialize FinancialDatasets client: {e}")
     
     def analyze(self, symbol: str) -> Dict[str, Any]:
         """
@@ -384,6 +400,37 @@ class FundamentalsAnalyzer:
                     debt_to_equity, free_cash_flow, revenue_growth
                 )
             }
+            
+            # Enhance with FinancialDatasets.ai premium data
+            if self.fd_client:
+                try:
+                    fd_metrics = self.fd_client.get_financial_metrics_snapshot(symbol)
+                    if 'error' not in fd_metrics:
+                        metrics = fd_metrics.get('financial_metrics', {})
+                        result['premium_data'] = {
+                            'source': 'FinancialDatasets.ai',
+                            'ev_to_ebitda': metrics.get('ev_to_ebitda'),
+                            'ev_to_revenue': metrics.get('ev_to_revenue'),
+                            'price_to_fcf': metrics.get('price_to_free_cash_flow'),
+                            'roic': metrics.get('roic'),
+                            'earnings_yield': metrics.get('earnings_yield'),
+                            'fcf_yield': metrics.get('free_cash_flow_yield'),
+                            'gross_margin': metrics.get('gross_margin'),
+                            'operating_margin': metrics.get('operating_margin'),
+                            'net_margin': metrics.get('net_margin'),
+                            'asset_turnover': metrics.get('asset_turnover'),
+                            'inventory_turnover': metrics.get('inventory_turnover'),
+                            'receivables_turnover': metrics.get('receivables_turnover'),
+                            'current_ratio': metrics.get('current_ratio'),
+                            'quick_ratio': metrics.get('quick_ratio'),
+                            'debt_to_equity': metrics.get('debt_to_equity'),
+                            'interest_coverage': metrics.get('interest_coverage'),
+                            'dividend_yield': metrics.get('dividend_yield'),
+                            'payout_ratio': metrics.get('payout_ratio')
+                        }
+                        logger.info(f"Enhanced with FinancialDatasets.ai premium data for {symbol}")
+                except Exception as e:
+                    logger.warning(f"Could not fetch FinancialDatasets premium data: {e}")
             
             logger.info(f"Fundamental analysis complete for {symbol}")
             return result
