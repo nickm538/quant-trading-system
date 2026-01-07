@@ -70,6 +70,15 @@ try:
 except ImportError:
     TWELVE_DATA_AVAILABLE = False
 
+# Import dynamic risk-free rate fetcher
+try:
+    from risk_free_rate import get_risk_free_rate
+    DYNAMIC_RISK_FREE_RATE = True
+except ImportError:
+    DYNAMIC_RISK_FREE_RATE = False
+    def get_risk_free_rate():
+        return 0.0435  # Fallback to current 10Y Treasury rate (Jan 2026)
+
 logger = logging.getLogger(__name__)
 
 # Custom JSON encoder for NumPy/Pandas types
@@ -279,8 +288,12 @@ class UltimateOptionsEngine:
     
     def __init__(self):
         """Initialize the Ultimate Options Intelligence Engine."""
+        # Get current risk-free rate dynamically from 10Y Treasury
+        self.risk_free_rate = get_risk_free_rate()
+        logger.info(f"Using dynamic risk-free rate: {self.risk_free_rate:.4f} ({self.risk_free_rate*100:.2f}%)")
+        
         # Core components
-        self.greeks_calc = GreeksCalculator(risk_free_rate=0.0525)  # Current Fed rate
+        self.greeks_calc = GreeksCalculator(risk_free_rate=self.risk_free_rate)
         self.pattern_engine = PatternRecognitionEngine()
         
         # TTM Squeeze
@@ -811,8 +824,8 @@ class UltimateOptionsEngine:
                                 option_type='call'
                             )
                             
-                            if iv <= 0:
-                                iv = 0.30  # Default if calculation fails
+                            if iv <= 0 or iv > 3.0:  # Skip if IV invalid (0% or >300%)
+                                continue  # CRITICAL: Never use fake IV - skip this option
                             
                             # Calculate delta
                             greeks = self.greeks_calc.calculate_all_greeks(
@@ -1071,8 +1084,8 @@ class UltimateOptionsEngine:
                 time_to_expiry=dte / 365.0,
                 option_type=option_type
             )
-            if iv <= 0:
-                iv = 0.30
+            if iv <= 0 or iv > 3.0:  # Skip if IV invalid (0% or >300%)
+                return None  # CRITICAL: Never use fake IV - skip this option
             
             # Calculate Greeks
             greeks = self.greeks_calc.calculate_all_greeks(
@@ -2215,10 +2228,10 @@ class UltimateOptionsEngine:
         puts = options_data.get('puts', [])
         
         if not calls and not puts:
-            return {'atm_iv': 0.30, 'skew': 0, 'term_structure': 'flat'}
+            return {'atm_iv': None, 'skew': 0, 'term_structure': 'unknown', 'error': 'No options data available'}
         
-        # Find ATM IV
-        atm_iv = 0.30
+        # Find ATM IV - start with None, only use real calculated values
+        atm_iv = None
         min_distance = float('inf')
         
         for option in calls + puts:
@@ -2243,10 +2256,14 @@ class UltimateOptionsEngine:
                     if iv > 0:
                         atm_iv = iv
         
+        # If no valid ATM IV found, return error
+        if atm_iv is None:
+            return {'atm_iv': None, 'skew': 0, 'term_structure': 'unknown', 'error': 'Could not calculate valid ATM IV'}
+        
         return {
             'atm_iv': round(atm_iv, 4),
             'atm_iv_pct': round(atm_iv * 100, 2),
-            'skew': 0,  # Simplified
+            'skew': 0,  # Would need full chain analysis for real skew
             'term_structure': 'normal'
         }
     
