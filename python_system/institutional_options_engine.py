@@ -56,15 +56,16 @@ class InstitutionalOptionsEngine:
         self.pattern_engine = PatternRecognitionEngine()
         
         # Category weights (must sum to 1.0)
+        # REBALANCED: Prioritize factors that directly impact profitability
         self.category_weights = {
-            'volatility': 0.20,      # IV analysis, skew, HV comparison
-            'greeks': 0.18,          # Advanced Greeks including second-order
-            'technical': 0.15,       # Momentum, trend, support/resistance
-            'liquidity': 0.12,       # Bid-ask spread, volume, OI
-            'event_risk': 0.12,      # Earnings, IV crush detection
-            'sentiment': 0.10,       # News, analyst ratings, insider trading
-            'flow': 0.08,            # Unusual activity, order flow
-            'expected_value': 0.05   # Probability, risk/reward, breakeven
+            'volatility': 0.18,      # IV analysis, skew, HV comparison - key for pricing
+            'greeks': 0.15,          # Advanced Greeks - important for risk management
+            'technical': 0.15,       # Momentum, trend, support/resistance - directional edge
+            'liquidity': 0.10,       # Bid-ask spread, volume, OI - execution quality
+            'event_risk': 0.12,      # Earnings, IV crush detection - avoid traps
+            'sentiment': 0.08,       # News, analyst ratings - secondary signal
+            'flow': 0.10,            # Unusual activity, order flow - smart money tracking
+            'expected_value': 0.12   # Probability, risk/reward - INCREASED (was 0.05)
         }
         
         # Hard rejection filters (balanced for quality and practicality)
@@ -639,16 +640,22 @@ class InstitutionalOptionsEngine:
         # 1. IV Rank & Percentile (40% of category)
         if iv_history and len(iv_history) > 0:
             iv_rank = self._calculate_iv_rank(iv, iv_history)
-            # Optimal range: 30-70, bell curve scoring
-            if 30 <= iv_rank <= 70:
-                iv_rank_score = 100
-            elif iv_rank < 30:
-                iv_rank_score = 50 + (iv_rank / 30) * 50
-            else:  # > 70
-                iv_rank_score = 100 - ((iv_rank - 70) / 30) * 50
+            # FIXED: More nuanced IV rank scoring
+            # Low IV (0-30): Good for buying (cheap options), score 80-90
+            # Mid IV (30-60): Balanced, score 85-95
+            # High IV (60-80): Caution but can still work, score 60-80
+            # Very High IV (80-100): High premium, score 40-60
+            if iv_rank < 30:
+                iv_rank_score = 85 + (30 - iv_rank) / 30 * 10  # 85-95 (low IV = cheap options)
+            elif iv_rank < 60:
+                iv_rank_score = 85 + (60 - iv_rank) / 30 * 10  # 85-95 (sweet spot)
+            elif iv_rank < 80:
+                iv_rank_score = 60 + (80 - iv_rank) / 20 * 20  # 60-80 (elevated but tradeable)
+            else:
+                iv_rank_score = 40 + (100 - iv_rank) / 20 * 20  # 40-60 (high premium risk)
             score += iv_rank_score * 0.40
         else:
-            score += 50 * 0.40  # Neutral if no history
+            score += 70 * 0.40  # Neutral-positive if no history (assume normal)
         
         # 2. IV vs HV comparison (30% of category)
         if historical_vol > 0:
@@ -734,15 +741,18 @@ class InstitutionalOptionsEngine:
         
         # 1. Delta positioning (35% of category)
         abs_delta = abs(delta)
-        # Bell curve with peak at 0.45-0.55
-        if 0.45 <= abs_delta <= 0.55:
-            delta_score = 100
-        elif 0.40 <= abs_delta < 0.45 or 0.55 < abs_delta <= 0.60:
-            delta_score = 90
-        elif 0.35 <= abs_delta < 0.40 or 0.60 < abs_delta <= 0.65:
-            delta_score = 75
+        # FIXED: More balanced scoring - don't over-penalize OTM or ITM options
+        # ATM (0.40-0.60) is good but OTM (0.15-0.40) and ITM (0.60-0.85) can be profitable too
+        if 0.40 <= abs_delta <= 0.60:
+            delta_score = 95  # ATM - balanced risk/reward
+        elif 0.30 <= abs_delta < 0.40 or 0.60 < abs_delta <= 0.70:
+            delta_score = 85  # Slightly OTM/ITM - still good
+        elif 0.20 <= abs_delta < 0.30 or 0.70 < abs_delta <= 0.80:
+            delta_score = 70  # More OTM/ITM - higher leverage or protection
+        elif 0.15 <= abs_delta < 0.20 or 0.80 < abs_delta <= 0.85:
+            delta_score = 55  # Deep OTM/ITM - speculative but valid
         else:
-            delta_score = 50
+            delta_score = 40  # Extreme deltas - lottery tickets or deep ITM
         score += delta_score * 0.35
         
         # 2. Gamma exposure (25% of category)
@@ -1075,21 +1085,29 @@ class InstitutionalOptionsEngine:
         
         # 1. News sentiment (40% of category)
         news_score = sentiment_data.get('news_score', 50)
-        # Align with option direction
+        # FIXED: Don't force alignment - sentiment is an independent signal
+        # Strong sentiment in either direction is useful information
+        # Neutral sentiment (40-60) is fine, extreme is notable
         if option_type == 'call':
-            if news_score > 70:
-                aligned_news_score = 90
-            elif news_score > 50:
-                aligned_news_score = 70
+            # For calls: positive news helps, negative news is warning
+            if news_score >= 70:
+                aligned_news_score = 85  # Bullish news supports call
+            elif news_score >= 50:
+                aligned_news_score = 70  # Neutral-positive
+            elif news_score >= 30:
+                aligned_news_score = 55  # Slight headwind but not disqualifying
             else:
-                aligned_news_score = 40
+                aligned_news_score = 40  # Negative news - caution on calls
         else:  # put
-            if news_score < 30:
-                aligned_news_score = 90
-            elif news_score < 50:
-                aligned_news_score = 70
+            # For puts: negative news helps, positive news is warning
+            if news_score <= 30:
+                aligned_news_score = 85  # Bearish news supports put
+            elif news_score <= 50:
+                aligned_news_score = 70  # Neutral-negative
+            elif news_score <= 70:
+                aligned_news_score = 55  # Slight headwind but not disqualifying
             else:
-                aligned_news_score = 40
+                aligned_news_score = 40  # Positive news - caution on puts
         score += aligned_news_score * 0.40
         
         # 2. Analyst revisions (30% of category)
@@ -1196,27 +1214,42 @@ class InstitutionalOptionsEngine:
             strike, current_price, option_type, iv, dte
         )
         
-        # Target 40-60% probability
-        if 0.40 <= prob_profit <= 0.60:
-            prob_score = 100
-        elif 0.30 <= prob_profit < 0.40 or 0.60 < prob_profit <= 0.70:
-            prob_score = 80
+        # FIXED: Use continuous scoring instead of arbitrary thresholds
+        # Higher probability = higher score, but cap at extremes (lottery tickets or near-certain)
+        if prob_profit < 0.15:
+            prob_score = 30  # Very low probability - lottery ticket
+        elif prob_profit > 0.85:
+            prob_score = 60  # Too high probability usually means low reward
         else:
-            prob_score = 50
+            # Linear scale from 0.15 to 0.85 probability
+            # Sweet spot is 0.35-0.65 which gets 70-90 score
+            prob_score = 40 + (prob_profit - 0.15) * (60 / 0.70)  # Scale 40-100
         score += prob_score * 0.50
         
         # 2. Risk/Reward ratio (30% of category)
+        # FIXED: Use IV-implied expected move instead of arbitrary 10%
+        # Expected move = Stock Price * IV * sqrt(DTE/365)
+        expected_move_pct = iv * np.sqrt(dte / 365) if dte > 0 else 0.05
+        expected_move = current_price * expected_move_pct
+        
         if option_type == 'call':
-            potential_gain = max(0, (strike * 1.10 - strike) - last_price)
+            # Target price is current + expected move
+            target_price = current_price + expected_move
+            potential_gain = max(0, (target_price - strike) - last_price) if target_price > strike else 0
         else:
-            potential_gain = max(0, (strike - strike * 0.90) - last_price)
+            # Target price is current - expected move
+            target_price = current_price - expected_move
+            potential_gain = max(0, (strike - target_price) - last_price) if target_price < strike else 0
         
         potential_loss = last_price
         
         if potential_loss > 0:
             rr_ratio = potential_gain / potential_loss
-            if rr_ratio >= 3:
-                rr_score = 100
+            # FIXED: Continuous scoring instead of arbitrary thresholds
+            if rr_ratio >= 5:
+                rr_score = 100  # Excellent R/R
+            elif rr_ratio >= 3:
+                rr_score = 90
             elif rr_ratio >= 2:
                 rr_score = 80
             elif rr_ratio >= 1:
