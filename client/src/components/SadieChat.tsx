@@ -16,6 +16,7 @@ interface Message {
     symbol_detected?: string;
     model_used?: string;
     nuke_mode?: boolean;
+    perplexity_used?: boolean;
   };
 }
 
@@ -24,9 +25,9 @@ export function SadieChat() {
     {
       id: 'welcome',
       role: 'system',
-      content: `🐿️ **Welcome to Sadie AI** - Your Ultimate Financial Intelligence Assistant
+      content: `🐿️ **Welcome to Sadie AI v2.0** - Your Ultimate Financial Intelligence Assistant
 
-I'm powered by **GPT o1 Thinking Mode** with deep pattern recognition and smart connections.
+I'm powered by **GPT o1 Thinking Mode** + **Perplexity AI** for real-time research with deep pattern recognition and smart connections.
 
 **Commands:**
 • Regular analysis: "Analyze NVDA", "Best options for AAPL"
@@ -209,9 +210,17 @@ I'm powered by **GPT o1 Thinking Mode** with deep pattern recognition and smart 
                   {/* Model Info */}
                   {message.data?.model_used && (
                     <div className="mt-3 pt-2 border-t border-border/30">
-                      <span className="text-[10px] opacity-50 flex items-center gap-1">
-                        <Sparkles className="w-2.5 h-2.5" />
-                        {message.data.model_used}
+                      <span className="text-[10px] opacity-50 flex items-center gap-2">
+                        <span className="flex items-center gap-1">
+                          <Sparkles className="w-2.5 h-2.5" />
+                          {message.data.model_used}
+                        </span>
+                        {message.data.perplexity_used && (
+                          <span className="flex items-center gap-1 text-blue-400">
+                            <Zap className="w-2.5 h-2.5" />
+                            + Perplexity
+                          </span>
+                        )}
                       </span>
                     </div>
                   )}

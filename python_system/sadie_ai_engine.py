@@ -1,10 +1,11 @@
 """
-SADIE AI ENGINE v1.1
+SADIE AI ENGINE v2.0
 =====================
 The Ultimate Financial Intelligence Chatbot
 
 Powered by:
 - OpenAI GPT-5.x Thinking Mode (via OpenRouter)
+- Perplexity AI Sonar Pro (Real-time Financial Research)
 - Complete SadieAI Financial Engine Suite
 - FinancialDatasets.ai Premium Data (financial statements, metrics, SEC filings, news)
 - Real-time market data (yfinance, Twelve Data, Finnhub)
@@ -13,6 +14,11 @@ Powered by:
 - GARCH Volatility Modeling
 - Kelly Criterion Position Sizing
 - Legendary Trader Wisdom (Buffett, Soros, Simons, Dalio, PTJ)
+
+Multi-Model Architecture:
+- Primary: GPT-5/o1 (Deep reasoning and analysis)
+- Complementary: Perplexity Sonar Pro (Real-time research, grounded facts)
+- Fallback: GPT-4o, Claude 3.5 Sonnet (Reliability)
 
 Data Sources:
 - FinancialDatasets.ai: Premium financial statements, metrics, SEC filings, company facts, news
@@ -80,6 +86,10 @@ class SadieAIEngine:
     OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY', '')
     OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
     
+    # Perplexity API configuration (complementary AI for real-time research)
+    PERPLEXITY_API_KEY = os.environ.get('PERPLEXITY_API_KEY', '')
+    PERPLEXITY_URL = "https://api.perplexity.ai/chat/completions"
+    
     # Model selection - prefer GPT-5 thinking mode, with reliable fallbacks
     MODELS = [
         "openai/o1",  # GPT-5 / o1 thinking mode (best for complex analysis)
@@ -87,6 +97,12 @@ class SadieAIEngine:
         "openai/gpt-4-turbo",  # GPT-4 Turbo (good fallback)
         "anthropic/claude-3.5-sonnet",  # Claude 3.5 Sonnet (excellent alternative)
         "openai/gpt-4"  # GPT-4 (final fallback)
+    ]
+    
+    # Perplexity models for real-time research
+    PERPLEXITY_MODELS = [
+        "sonar-pro",  # Best for financial research with citations
+        "sonar",  # Fast, reliable alternative
     ]
     
     # Finnhub API for additional data
@@ -1502,6 +1518,11 @@ One comprehensive paragraph that synthesizes EVERYTHING above - BOTH MACRO AND M
             # Build context with real-time data
             context = self._build_context_message(symbol)
             
+            # Get Perplexity real-time research (complementary AI)
+            perplexity_research = None
+            if self.PERPLEXITY_API_KEY:
+                perplexity_research = self._get_perplexity_research(user_message, symbol)
+            
             # Prepare messages for GPT
             if is_nuke:
                 # NUKE MODE - Use enhanced system context
@@ -1531,6 +1552,13 @@ One comprehensive paragraph that synthesizes EVERYTHING above - BOTH MACRO AND M
                         "content": f"REAL-TIME MARKET DATA:\n{context}"
                     }
                 ]
+            
+            # Add Perplexity research if available (complementary real-time intelligence)
+            if perplexity_research:
+                messages.append({
+                    "role": "system",
+                    "content": f"PERPLEXITY AI REAL-TIME RESEARCH (use this for current news, analyst opinions, and recent developments):\n\n{perplexity_research}"
+                })
             
             # Add conversation history (last 10 exchanges)
             for msg in self.conversation_history[-20:]:
@@ -1619,7 +1647,8 @@ One comprehensive paragraph that synthesizes EVERYTHING above - BOTH MACRO AND M
                                         "symbol_detected": symbol,
                                         "model_used": fallback_model,
                                         "tokens_used": fallback_result.get('usage', {}),
-                                        "nuke_mode": is_nuke
+                                        "nuke_mode": is_nuke,
+                                        "perplexity_used": perplexity_research is not None
                                     }
                                     return response
                         except Exception as fallback_error:
@@ -1650,7 +1679,8 @@ One comprehensive paragraph that synthesizes EVERYTHING above - BOTH MACRO AND M
                     "symbol_detected": symbol,
                     "model_used": result.get('model', self.MODELS[0]),
                     "tokens_used": result.get('usage', {}),
-                    "nuke_mode": is_nuke
+                    "nuke_mode": is_nuke,
+                    "perplexity_used": perplexity_research is not None
                 }
                 
             else:
@@ -1684,7 +1714,8 @@ One comprehensive paragraph that synthesizes EVERYTHING above - BOTH MACRO AND M
                             "symbol_detected": symbol,
                             "model_used": model,
                             "tokens_used": result.get('usage', {}),
-                            "nuke_mode": is_nuke
+                            "nuke_mode": is_nuke,
+                            "perplexity_used": perplexity_research is not None
                         }
                         break
                 
@@ -1695,6 +1726,97 @@ One comprehensive paragraph that synthesizes EVERYTHING above - BOTH MACRO AND M
             response["message"] = f"Error: {str(e)}"
         
         return response
+    
+    def _get_perplexity_research(self, query: str, symbol: Optional[str] = None) -> Optional[str]:
+        """
+        Get real-time financial research from Perplexity AI.
+        
+        Perplexity excels at:
+        - Real-time news and market updates
+        - Grounded facts with citations
+        - Current events affecting stocks
+        - Recent analyst opinions and price targets
+        
+        This complements GPT's deep reasoning with real-time research.
+        """
+        if not self.PERPLEXITY_API_KEY:
+            return None
+        
+        try:
+            # Build a focused financial research query
+            if symbol:
+                research_query = f"""Provide current, real-time financial research on {symbol} stock:
+
+1. Latest news and developments (last 24-48 hours)
+2. Recent analyst ratings, price targets, and upgrades/downgrades
+3. Any upcoming catalysts (earnings, FDA dates, product launches, etc.)
+4. Current market sentiment and institutional activity
+5. Key risks and concerns being discussed
+6. Recent insider trading activity
+7. Options flow and unusual activity if notable
+
+Be specific with dates, numbers, and cite sources. Focus on actionable trading information.
+
+Original query: {query}"""
+            else:
+                research_query = f"""Provide current, real-time financial market research:
+
+{query}
+
+Be specific with dates, numbers, and cite sources. Focus on actionable trading information."""
+            
+            headers = {
+                "Authorization": f"Bearer {self.PERPLEXITY_API_KEY}",
+                "Content-Type": "application/json"
+            }
+            
+            payload = {
+                "model": self.PERPLEXITY_MODELS[0],  # sonar-pro
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": "You are a professional financial research analyst. Provide accurate, current, and actionable market intelligence. Always cite sources and be specific with dates and numbers. Focus on information that would help a trader make profitable decisions."
+                    },
+                    {
+                        "role": "user",
+                        "content": research_query
+                    }
+                ],
+                "max_tokens": 2000,
+                "temperature": 0.2,  # Low temperature for factual accuracy
+                "return_citations": True,
+                "search_recency_filter": "week"  # Focus on recent information
+            }
+            
+            response = requests.post(
+                self.PERPLEXITY_URL,
+                headers=headers,
+                json=payload,
+                timeout=30
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                content = result.get('choices', [{}])[0].get('message', {}).get('content', '')
+                citations = result.get('citations', [])
+                
+                if content:
+                    # Format with citations if available
+                    research_output = f"📊 **PERPLEXITY REAL-TIME RESEARCH**\n\n{content}"
+                    if citations:
+                        research_output += "\n\n**Sources:**\n"
+                        for i, cite in enumerate(citations[:5], 1):  # Top 5 citations
+                            research_output += f"{i}. {cite}\n"
+                    return research_output
+            else:
+                import sys as _sys
+                print(f"Perplexity API error: {response.status_code}", file=_sys.stderr)
+                
+        except Exception as e:
+            import sys as _sys
+            print(f"Perplexity research error: {e}", file=_sys.stderr)
+        
+        return None
     
     def clear_history(self):
         """Clear conversation history."""
