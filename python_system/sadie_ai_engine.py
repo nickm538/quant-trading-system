@@ -74,6 +74,27 @@ except ImportError as e:
     print(f"Warning: FinancialDatasets client not available: {e}", file=_sys.stderr)
     HAS_FINANCIAL_DATASETS = False
 
+# Import enhanced v3 system prompts
+try:
+    from sadie_system_prompt_v3 import SYSTEM_CONTEXT_V3, NUKE_CONTEXT_V3, FACTOR_WEIGHTS, NOISE_FILTERS, CONFIDENCE_LEVELS
+    HAS_V3_PROMPTS = True
+except ImportError:
+    HAS_V3_PROMPTS = False
+
+# Import factor scoring engine for weighted analysis
+try:
+    from factor_scoring_engine import FactorScoringEngine
+    HAS_FACTOR_SCORING = True
+except ImportError:
+    HAS_FACTOR_SCORING = False
+
+# Import noise filter engine for signal/noise separation
+try:
+    from noise_filter_engine import NoiseFilterEngine
+    HAS_NOISE_FILTER = True
+except ImportError:
+    HAS_NOISE_FILTER = False
+
 
 class SadieAIEngine:
     """
@@ -671,6 +692,32 @@ One comprehensive paragraph that synthesizes EVERYTHING above - BOTH MACRO AND M
         self.ttm_analyzer = None
         self.data_fetcher = None
         self.twelve_data = None
+        
+        # Use v3 prompts if available (legendary grade)
+        if HAS_V3_PROMPTS:
+            self.system_context = SYSTEM_CONTEXT_V3
+            self.nuke_context = NUKE_CONTEXT_V3
+            self.factor_weights = FACTOR_WEIGHTS
+            self.noise_filters = NOISE_FILTERS
+            self.confidence_levels = CONFIDENCE_LEVELS
+        else:
+            self.system_context = self.SYSTEM_CONTEXT
+            self.nuke_context = self.NUKE_CONTEXT
+            self.factor_weights = None
+            self.noise_filters = None
+            self.confidence_levels = None
+        
+        # Initialize factor scoring engine for weighted analysis
+        if HAS_FACTOR_SCORING:
+            self.factor_scorer = FactorScoringEngine()
+        else:
+            self.factor_scorer = None
+        
+        # Initialize noise filter engine for signal/noise separation
+        if HAS_NOISE_FILTER:
+            self.noise_filter = NoiseFilterEngine()
+        else:
+            self.noise_filter = None
         self.financial_datasets = None
         self.smart_money = None
         
@@ -1421,6 +1468,108 @@ One comprehensive paragraph that synthesizes EVERYTHING above - BOTH MACRO AND M
                                 context_parts.append(f"Probability Up: {mc.get('prob_up', 'N/A')}%")
                 except Exception as e:
                     context_parts.append(f"\n[Engine analysis unavailable: {str(e)}]")
+            
+            # FACTOR SCORING ENGINE - Comprehensive Weighted Analysis (v3.0)
+            if self.factor_scorer:
+                try:
+                    # Prepare data for factor scoring
+                    factor_data = {
+                        "macro": macro_data,
+                        "price_data": data.get("price_data", {}),
+                        "technicals": data.get("technicals", {}),
+                        "fundamentals": data.get("fundamentals", {}),
+                        "smart_money": smart_money_data if smart_money_data else {},
+                        "catalysts": catalysts if catalysts else []
+                    }
+                    
+                    factor_scores = self.factor_scorer.score_all_factors(factor_data)
+                    
+                    context_parts.append(f"\n=== 📊 FACTOR SCORING ENGINE (v3.0 - Legendary Grade) ===")
+                    context_parts.append(f"Composite Score: {factor_scores['composite_score']}/100")
+                    context_parts.append(f"Signal: {factor_scores['signal']}")
+                    context_parts.append(f"Conviction Level: {factor_scores['conviction']}/10")
+                    context_parts.append(f"Macro/Micro Alignment: {factor_scores['alignment']}")
+                    
+                    cat_scores = factor_scores['category_scores']
+                    context_parts.append(f"\n--- Category Scores (Weighted) ---")
+                    context_parts.append(f"Macro Factors (40% weight): {cat_scores['macro']:.1f}/100")
+                    context_parts.append(f"Micro Factors (40% weight): {cat_scores['micro']:.1f}/100")
+                    context_parts.append(f"Non-Traditional (20% weight): {cat_scores['nontraditional']:.1f}/100")
+                    
+                    context_parts.append(f"\n--- Probability Assessment ---")
+                    context_parts.append(f"Bull Probability: {factor_scores['bull_probability']:.1f}%")
+                    context_parts.append(f"Bear Probability: {factor_scores['bear_probability']:.1f}%")
+                    
+                    ci = factor_scores['confidence_interval']
+                    context_parts.append(f"Confidence Interval: {ci['lower']:.1f} - {ci['upper']:.1f}")
+                    context_parts.append(f"Factor Dispersion: {ci['dispersion']:.1f} (lower = more aligned)")
+                    
+                    # Add individual factor explanations
+                    context_parts.append(f"\n--- Factor Explanations ---")
+                    for factor, explanation in factor_scores.get('explanations', {}).items():
+                        if explanation and explanation != "Neutral":
+                            context_parts.append(f"{factor.replace('_', ' ').title()}: {explanation}")
+                            
+                except Exception as e:
+                    import sys as _sys
+                    print(f"Warning: Factor scoring failed: {e}", file=_sys.stderr)
+            
+            # NOISE FILTER ENGINE - Signal vs Noise Analysis (v3.0)
+            if self.noise_filter:
+                try:
+                    # Prepare data for noise filtering
+                    filter_data = {
+                        "price_data": data.get("price_data", {}),
+                        "technicals": data.get("technicals", {}),
+                        "fundamentals": data.get("fundamentals", {}),
+                        "smart_money": smart_money_data if smart_money_data else {},
+                        "macro": macro_data
+                    }
+                    
+                    filter_result = self.noise_filter.filter_and_validate(filter_data)
+                    
+                    context_parts.append(f"\n=== 🔍 NOISE FILTER ANALYSIS (v3.0 - Legendary Grade) ===")
+                    
+                    # Data quality
+                    dq = filter_result['data_quality']
+                    context_parts.append(f"Data Quality Score: {dq['score']}/100")
+                    if dq['issues']:
+                        context_parts.append(f"Data Issues: {', '.join(dq['issues'])}")
+                    
+                    # Signal strength
+                    ss = filter_result['signal_strength']
+                    context_parts.append(f"\n--- Signal Analysis ---")
+                    context_parts.append(f"Total Signals: {ss['total_signals']} (High: {ss['high_significance']}, Medium: {ss['medium_significance']})")
+                    context_parts.append(f"Noise Filtered: {ss['noise_filtered']} items")
+                    context_parts.append(f"Signal-to-Noise Ratio: {ss['signal_to_noise_ratio']}")
+                    context_parts.append(f"Signal Strength: {ss['interpretation']}")
+                    
+                    # Confirmations
+                    conf = filter_result['confirmations']
+                    context_parts.append(f"\n--- Signal Confirmations ---")
+                    context_parts.append(f"Bullish Confirmations: {conf['bullish_confirmations']}")
+                    context_parts.append(f"Bearish Confirmations: {conf['bearish_confirmations']}")
+                    if conf['conflicting_signals']:
+                        context_parts.append(f"⚠️ CONFLICTING SIGNALS DETECTED - Lower conviction recommended")
+                    
+                    # Bias warnings
+                    biases = filter_result['bias_warnings']
+                    if biases:
+                        context_parts.append(f"\n--- Bias Alerts ---")
+                        for bias in biases:
+                            if bias.get('severity') in ['HIGH', 'MEDIUM']:
+                                context_parts.append(f"[{bias['severity']}] {bias['type']}: {bias['note']}")
+                    
+                    # Confidence adjustment
+                    adj = filter_result['recommendation_confidence_adjustment']
+                    if adj['adjustment'] != 0:
+                        context_parts.append(f"\n--- Confidence Adjustment ---")
+                        context_parts.append(f"Recommended Adjustment: {adj['adjustment']:+.1f} points")
+                        context_parts.append(f"Reasons: {'; '.join(adj['reasons'])}")
+                        
+                except Exception as e:
+                    import sys as _sys
+                    print(f"Warning: Noise filtering failed: {e}", file=_sys.stderr)
         
         return "\n".join(context_parts)
     
@@ -1524,17 +1673,17 @@ One comprehensive paragraph that synthesizes EVERYTHING above - BOTH MACRO AND M
             if self.PERPLEXITY_API_KEY:
                 perplexity_research = self._get_perplexity_research(user_message, symbol)
             
-            # Prepare messages for GPT
+            # Prepare messages for GPT (use v3 prompts if available)
             if is_nuke:
-                # NUKE MODE - Use enhanced system context
+                # NUKE MODE - Use enhanced system context (legendary grade v3)
                 messages = [
                     {
                         "role": "system",
-                        "content": self.SYSTEM_CONTEXT
+                        "content": self.system_context  # v3 if available
                     },
                     {
                         "role": "system",
-                        "content": self.NUKE_CONTEXT
+                        "content": self.nuke_context  # v3 if available
                     },
                     {
                         "role": "system", 
@@ -1542,11 +1691,11 @@ One comprehensive paragraph that synthesizes EVERYTHING above - BOTH MACRO AND M
                     }
                 ]
             else:
-                # Normal mode
+                # Normal mode (legendary grade v3)
                 messages = [
                     {
                         "role": "system",
-                        "content": self.SYSTEM_CONTEXT
+                        "content": self.system_context  # v3 if available
                     },
                     {
                         "role": "system", 
