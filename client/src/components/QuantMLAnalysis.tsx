@@ -233,26 +233,31 @@ export function QuantMLAnalysis({ mlPrediction, loading }: QuantMLAnalysisProps)
             </div>
             
             <div className="text-center p-3 rounded-lg bg-muted/50">
-              <div className="text-2xl font-bold text-blue-600">
+              <div className={`text-2xl font-bold ${model_performance.avg_sharpe_ratio > 1 ? 'text-green-600' : model_performance.avg_sharpe_ratio > 0 ? 'text-blue-600' : 'text-red-600'}`}>
                 {model_performance.avg_sharpe_ratio.toFixed(2)}
               </div>
               <div className="text-xs text-muted-foreground mt-1">
-                Sharpe Ratio
+                Real Sharpe Ratio
               </div>
               <div className="text-xs text-muted-foreground mt-1">
-                {model_performance.avg_sharpe_ratio > 1 ? 'Strong' : 'Moderate'} risk-adjusted returns
+                {model_performance.avg_sharpe_ratio > 2 ? '🏆 Excellent' : 
+                 model_performance.avg_sharpe_ratio > 1 ? '✅ Strong' : 
+                 model_performance.avg_sharpe_ratio > 0.5 ? '📊 Moderate' :
+                 model_performance.avg_sharpe_ratio > 0 ? '⚠️ Weak' : '❌ Negative'}
               </div>
             </div>
             
             <div className="text-center p-3 rounded-lg bg-muted/50">
-              <div className="text-2xl font-bold text-purple-600">
+              <div className={`text-2xl font-bold ${model_performance.avg_win_rate > 55 ? 'text-green-600' : model_performance.avg_win_rate > 50 ? 'text-purple-600' : 'text-orange-600'}`}>
                 {model_performance.avg_win_rate.toFixed(1)}%
               </div>
               <div className="text-xs text-muted-foreground mt-1">
-                Win Rate
+                Direction Accuracy
               </div>
               <div className="text-xs text-muted-foreground mt-1">
-                Historical success rate
+                {model_performance.avg_win_rate > 60 ? '🎯 Excellent' :
+                 model_performance.avg_win_rate > 55 ? '✅ Strong' :
+                 model_performance.avg_win_rate > 50 ? '📊 Above Random' : '⚠️ Below 50%'}
               </div>
             </div>
           </div>

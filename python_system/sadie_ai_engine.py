@@ -95,6 +95,13 @@ try:
 except ImportError:
     HAS_NOISE_FILTER = False
 
+# Import data integrity and anti-hallucination module
+try:
+    from data_integrity_v2 import DataIntegrityValidator, AntiHallucinationGuard, DataQualityReport
+    HAS_DATA_INTEGRITY = True
+except ImportError:
+    HAS_DATA_INTEGRITY = False
+
 
 class SadieAIEngine:
     """
