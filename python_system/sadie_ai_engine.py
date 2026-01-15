@@ -16,9 +16,10 @@ Powered by:
 - Legendary Trader Wisdom (Buffett, Soros, Simons, Dalio, PTJ)
 
 Multi-Model Architecture:
-- Primary: GPT-5/o1 (Deep reasoning and analysis)
+- Primary: GPT-5.1/o1-pro (Most advanced reasoning and analysis)
+- First Fallback: GPT-5/o1 (Deep reasoning)
 - Complementary: Perplexity Sonar Pro (Real-time research, grounded facts)
-- Fallback: GPT-4o, Claude 3.5 Sonnet (Reliability)
+- Additional Fallbacks: GPT-4o, Claude 3.5 Sonnet (Reliability)
 
 Data Sources:
 - FinancialDatasets.ai: Premium financial statements, metrics, SEC filings, company facts, news
@@ -90,9 +91,10 @@ class SadieAIEngine:
     PERPLEXITY_API_KEY = os.environ.get('PERPLEXITY_API_KEY', '')
     PERPLEXITY_URL = "https://api.perplexity.ai/chat/completions"
     
-    # Model selection - prefer GPT-5 thinking mode, with reliable fallbacks
+    # Model selection - prefer GPT-5.1 thinking mode, with reliable fallbacks
     MODELS = [
-        "openai/o1",  # GPT-5 / o1 thinking mode (best for complex analysis)
+        "openai/o1-pro",  # GPT-5.1 / o1-pro (most advanced reasoning)
+        "openai/o1",  # GPT-5 / o1 thinking mode (first fallback)
         "openai/gpt-4o",  # GPT-4o (fast, reliable, great for general queries)
         "openai/gpt-4-turbo",  # GPT-4 Turbo (good fallback)
         "anthropic/claude-3.5-sonnet",  # Claude 3.5 Sonnet (excellent alternative)
