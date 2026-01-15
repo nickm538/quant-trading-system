@@ -54,7 +54,7 @@ try:
     from fundamentals_analyzer import FundamentalsAnalyzer
     from trading_education import TradingEducation
     from market_scanner import MarketScanner
-    from indicators.ttm_squeeze import TTMSqueezeAnalyzer
+    from indicators.ttm_squeeze import TTMSqueeze as TTMSqueezeAnalyzer
     from indicators.bohen_5to1 import Bohen5to1Scanner
     from twelvedata_client import TwelveDataClient
     from robust_data_fetcher import RobustDataFetcher
