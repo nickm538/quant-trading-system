@@ -16,10 +16,10 @@ Powered by:
 - Legendary Trader Wisdom (Buffett, Soros, Simons, Dalio, PTJ)
 
 Multi-Model Architecture:
-- Primary: GPT-5.1/o1-pro (Most advanced reasoning and analysis)
-- First Fallback: GPT-5/o1 (Deep reasoning)
+- Primary: GPT-4o (Fast, reliable, cost-effective)
+- First Fallback: GPT-4 Turbo (Good balance of quality/cost)
 - Complementary: Perplexity Sonar Pro (Real-time research, grounded facts)
-- Additional Fallbacks: GPT-4o, Claude 3.5 Sonnet (Reliability)
+- Additional Fallbacks: Claude 3.5 Sonnet, GPT-4 (Reliability)
 
 Data Sources:
 - FinancialDatasets.ai: Premium financial statements, metrics, SEC filings, company facts, news
@@ -91,14 +91,13 @@ class SadieAIEngine:
     PERPLEXITY_API_KEY = os.environ.get('PERPLEXITY_API_KEY', '')
     PERPLEXITY_URL = "https://api.perplexity.ai/chat/completions"
     
-    # Model selection - prefer GPT-5.1 thinking mode, with reliable fallbacks
+    # Model selection - cost-effective with great quality
     MODELS = [
-        "openai/o1-pro",  # GPT-5.1 / o1-pro (most advanced reasoning)
-        "openai/o1",  # GPT-5 / o1 thinking mode (first fallback)
-        "openai/gpt-4o",  # GPT-4o (fast, reliable, great for general queries)
-        "openai/gpt-4-turbo",  # GPT-4 Turbo (good fallback)
+        "openai/gpt-4o",  # GPT-4o (fast, reliable, cost-effective ~$2.50/1M tokens)
+        "openai/gpt-4-turbo",  # GPT-4 Turbo (good balance)
         "anthropic/claude-3.5-sonnet",  # Claude 3.5 Sonnet (excellent alternative)
-        "openai/gpt-4"  # GPT-4 (final fallback)
+        "openai/gpt-4",  # GPT-4 (reliable fallback)
+        "openai/gpt-4o-mini"  # GPT-4o Mini (ultra cheap fallback ~$0.15/1M tokens)
     ]
     
     # Perplexity models for real-time research
