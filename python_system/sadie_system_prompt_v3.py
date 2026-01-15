@@ -598,4 +598,3 @@ CONFIDENCE_LEVELS = {
     9: "Exceptional - Rare setup, high conviction",
     10: "Maximum - Textbook setup, maximum position (rare)"
 }
-"""
