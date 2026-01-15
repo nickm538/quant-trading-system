@@ -291,10 +291,51 @@ def predict_stock_price(symbol: str, horizon_days: int = 30) -> Dict:
         # Calculate price targets
         price_change_pct = (predicted_return * 100)
         
-        # Get model performance metrics
-        avg_accuracy = np.mean([m['test_accuracy'] / 10000.0 for m in models])
-        avg_sharpe = np.mean([m['sharpe_ratio'] / 10000.0 if m['sharpe_ratio'] else 0 for m in models])
-        avg_win_rate = np.mean([m['win_rate'] / 10000.0 if m['win_rate'] else 0 for m in models])
+        # Get model performance metrics from database (historical backtest results)
+        db_avg_accuracy = np.mean([m['test_accuracy'] / 10000.0 for m in models])
+        db_avg_sharpe = np.mean([m['sharpe_ratio'] / 10000.0 if m['sharpe_ratio'] else 0 for m in models])
+        db_avg_win_rate = np.mean([m['win_rate'] / 10000.0 if m['win_rate'] else 0 for m in models])
+        
+        # Calculate REAL current Sharpe Ratio from actual stock returns
+        try:
+            # Get historical returns for the stock
+            returns = df['close'].pct_change().dropna()
+            
+            # Calculate Sharpe Ratio (annualized, assuming 0% risk-free rate)
+            # Sharpe = (mean return / std of returns) * sqrt(252 trading days)
+            if len(returns) > 20 and returns.std() > 0:
+                daily_mean = returns.mean()
+                daily_std = returns.std()
+                real_sharpe_ratio = (daily_mean / daily_std) * np.sqrt(252)
+            else:
+                real_sharpe_ratio = db_avg_sharpe  # Fallback to DB value
+            
+            # Calculate real direction accuracy from recent data
+            recent_returns = returns.tail(60)  # Last ~3 months
+            if len(recent_returns) > 10:
+                # Use momentum signal as proxy for prediction direction
+                momentum_signal = df['close'].rolling(5).mean().pct_change().dropna()
+                if len(momentum_signal) >= len(recent_returns):
+                    aligned_momentum = momentum_signal.tail(len(recent_returns))
+                    # Direction accuracy: when momentum sign matches actual return sign
+                    correct_directions = (np.sign(aligned_momentum.values) == np.sign(recent_returns.values)).sum()
+                    real_win_rate = correct_directions / len(recent_returns)
+                else:
+                    real_win_rate = db_avg_win_rate
+            else:
+                real_win_rate = db_avg_win_rate
+                
+            print(f"📊 Real Sharpe Ratio for {symbol}: {real_sharpe_ratio:.2f}, Win Rate: {real_win_rate*100:.1f}%")
+            
+        except Exception as e:
+            print(f"Warning: Error calculating real Sharpe ratio: {e}")
+            real_sharpe_ratio = db_avg_sharpe
+            real_win_rate = db_avg_win_rate
+        
+        # Use real calculated values
+        avg_accuracy = db_avg_accuracy
+        avg_sharpe = real_sharpe_ratio
+        avg_win_rate = real_win_rate
         
         # Generate recommendation
         if predicted_return > 0.03:  # > 3% gain

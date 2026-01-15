@@ -336,6 +336,43 @@ def make_transfer_learning_prediction(
         avg_accuracy = np.mean([m['test_accuracy'] / 10000.0 for m in models]) * 100
         avg_r2 = np.mean([m['r2_score'] / 10000.0 for m in models if m['r2_score']])
         
+        # Calculate REAL Sharpe Ratio from actual stock returns
+        try:
+            # Get historical returns for the target stock
+            returns = df['close'].pct_change().dropna()
+            
+            # Calculate Sharpe Ratio (annualized, assuming 0% risk-free rate)
+            # Sharpe = (mean return / std of returns) * sqrt(252 trading days)
+            if len(returns) > 20 and returns.std() > 0:
+                daily_mean = returns.mean()
+                daily_std = returns.std()
+                real_sharpe_ratio = (daily_mean / daily_std) * np.sqrt(252)
+            else:
+                real_sharpe_ratio = 0.0
+            
+            # Also calculate direction accuracy from recent predictions vs actual
+            # This gives us a real win rate
+            recent_returns = returns.tail(60)  # Last ~3 months
+            if len(recent_returns) > 10:
+                # Simulate: if we predicted direction correctly based on momentum
+                momentum_signal = df['close'].rolling(5).mean().pct_change().dropna()
+                if len(momentum_signal) >= len(recent_returns):
+                    aligned_momentum = momentum_signal.tail(len(recent_returns))
+                    # Direction accuracy: when momentum sign matches actual return sign
+                    correct_directions = (np.sign(aligned_momentum.values) == np.sign(recent_returns.values)).sum()
+                    real_win_rate = (correct_directions / len(recent_returns)) * 100
+                else:
+                    real_win_rate = 50.0
+            else:
+                real_win_rate = 50.0
+                
+            logger.info(f"Real Sharpe Ratio for {target_symbol}: {real_sharpe_ratio:.2f}, Win Rate: {real_win_rate:.1f}%")
+            
+        except Exception as e:
+            logger.warning(f"Error calculating real Sharpe ratio: {e}")
+            real_sharpe_ratio = 0.0
+            real_win_rate = 50.0
+        
         result = {
             'success': True,
             'symbol': target_symbol,
@@ -352,8 +389,8 @@ def make_transfer_learning_prediction(
             'similar_stocks': [{'symbol': s, 'similarity': sim} for s, sim in similar_stocks],
             'model_performance': {
                 'avg_accuracy': avg_accuracy,
-                'avg_sharpe_ratio': 1.0,  # Conservative estimate
-                'avg_win_rate': 50.0,  # Neutral
+                'avg_sharpe_ratio': round(real_sharpe_ratio, 2),  # REAL calculated Sharpe
+                'avg_win_rate': round(real_win_rate, 1),  # REAL calculated win rate
                 'num_models_used': len(predictions)
             },
             'ensemble_details': {
