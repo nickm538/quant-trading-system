@@ -102,6 +102,20 @@ try:
 except ImportError:
     HAS_DATA_INTEGRITY = False
 
+# Import comprehensive technical analysis v2
+try:
+    from comprehensive_technicals_v2 import ComprehensiveTechnicalAnalyzer
+    HAS_COMPREHENSIVE_TECHNICALS = True
+except ImportError:
+    HAS_COMPREHENSIVE_TECHNICALS = False
+
+# Import chart pattern recognition v2
+try:
+    from chart_patterns_v2 import ChartPatternRecognition
+    HAS_CHART_PATTERNS = True
+except ImportError:
+    HAS_CHART_PATTERNS = False
+
 
 class SadieAIEngine:
     """
@@ -725,6 +739,19 @@ One comprehensive paragraph that synthesizes EVERYTHING above - BOTH MACRO AND M
             self.noise_filter = NoiseFilterEngine()
         else:
             self.noise_filter = None
+        
+        # Initialize comprehensive technical analyzer (v2.0)
+        if HAS_COMPREHENSIVE_TECHNICALS:
+            self.comprehensive_technicals = ComprehensiveTechnicalAnalyzer()
+        else:
+            self.comprehensive_technicals = None
+        
+        # Initialize chart pattern recognition (v2.0)
+        if HAS_CHART_PATTERNS:
+            self.chart_patterns = ChartPatternRecognition()
+        else:
+            self.chart_patterns = None
+        
         self.financial_datasets = None
         self.smart_money = None
         
@@ -1577,6 +1604,118 @@ One comprehensive paragraph that synthesizes EVERYTHING above - BOTH MACRO AND M
                 except Exception as e:
                     import sys as _sys
                     print(f"Warning: Noise filtering failed: {e}", file=_sys.stderr)
+        
+        # COMPREHENSIVE TECHNICAL ANALYSIS (v2.0)
+        if self.comprehensive_technicals and symbol:
+            try:
+                tech_result = self.comprehensive_technicals.analyze(symbol)
+                
+                if 'error' not in tech_result:
+                    context_parts.append(f"\n=== 📊 COMPREHENSIVE TECHNICAL ANALYSIS (v2.0) ===")
+                    
+                    # Intelligent Score
+                    score = tech_result.get('intelligent_score', {})
+                    if score:
+                        context_parts.append(f"\n--- Intelligent Technical Score ---")
+                        context_parts.append(f"Score: {score.get('score', 'N/A')}/100 ({score.get('rating', 'N/A')})")
+                        context_parts.append(f"Bullish Signals: {score.get('bullish_count', 0)}")
+                        context_parts.append(f"Bearish Signals: {score.get('bearish_count', 0)}")
+                    
+                    # Ichimoku Cloud
+                    ichimoku = tech_result.get('ichimoku', {})
+                    if ichimoku:
+                        context_parts.append(f"\n--- Ichimoku Cloud ---")
+                        context_parts.append(f"Trend: {ichimoku.get('trend', 'N/A')}")
+                        context_parts.append(f"Price Position: {ichimoku.get('price_position', 'N/A')}")
+                        context_parts.append(f"TK Cross: {ichimoku.get('tk_cross', 'N/A')}")
+                        context_parts.append(f"Cloud: {'Bullish (Green)' if ichimoku.get('cloud_bullish') else 'Bearish (Red)'}")
+                    
+                    # Golden/Death Cross
+                    gdc = tech_result.get('golden_death_cross', {})
+                    if gdc:
+                        context_parts.append(f"\n--- Golden/Death Cross ---")
+                        context_parts.append(f"Signal: {gdc.get('signal', 'N/A')}")
+                        context_parts.append(f"50 SMA: ${gdc.get('sma_50', 0):.2f}")
+                        context_parts.append(f"200 SMA: ${gdc.get('sma_200', 0):.2f}")
+                    
+                    # Stochastic RSI
+                    stoch = tech_result.get('stochastic_rsi', {})
+                    if stoch:
+                        context_parts.append(f"\n--- Stochastic RSI ---")
+                        context_parts.append(f"%K: {stoch.get('stoch_rsi_k', 'N/A')} | %D: {stoch.get('stoch_rsi_d', 'N/A')}")
+                        context_parts.append(f"Signal: {stoch.get('signal', 'N/A')}")
+                    
+                    # DMI/ADX
+                    dmi = tech_result.get('dmi', {})
+                    if dmi:
+                        context_parts.append(f"\n--- DMI/ADX ---")
+                        context_parts.append(f"+DI: {dmi.get('plus_di', 'N/A')} | -DI: {dmi.get('minus_di', 'N/A')}")
+                        context_parts.append(f"ADX: {dmi.get('adx', 'N/A')} ({dmi.get('trend_strength', 'N/A')})")
+                    
+                    # Volume Indicators
+                    obv = tech_result.get('obv', {})
+                    mfi = tech_result.get('mfi', {})
+                    vwap = tech_result.get('vwap', {})
+                    if obv or mfi or vwap:
+                        context_parts.append(f"\n--- Volume Indicators ---")
+                        if obv:
+                            context_parts.append(f"OBV: {obv.get('obv_trend', 'N/A')} | Divergence: {obv.get('divergence', 'NONE')}")
+                        if mfi:
+                            context_parts.append(f"MFI: {mfi.get('mfi', 'N/A')} ({mfi.get('signal', 'N/A')})")
+                        if vwap:
+                            context_parts.append(f"VWAP: ${vwap.get('vwap', 0):.2f} | Deviation: {vwap.get('deviation_pct', 0):.1f}%")
+                    
+                    # Additional Momentum
+                    cci = tech_result.get('cci', {})
+                    williams = tech_result.get('williams_r', {})
+                    trix = tech_result.get('trix', {})
+                    aroon = tech_result.get('aroon', {})
+                    if cci or williams or trix or aroon:
+                        context_parts.append(f"\n--- Additional Momentum ---")
+                        if cci:
+                            context_parts.append(f"CCI: {cci.get('cci', 'N/A')} ({cci.get('signal', 'N/A')})")
+                        if williams:
+                            context_parts.append(f"Williams %R: {williams.get('williams_r', 'N/A')} ({williams.get('signal', 'N/A')})")
+                        if trix:
+                            context_parts.append(f"TRIX: {trix.get('trix', 'N/A')} ({trix.get('signal', 'N/A')})")
+                        if aroon:
+                            context_parts.append(f"Aroon: Up {aroon.get('aroon_up', 'N/A')} / Down {aroon.get('aroon_down', 'N/A')} ({aroon.get('signal', 'N/A')})")
+                    
+                    # Candlestick Patterns
+                    candles = tech_result.get('candlestick', {})
+                    if candles and candles.get('patterns'):
+                        context_parts.append(f"\n--- Candlestick Patterns ---")
+                        for pattern in candles['patterns'][:3]:  # Top 3
+                            context_parts.append(f"{pattern['name']}: {pattern['type']} ({pattern['strength']})")
+                            
+            except Exception as e:
+                import sys as _sys
+                print(f"Warning: Comprehensive technicals failed: {e}", file=_sys.stderr)
+        
+        # CHART PATTERN RECOGNITION (v2.0)
+        if self.chart_patterns and symbol:
+            try:
+                pattern_result = self.chart_patterns.analyze(symbol)
+                
+                if 'error' not in pattern_result and pattern_result.get('patterns_found'):
+                    context_parts.append(f"\n=== 📈 CHART PATTERN RECOGNITION (v2.0) ===")
+                    context_parts.append(f"Patterns Found: {pattern_result.get('pattern_count', 0)}")
+                    context_parts.append(f"Bullish: {pattern_result.get('bullish_patterns', 0)} | Bearish: {pattern_result.get('bearish_patterns', 0)}")
+                    context_parts.append(f"Breaking Now: {pattern_result.get('breaking_patterns', 0)}")
+                    context_parts.append(f"Overall Signal: {pattern_result.get('overall_signal', 'NEUTRAL')}")
+                    
+                    for pattern in pattern_result['patterns_found'][:3]:  # Top 3
+                        context_parts.append(f"\n--- {pattern['pattern']} ---")
+                        context_parts.append(f"Type: {pattern['type']}")
+                        context_parts.append(f"Confidence: {pattern.get('confidence', 0)*100:.0f}%")
+                        if pattern.get('target'):
+                            context_parts.append(f"Target: ${pattern['target']:.2f}")
+                        if pattern.get('breaking'):
+                            context_parts.append(f"⚠️ ACTIVELY BREAKING - Trade signal active!")
+                            
+            except Exception as e:
+                import sys as _sys
+                print(f"Warning: Chart pattern recognition failed: {e}", file=_sys.stderr)
         
         return "\n".join(context_parts)
     
