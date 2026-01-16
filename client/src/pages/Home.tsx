@@ -190,7 +190,36 @@ export default function Home() {
       {/* Main Content */}
       <div className="container py-8">
         <Tabs defaultValue="stock" className="w-full">
-          <TabsList className="grid w-full grid-cols-6 mb-8">
+          {/* Mobile: Vertical stacked tabs */}
+          <TabsList className="flex flex-col w-full gap-2 mb-6 md:hidden h-auto bg-transparent">
+            <TabsTrigger value="stock" className="w-full justify-start gap-2 px-4 py-3">
+              <TrendingUp className="h-4 w-4" />
+              Stock Analysis
+            </TabsTrigger>
+            <TabsTrigger value="ultimate-options" className="w-full justify-start gap-2 px-4 py-3">
+              <Zap className="h-4 w-4" />
+              Ultimate Options
+            </TabsTrigger>
+            <TabsTrigger value="scanner" className="w-full justify-start gap-2 px-4 py-3">
+              <Search className="h-4 w-4" />
+              Market Scanner
+            </TabsTrigger>
+            <TabsTrigger value="ml" className="w-full justify-start gap-2 px-4 py-3">
+              <Brain className="h-4 w-4" />
+              ML/Quantum
+            </TabsTrigger>
+            <TabsTrigger value="train" className="w-full justify-start gap-2 px-4 py-3">
+              <Brain className="h-4 w-4" />
+              Train Models
+            </TabsTrigger>
+            <TabsTrigger value="sadie" className="w-full justify-start gap-2 px-4 py-3 bg-gradient-to-r from-orange-500/10 to-amber-500/10">
+              <MessageCircle className="h-4 w-4 text-orange-500" />
+              <span className="bg-gradient-to-r from-orange-500 to-amber-500 bg-clip-text text-transparent font-semibold">Sadie AI</span>
+            </TabsTrigger>
+          </TabsList>
+          
+          {/* Desktop: Horizontal grid tabs */}
+          <TabsList className="hidden md:grid w-full grid-cols-6 mb-8">
             <TabsTrigger value="stock" className="flex items-center gap-2">
               <TrendingUp className="h-4 w-4" />
               Stock Analysis
