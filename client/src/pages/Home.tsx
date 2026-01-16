@@ -263,6 +263,14 @@ export default function Home() {
             </TabsTrigger>
           </TabsList>
           <TabsList className="hidden md:grid w-full grid-cols-5 gap-2 mb-8">
+            <TabsTrigger value="options-flow" className="flex items-center gap-2">
+              <BarChartIcon className="h-4 w-4 text-blue-500" />
+              Options Flow
+            </TabsTrigger>
+            <TabsTrigger value="ttm-squeeze" className="flex items-center gap-2">
+              <Circle className="h-4 w-4 text-red-500" />
+              TTM Squeeze
+            </TabsTrigger>
             <TabsTrigger value="sadie" className="flex items-center gap-2 bg-gradient-to-r from-orange-500/10 to-amber-500/10 hover:from-orange-500/20 hover:to-amber-500/20">
               <MessageCircle className="h-4 w-4 text-orange-500" />
               <span className="bg-gradient-to-r from-orange-500 to-amber-500 bg-clip-text text-transparent font-semibold">Sadie AI</span>
@@ -270,14 +278,6 @@ export default function Home() {
             <TabsTrigger value="dark-pool" className="flex items-center gap-2">
               <Eye className="h-4 w-4 text-purple-500" />
               Dark Pool
-            </TabsTrigger>
-            <TabsTrigger value="ttm-squeeze" className="flex items-center gap-2">
-              <Circle className="h-4 w-4 text-red-500" />
-              TTM Squeeze
-            </TabsTrigger>
-            <TabsTrigger value="options-flow" className="flex items-center gap-2">
-              <BarChartIcon className="h-4 w-4 text-blue-500" />
-              Options Flow
             </TabsTrigger>
             <TabsTrigger value="breakout" className="flex items-center gap-2">
               <Rocket className="h-4 w-4 text-orange-500" />
