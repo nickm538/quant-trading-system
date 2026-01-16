@@ -116,6 +116,13 @@ try:
 except ImportError:
     HAS_CHART_PATTERNS = False
 
+# Import comprehensive fundamentals v2
+try:
+    from comprehensive_fundamentals_v2 import ComprehensiveFundamentalsV2
+    HAS_COMPREHENSIVE_FUNDAMENTALS = True
+except ImportError:
+    HAS_COMPREHENSIVE_FUNDAMENTALS = False
+
 
 class SadieAIEngine:
     """
@@ -751,6 +758,12 @@ One comprehensive paragraph that synthesizes EVERYTHING above - BOTH MACRO AND M
             self.chart_patterns = ChartPatternRecognition()
         else:
             self.chart_patterns = None
+        
+        # Initialize comprehensive fundamentals v2
+        if HAS_COMPREHENSIVE_FUNDAMENTALS:
+            self.comprehensive_fundamentals = ComprehensiveFundamentalsV2()
+        else:
+            self.comprehensive_fundamentals = None
         
         self.financial_datasets = None
         self.smart_money = None
@@ -1716,6 +1729,80 @@ One comprehensive paragraph that synthesizes EVERYTHING above - BOTH MACRO AND M
             except Exception as e:
                 import sys as _sys
                 print(f"Warning: Chart pattern recognition failed: {e}", file=_sys.stderr)
+        
+        # COMPREHENSIVE FUNDAMENTALS v2.0
+        if self.comprehensive_fundamentals and symbol:
+            try:
+                fund_result = self.comprehensive_fundamentals.analyze(symbol)
+                
+                if 'error' not in fund_result:
+                    context_parts.append(f"\n=== 📊 COMPREHENSIVE FUNDAMENTALS v2.0 ===")
+                    context_parts.append(f"Company: {fund_result.get('company_name', symbol)}")
+                    context_parts.append(f"Sector: {fund_result.get('sector', 'N/A')} | Industry: {fund_result.get('industry', 'N/A')}")
+                    
+                    # Intelligent Score
+                    score = fund_result.get('intelligent_score', {})
+                    context_parts.append(f"\n📈 INTELLIGENT SCORE: {score.get('score', 0)}/100 - {score.get('rating', 'N/A')}")
+                    
+                    # Valuation
+                    val = fund_result.get('valuation', {})
+                    context_parts.append(f"\n💰 VALUATION: {val.get('overall_assessment', 'N/A')}")
+                    context_parts.append(f"P/E: {val.get('pe_ratio', 'N/A')} | P/S: {val.get('price_to_sales', 'N/A'):.2f}" if val.get('price_to_sales') else f"P/E: {val.get('pe_ratio', 'N/A')}")
+                    context_parts.append(f"P/B: {val.get('price_to_book', 'N/A')} | EV/EBITDA: {val.get('ev_to_ebitda', 'N/A')}")
+                    context_parts.append(f"PEG Ratio: {val.get('peg_ratio', 'N/A')}")
+                    
+                    # Profitability
+                    prof = fund_result.get('profitability', {})
+                    context_parts.append(f"\n💵 PROFITABILITY: {prof.get('overall_assessment', 'N/A')}")
+                    roe = prof.get('roe', 0)
+                    roa = prof.get('roa', 0)
+                    roic = prof.get('roic', 0)
+                    context_parts.append(f"ROE: {roe*100:.1f}% | ROA: {roa*100:.1f}% | ROIC: {roic*100:.1f}%")
+                    context_parts.append(f"Gross Margin: {prof.get('gross_margin', 0)*100:.1f}% | Net Margin: {prof.get('net_margin', 0)*100:.1f}%")
+                    
+                    # Growth
+                    growth = fund_result.get('growth', {})
+                    context_parts.append(f"\n📈 GROWTH: {growth.get('overall_assessment', 'N/A')}")
+                    context_parts.append(f"Revenue Growth: {growth.get('revenue_growth_yoy', 0)*100:.1f}% | EPS Growth: {growth.get('earnings_growth_yoy', 0)*100:.1f}%")
+                    
+                    # Financial Health
+                    health = fund_result.get('financial_health', {})
+                    context_parts.append(f"\n🏦 FINANCIAL HEALTH: {health.get('overall_assessment', 'N/A')}")
+                    context_parts.append(f"Current Ratio: {health.get('current_ratio', 'N/A')} | Quick Ratio: {health.get('quick_ratio', 'N/A')}")
+                    context_parts.append(f"Debt/Equity: {health.get('debt_to_equity', 'N/A')}")
+                    
+                    # Cash Flow
+                    cf = fund_result.get('cash_flow', {})
+                    context_parts.append(f"\n💸 CASH FLOW: {cf.get('overall_assessment', 'N/A')}")
+                    context_parts.append(f"FCF Yield: {cf.get('fcf_yield', 0)*100:.1f}% | Cash Conversion: {cf.get('cash_conversion', 0):.2f}x")
+                    
+                    # R² Score
+                    r2 = fund_result.get('r2_score', {})
+                    context_parts.append(f"\n📊 R² SCORE: {r2.get('r2', 0):.2f} - {r2.get('predictability', 'N/A')}")
+                    context_parts.append(f"Earnings Trend: {r2.get('earnings_trend', 'N/A')}")
+                    
+                    # GARP Setup
+                    garp = fund_result.get('garp_setup', {})
+                    context_parts.append(f"\n🎯 GARP SETUP: {garp.get('signal', 'N/A')}")
+                    context_parts.append(f"GARP Score: {garp.get('garp_score', 0)}/100")
+                    
+                    # MOAT Setup
+                    moat = fund_result.get('moat_setup', {})
+                    context_parts.append(f"\n🏰 MOAT SETUP: {moat.get('signal', 'N/A')}")
+                    if moat.get('moat_sources'):
+                        context_parts.append(f"Moat Sources: {', '.join(moat['moat_sources'])}")
+                    
+                    # AI Interpretation
+                    interp = fund_result.get('interpretation', {})
+                    if interp.get('summary'):
+                        context_parts.append(f"\n🤖 AI INTERPRETATION:")
+                        context_parts.append(interp['summary'])
+                        context_parts.append(f"\nBull Case: {'; '.join(interp.get('bull_case', [])[:3])}")
+                        context_parts.append(f"Bear Case: {'; '.join(interp.get('bear_case', [])[:3])}")
+                        
+            except Exception as e:
+                import sys as _sys
+                print(f"Warning: Comprehensive fundamentals failed: {e}", file=_sys.stderr)
         
         return "\n".join(context_parts)
     
