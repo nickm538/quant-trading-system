@@ -235,7 +235,7 @@ class TTMSqueeze:
             Returns error status if data cannot be fetched (NO FALLBACKS).
         """
         import sys
-        print(f"🔍 Calculating TTM Squeeze for {symbol} ({interval})...", file=sys.stderr)
+        # Debug logging disabled for production
         
         # Fetch real-time price data
         price_data = self._fetch_price_data(symbol, interval, outputsize=100)
@@ -451,9 +451,7 @@ class TTMSqueeze:
             'momentum_history': [round(m, 4) if m else None for m in momentum[-10:]]
         }
         
-        print(f"✅ TTM Squeeze calculated: {'🔴 SQUEEZE ON' if current_squeeze else '🟢 SQUEEZE OFF'}", file=sys.stderr)
-        print(f"   Momentum: {current_momentum:.4f} ({momentum_color})" if current_momentum else "   Momentum: N/A", file=sys.stderr)
-        print(f"   Signal: {signal} ({signal_strength})", file=sys.stderr)
+        # Debug logging disabled for production
         
         return result
 

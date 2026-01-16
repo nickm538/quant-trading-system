@@ -95,7 +95,7 @@ def run_breakout(symbol: str) -> dict:
     try:
         from breakout_detector import BreakoutDetector
         scanner = BreakoutDetector()
-        result = scanner.analyze(symbol)
+        result = scanner.analyze_breakout(symbol)
         return result
     except Exception as e:
         return {"error": str(e), "symbol": symbol}
