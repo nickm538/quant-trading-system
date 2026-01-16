@@ -19,6 +19,11 @@ import { GreeksHeatmap } from "@/components/GreeksHeatmap";
 import { InstitutionalOptionsAnalysis } from "@/components/InstitutionalOptionsAnalysis";
 import { UltimateOptionsAnalysis } from "@/components/UltimateOptionsAnalysis";
 import { SadieChat } from "@/components/SadieChat";
+import { DarkPoolScanner } from "@/components/DarkPoolScanner";
+import { TTMSqueezeScanner } from "@/components/TTMSqueezeScanner";
+import { OptionsFlowScanner } from "@/components/OptionsFlowScanner";
+import { BreakoutDetector } from "@/components/BreakoutDetector";
+import { Eye, Circle, BarChart3 as BarChartIcon, Rocket } from "lucide-react";
 
 export default function Home() {
   const [symbol, setSymbol] = useState("");
@@ -216,10 +221,26 @@ export default function Home() {
               <MessageCircle className="h-4 w-4 text-orange-500" />
               <span className="bg-gradient-to-r from-orange-500 to-amber-500 bg-clip-text text-transparent font-semibold">Sadie AI</span>
             </TabsTrigger>
+            <TabsTrigger value="dark-pool" className="w-full justify-start gap-2 px-4 py-3">
+              <Eye className="h-4 w-4 text-purple-500" />
+              Dark Pool Scanner
+            </TabsTrigger>
+            <TabsTrigger value="ttm-squeeze" className="w-full justify-start gap-2 px-4 py-3">
+              <Circle className="h-4 w-4 text-red-500" />
+              TTM Squeeze
+            </TabsTrigger>
+            <TabsTrigger value="options-flow" className="w-full justify-start gap-2 px-4 py-3">
+              <BarChartIcon className="h-4 w-4 text-blue-500" />
+              Options Flow
+            </TabsTrigger>
+            <TabsTrigger value="breakout" className="w-full justify-start gap-2 px-4 py-3">
+              <Rocket className="h-4 w-4 text-orange-500" />
+              Breakout Detector
+            </TabsTrigger>
           </TabsList>
           
-          {/* Desktop: Horizontal grid tabs */}
-          <TabsList className="hidden md:grid w-full grid-cols-6 mb-8">
+          {/* Desktop: Horizontal grid tabs - 2 rows */}
+          <TabsList className="hidden md:grid w-full grid-cols-5 gap-2 mb-4">
             <TabsTrigger value="stock" className="flex items-center gap-2">
               <TrendingUp className="h-4 w-4" />
               Stock Analysis
@@ -240,9 +261,27 @@ export default function Home() {
               <Brain className="h-4 w-4" />
               Train Models
             </TabsTrigger>
+          </TabsList>
+          <TabsList className="hidden md:grid w-full grid-cols-5 gap-2 mb-8">
             <TabsTrigger value="sadie" className="flex items-center gap-2 bg-gradient-to-r from-orange-500/10 to-amber-500/10 hover:from-orange-500/20 hover:to-amber-500/20">
               <MessageCircle className="h-4 w-4 text-orange-500" />
               <span className="bg-gradient-to-r from-orange-500 to-amber-500 bg-clip-text text-transparent font-semibold">Sadie AI</span>
+            </TabsTrigger>
+            <TabsTrigger value="dark-pool" className="flex items-center gap-2">
+              <Eye className="h-4 w-4 text-purple-500" />
+              Dark Pool
+            </TabsTrigger>
+            <TabsTrigger value="ttm-squeeze" className="flex items-center gap-2">
+              <Circle className="h-4 w-4 text-red-500" />
+              TTM Squeeze
+            </TabsTrigger>
+            <TabsTrigger value="options-flow" className="flex items-center gap-2">
+              <BarChartIcon className="h-4 w-4 text-blue-500" />
+              Options Flow
+            </TabsTrigger>
+            <TabsTrigger value="breakout" className="flex items-center gap-2">
+              <Rocket className="h-4 w-4 text-orange-500" />
+              Breakout
             </TabsTrigger>
           </TabsList>
 
@@ -1230,6 +1269,26 @@ export default function Home() {
           {/* Sadie AI Chatbot Tab */}
           <TabsContent value="sadie" className="space-y-6">
             <SadieChat />
+          </TabsContent>
+
+          {/* Dark Pool Scanner Tab */}
+          <TabsContent value="dark-pool" className="space-y-6">
+            <DarkPoolScanner />
+          </TabsContent>
+
+          {/* TTM Squeeze Scanner Tab */}
+          <TabsContent value="ttm-squeeze" className="space-y-6">
+            <TTMSqueezeScanner />
+          </TabsContent>
+
+          {/* Options Flow Scanner Tab */}
+          <TabsContent value="options-flow" className="space-y-6">
+            <OptionsFlowScanner />
+          </TabsContent>
+
+          {/* Breakout Detector Tab */}
+          <TabsContent value="breakout" className="space-y-6">
+            <BreakoutDetector />
           </TabsContent>
         </Tabs>
       </div>

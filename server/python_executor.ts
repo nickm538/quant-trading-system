@@ -650,3 +650,152 @@ export async function sadieClearHistory(): Promise<any> {
     };
   }
 }
+
+
+// ============================================================================
+// NEW SCANNER MODULES (from financial-analysis-system)
+// ============================================================================
+
+const SCANNER_SCRIPT = path.join(PYTHON_SYSTEM_PATH, 'run_scanners.py');
+
+/**
+ * Dark Pool Scanner - Insider Movement/Oracle Analysis
+ */
+export async function scanDarkPool(params: { symbol: string }): Promise<any> {
+  const { symbol } = params;
+  const command = `${PYTHON_BIN} ${SCANNER_SCRIPT} dark_pool ${symbol}`;
+  
+  try {
+    console.log(`🔮 Scanning dark pool activity for ${symbol}...`);
+    const { stdout, stderr } = await execAsync(command, {
+      maxBuffer: 10 * 1024 * 1024,
+      timeout: 60000,
+      cwd: PYTHON_SYSTEM_PATH,
+      env: {
+        ...process.env,
+        PYTHONPATH: '',
+        PYTHONHOME: '',
+        LD_LIBRARY_PATH: process.env.LD_LIBRARY_PATH || '',
+      },
+    });
+    
+    if (stderr && !stderr.includes('INFO') && !stderr.includes('WARNING')) {
+      console.error('Dark pool scanner stderr:', stderr);
+    }
+    
+    return JSON.parse(stdout);
+  } catch (error: any) {
+    console.error('Dark pool scanner error:', error);
+    return {
+      error: `Dark pool scan failed: ${error.message}`,
+      symbol,
+    };
+  }
+}
+
+/**
+ * TTM Squeeze Scanner - Volatility Compression Detection
+ */
+export async function scanTTMSqueeze(params: { symbol: string }): Promise<any> {
+  const { symbol } = params;
+  const command = `${PYTHON_BIN} ${SCANNER_SCRIPT} ttm_squeeze ${symbol}`;
+  
+  try {
+    console.log(`🔴 Scanning TTM Squeeze for ${symbol}...`);
+    const { stdout, stderr } = await execAsync(command, {
+      maxBuffer: 10 * 1024 * 1024,
+      timeout: 60000,
+      cwd: PYTHON_SYSTEM_PATH,
+      env: {
+        ...process.env,
+        PYTHONPATH: '',
+        PYTHONHOME: '',
+        LD_LIBRARY_PATH: process.env.LD_LIBRARY_PATH || '',
+        TWELVEDATA_API_KEY: process.env.TWELVEDATA_API_KEY || '5e7a5daaf41d46a8966963106ebef210',
+      },
+    });
+    
+    if (stderr && !stderr.includes('INFO') && !stderr.includes('WARNING')) {
+      console.error('TTM Squeeze scanner stderr:', stderr);
+    }
+    
+    return JSON.parse(stdout);
+  } catch (error: any) {
+    console.error('TTM Squeeze scanner error:', error);
+    return {
+      error: `TTM Squeeze scan failed: ${error.message}`,
+      symbol,
+    };
+  }
+}
+
+/**
+ * Options Flow Scanner - Bear to Bull Pressure Analysis
+ */
+export async function scanOptionsFlow(params: { symbol: string }): Promise<any> {
+  const { symbol } = params;
+  const command = `${PYTHON_BIN} ${SCANNER_SCRIPT} options_flow ${symbol}`;
+  
+  try {
+    console.log(`📊 Scanning options flow for ${symbol}...`);
+    const { stdout, stderr } = await execAsync(command, {
+      maxBuffer: 10 * 1024 * 1024,
+      timeout: 60000,
+      cwd: PYTHON_SYSTEM_PATH,
+      env: {
+        ...process.env,
+        PYTHONPATH: '',
+        PYTHONHOME: '',
+        LD_LIBRARY_PATH: process.env.LD_LIBRARY_PATH || '',
+      },
+    });
+    
+    if (stderr && !stderr.includes('INFO') && !stderr.includes('WARNING')) {
+      console.error('Options flow scanner stderr:', stderr);
+    }
+    
+    return JSON.parse(stdout);
+  } catch (error: any) {
+    console.error('Options flow scanner error:', error);
+    return {
+      error: `Options flow scan failed: ${error.message}`,
+      symbol,
+    };
+  }
+}
+
+/**
+ * Breakout Detector - Multi-Signal Breakout Analysis
+ */
+export async function scanBreakout(params: { symbol: string }): Promise<any> {
+  const { symbol } = params;
+  const command = `${PYTHON_BIN} ${SCANNER_SCRIPT} breakout ${symbol}`;
+  
+  try {
+    console.log(`🚀 Scanning breakout signals for ${symbol}...`);
+    const { stdout, stderr } = await execAsync(command, {
+      maxBuffer: 10 * 1024 * 1024,
+      timeout: 60000,
+      cwd: PYTHON_SYSTEM_PATH,
+      env: {
+        ...process.env,
+        PYTHONPATH: '',
+        PYTHONHOME: '',
+        LD_LIBRARY_PATH: process.env.LD_LIBRARY_PATH || '',
+        TWELVEDATA_API_KEY: process.env.TWELVEDATA_API_KEY || '5e7a5daaf41d46a8966963106ebef210',
+      },
+    });
+    
+    if (stderr && !stderr.includes('INFO') && !stderr.includes('WARNING')) {
+      console.error('Breakout detector stderr:', stderr);
+    }
+    
+    return JSON.parse(stdout);
+  } catch (error: any) {
+    console.error('Breakout detector error:', error);
+    return {
+      error: `Breakout scan failed: ${error.message}`,
+      symbol,
+    };
+  }
+}

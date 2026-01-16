@@ -3,7 +3,7 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router, protectedProcedure } from "./_core/trpc";
 import { z } from "zod";
-import { analyzeStock, analyzeOptions, scanMarket, checkPythonSystem, getGreeksHeatmap, analyzeInstitutionalOptions, scanUltimateOptions, analyzeUltimateOptions, analyzeFundamentals, getEducation, sadieChat, sadieChatWithImage, sadieAnalyze, sadieClearHistory } from "./python_executor";
+import { analyzeStock, analyzeOptions, scanMarket, checkPythonSystem, getGreeksHeatmap, analyzeInstitutionalOptions, scanUltimateOptions, analyzeUltimateOptions, analyzeFundamentals, getEducation, sadieChat, sadieChatWithImage, sadieAnalyze, sadieClearHistory, scanDarkPool, scanTTMSqueeze, scanOptionsFlow, scanBreakout } from "./python_executor";
 import { exec } from "child_process";
 import { promisify } from "util";
 import * as path from "path";
@@ -377,6 +377,59 @@ export const appRouter = router({
     sadieClearHistory: publicProcedure
       .mutation(async () => {
         return await sadieClearHistory();
+      }),
+  }),
+
+  // ============================================================================
+  // NEW SCANNER MODULES (from financial-analysis-system)
+  // ============================================================================
+  scanners: router({
+    // Dark Pool Scanner - Insider Movement/Oracle Analysis
+    darkPool: publicProcedure
+      .input(
+        z.object({
+          symbol: z.string().min(1).max(10),
+        })
+      )
+      .mutation(async ({ input }) => {
+        console.log('🔮 Dark Pool scan for:', input.symbol);
+        return await scanDarkPool({ symbol: input.symbol.toUpperCase() });
+      }),
+
+    // TTM Squeeze Scanner - Volatility Compression Detection
+    ttmSqueeze: publicProcedure
+      .input(
+        z.object({
+          symbol: z.string().min(1).max(10),
+        })
+      )
+      .mutation(async ({ input }) => {
+        console.log('🔴 TTM Squeeze scan for:', input.symbol);
+        return await scanTTMSqueeze({ symbol: input.symbol.toUpperCase() });
+      }),
+
+    // Options Flow Scanner - Bear to Bull Pressure Analysis
+    optionsFlow: publicProcedure
+      .input(
+        z.object({
+          symbol: z.string().min(1).max(10),
+        })
+      )
+      .mutation(async ({ input }) => {
+        console.log('📊 Options Flow scan for:', input.symbol);
+        return await scanOptionsFlow({ symbol: input.symbol.toUpperCase() });
+      }),
+
+    // Breakout Detector - Multi-Signal Breakout Analysis
+    breakout: publicProcedure
+      .input(
+        z.object({
+          symbol: z.string().min(1).max(10),
+        })
+      )
+      .mutation(async ({ input }) => {
+        console.log('🚀 Breakout scan for:', input.symbol);
+        return await scanBreakout({ symbol: input.symbol.toUpperCase() });
       }),
   }),
 });
