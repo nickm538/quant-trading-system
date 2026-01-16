@@ -79,19 +79,19 @@ export function TTMSqueezeScanner() {
           <Card className="md:col-span-2 lg:col-span-1">
             <CardHeader className="pb-2">
               <CardTitle className="text-lg flex items-center gap-2">
-                <Circle className={`h-6 w-6 ${result.squeeze_on ? 'fill-red-500 text-red-500' : 'fill-green-500 text-green-500'}`} />
+                <Circle className={`h-6 w-6 ${result.squeeze_on === true || result.squeeze_on === 'True' ? 'fill-red-500 text-red-500' : 'fill-green-500 text-green-500'}`} />
                 Squeeze Status
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
                 <div className="flex items-center gap-3">
-                  <Badge className={`${result.squeeze_on ? 'bg-red-500' : 'bg-green-500'} text-white text-lg px-4 py-2`}>
-                    {result.squeeze_on ? '🔴 SQUEEZE ON' : '🟢 SQUEEZE OFF'}
+                  <Badge className={`${result.squeeze_on === true || result.squeeze_on === 'True' ? 'bg-red-500' : 'bg-green-500'} text-white text-lg px-4 py-2`}>
+                    {result.squeeze_on === true || result.squeeze_on === 'True' ? '🔴 SQUEEZE ON' : '🟢 SQUEEZE OFF'}
                   </Badge>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  {result.squeeze_on 
+                  {result.squeeze_on === true || result.squeeze_on === 'True'
                     ? 'Volatility is compressed. Price is coiling for a potential breakout!'
                     : 'Volatility is expanding. The squeeze has fired - momentum is in play.'}
                 </p>

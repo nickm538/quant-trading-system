@@ -418,7 +418,7 @@ class TTMSqueeze:
             
             # Current values
             'current_price': current_price,
-            'squeeze_on': current_squeeze,
+            'squeeze_on': bool(current_squeeze) if current_squeeze is not None else False,
             'squeeze_count': squeeze_count,
             'momentum': round(current_momentum, 4) if current_momentum else None,
             'momentum_color': momentum_color,
@@ -426,7 +426,7 @@ class TTMSqueeze:
             # NEW: Squeeze intensity metrics
             'squeeze_intensity': squeeze_intensity,
             'squeeze_intensity_ratio': round(squeeze_intensity_ratio, 3) if squeeze_intensity_ratio else None,
-            'tight_squeeze': tight_squeeze,  # Using 1.0x ATR Keltner
+            'tight_squeeze': bool(tight_squeeze),  # Using 1.0x ATR Keltner
             
             # Signal interpretation
             'signal': signal,
@@ -447,7 +447,7 @@ class TTMSqueeze:
             'bb_width': round((bb_upper[idx] - bb_lower[idx]) / bb_sma[idx] * 100, 2) if bb_upper[idx] and bb_lower[idx] and bb_sma[idx] else None,
             
             # Historical squeeze data (last 10 bars)
-            'squeeze_history': squeeze_on[-10:],
+            'squeeze_history': [bool(s) if s is not None else False for s in squeeze_on[-10:]],
             'momentum_history': [round(m, 4) if m else None for m in momentum[-10:]]
         }
         
