@@ -7,12 +7,16 @@ Runs the 4 scanner modules from financial-analysis-system:
 2. TTM Squeeze Scanner
 3. Options Flow (Bear to Bull)
 4. Breakout Detector
+5. Market-Wide TTM Squeeze Scanner (NEW)
+6. Market-Wide Breakout Scanner (NEW)
 
 Usage:
     python run_scanners.py dark_pool AAPL
     python run_scanners.py ttm_squeeze AAPL
     python run_scanners.py options_flow AAPL
     python run_scanners.py breakout AAPL
+    python run_scanners.py market_ttm_squeeze 100
+    python run_scanners.py market_breakout 100
 """
 
 import sys
@@ -101,22 +105,48 @@ def run_breakout(symbol: str) -> dict:
         return {"error": str(e), "symbol": symbol}
 
 
+def run_market_ttm_squeeze(max_stocks: int = 100) -> dict:
+    """Run Market-Wide TTM Squeeze Scanner"""
+    try:
+        from market_wide_scanner import MarketWideScanner
+        scanner = MarketWideScanner()
+        result = scanner.scan_ttm_squeeze(max_stocks=max_stocks, min_score=30)
+        return result
+    except Exception as e:
+        return {"error": str(e), "status": "error"}
+
+
+def run_market_breakout(max_stocks: int = 100) -> dict:
+    """Run Market-Wide Breakout Scanner"""
+    try:
+        from market_wide_scanner import MarketWideScanner
+        scanner = MarketWideScanner()
+        result = scanner.scan_breakouts(max_stocks=max_stocks, min_score=30)
+        return result
+    except Exception as e:
+        return {"error": str(e), "status": "error"}
+
+
 def main():
     if len(sys.argv) < 3:
-        print(json.dumps({"error": "Usage: python run_scanners.py <scanner_type> <symbol>"}))
+        print(json.dumps({"error": "Usage: python run_scanners.py <scanner_type> <symbol_or_count>"}))
         sys.exit(1)
     
     scanner_type = sys.argv[1].lower()
-    symbol = sys.argv[2].upper()
+    arg = sys.argv[2]
     
     if scanner_type == "dark_pool":
-        result = run_dark_pool(symbol)
+        result = run_dark_pool(arg.upper())
     elif scanner_type == "ttm_squeeze":
-        result = run_ttm_squeeze(symbol)
+        result = run_ttm_squeeze(arg.upper())
     elif scanner_type == "options_flow":
-        result = run_options_flow(symbol)
+        result = run_options_flow(arg.upper())
     elif scanner_type == "breakout":
-        result = run_breakout(symbol)
+        result = run_breakout(arg.upper())
+    elif scanner_type == "market_ttm_squeeze":
+        result = run_market_ttm_squeeze(int(arg))
+    elif scanner_type == "market_breakout":
+        result = run_market_breakout(int(arg))
     else:
         result = {"error": f"Unknown scanner type: {scanner_type}"}
     

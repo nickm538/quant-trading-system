@@ -799,3 +799,76 @@ export async function scanBreakout(params: { symbol: string }): Promise<any> {
     };
   }
 }
+
+
+/**
+ * Market-Wide TTM Squeeze Scanner - Scans entire market for squeeze setups
+ */
+export async function scanMarketTTMSqueeze(params: { maxStocks?: number }): Promise<any> {
+  const { maxStocks = 100 } = params;
+  const command = `${PYTHON_BIN} ${SCANNER_SCRIPT} market_ttm_squeeze ${maxStocks}`;
+  
+  try {
+    console.log(`🔴 Scanning entire market for TTM Squeeze setups (${maxStocks} stocks)...`);
+    const { stdout, stderr } = await execAsync(command, {
+      maxBuffer: 50 * 1024 * 1024, // 50MB buffer for large results
+      timeout: 600000, // 10 minute timeout for market-wide scan
+      cwd: PYTHON_SYSTEM_PATH,
+      env: {
+        ...process.env,
+        PYTHONPATH: '',
+        PYTHONHOME: '',
+        LD_LIBRARY_PATH: process.env.LD_LIBRARY_PATH || '',
+        TWELVEDATA_API_KEY: process.env.TWELVEDATA_API_KEY || '5e7a5daaf41d46a8966963106ebef210',
+      },
+    });
+    
+    if (stderr && !stderr.includes('INFO') && !stderr.includes('WARNING')) {
+      console.error('Market TTM Squeeze scanner stderr:', stderr);
+    }
+    
+    return JSON.parse(stdout);
+  } catch (error: any) {
+    console.error('Market TTM Squeeze scanner error:', error);
+    return {
+      error: `Market TTM Squeeze scan failed: ${error.message}`,
+      status: 'error',
+    };
+  }
+}
+
+/**
+ * Market-Wide Breakout Scanner - Scans entire market for breakout setups
+ */
+export async function scanMarketBreakout(params: { maxStocks?: number }): Promise<any> {
+  const { maxStocks = 100 } = params;
+  const command = `${PYTHON_BIN} ${SCANNER_SCRIPT} market_breakout ${maxStocks}`;
+  
+  try {
+    console.log(`🚀 Scanning entire market for Breakout setups (${maxStocks} stocks)...`);
+    const { stdout, stderr } = await execAsync(command, {
+      maxBuffer: 50 * 1024 * 1024, // 50MB buffer for large results
+      timeout: 600000, // 10 minute timeout for market-wide scan
+      cwd: PYTHON_SYSTEM_PATH,
+      env: {
+        ...process.env,
+        PYTHONPATH: '',
+        PYTHONHOME: '',
+        LD_LIBRARY_PATH: process.env.LD_LIBRARY_PATH || '',
+        TWELVEDATA_API_KEY: process.env.TWELVEDATA_API_KEY || '5e7a5daaf41d46a8966963106ebef210',
+      },
+    });
+    
+    if (stderr && !stderr.includes('INFO') && !stderr.includes('WARNING')) {
+      console.error('Market Breakout scanner stderr:', stderr);
+    }
+    
+    return JSON.parse(stdout);
+  } catch (error: any) {
+    console.error('Market Breakout scanner error:', error);
+    return {
+      error: `Market Breakout scan failed: ${error.message}`,
+      status: 'error',
+    };
+  }
+}

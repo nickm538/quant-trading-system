@@ -3,7 +3,7 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router, protectedProcedure } from "./_core/trpc";
 import { z } from "zod";
-import { analyzeStock, analyzeOptions, scanMarket, checkPythonSystem, getGreeksHeatmap, analyzeInstitutionalOptions, scanUltimateOptions, analyzeUltimateOptions, analyzeFundamentals, getEducation, sadieChat, sadieChatWithImage, sadieAnalyze, sadieClearHistory, scanDarkPool, scanTTMSqueeze, scanOptionsFlow, scanBreakout } from "./python_executor";
+import { analyzeStock, analyzeOptions, scanMarket, checkPythonSystem, getGreeksHeatmap, analyzeInstitutionalOptions, scanUltimateOptions, analyzeUltimateOptions, analyzeFundamentals, getEducation, sadieChat, sadieChatWithImage, sadieAnalyze, sadieClearHistory, scanDarkPool, scanTTMSqueeze, scanOptionsFlow, scanBreakout, scanMarketTTMSqueeze, scanMarketBreakout } from "./python_executor";
 import { exec } from "child_process";
 import { promisify } from "util";
 import * as path from "path";
@@ -430,6 +430,30 @@ export const appRouter = router({
       .mutation(async ({ input }) => {
         console.log('🚀 Breakout scan for:', input.symbol);
         return await scanBreakout({ symbol: input.symbol.toUpperCase() });
+      }),
+
+    // Market-Wide TTM Squeeze Scanner - Scans entire market
+    marketTTMSqueeze: publicProcedure
+      .input(
+        z.object({
+          maxStocks: z.number().int().min(10).max(500).optional().default(100),
+        })
+      )
+      .mutation(async ({ input }) => {
+        console.log(`🔴 Market-wide TTM Squeeze scan (${input.maxStocks} stocks)...`);
+        return await scanMarketTTMSqueeze({ maxStocks: input.maxStocks });
+      }),
+
+    // Market-Wide Breakout Scanner - Scans entire market
+    marketBreakout: publicProcedure
+      .input(
+        z.object({
+          maxStocks: z.number().int().min(10).max(500).optional().default(100),
+        })
+      )
+      .mutation(async ({ input }) => {
+        console.log(`🚀 Market-wide Breakout scan (${input.maxStocks} stocks)...`);
+        return await scanMarketBreakout({ maxStocks: input.maxStocks });
       }),
   }),
 });
