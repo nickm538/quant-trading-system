@@ -169,8 +169,9 @@ export default function Home() {
             <Badge variant="outline" className="px-4 py-1">
               Institutional-Grade Quantitative Analysis
             </Badge>
-            <h1 className="text-4xl md:text-5xl font-bold tracking-tight">
-              {APP_TITLE}
+            <h1 className="text-4xl md:text-5xl font-bold tracking-tight flex items-center justify-center gap-3">
+              <img src="/sadie-logo.png" alt="Sadie" className="h-12 w-12 md:h-14 md:w-14 rounded-xl shadow-lg" />
+              <span className="text-orange-500">Sadie</span>
             </h1>
             <p className="text-xl text-muted-foreground max-w-2xl">
               Advanced stochastic modeling with 20,000 Monte Carlo simulations, GARCH volatility, 
