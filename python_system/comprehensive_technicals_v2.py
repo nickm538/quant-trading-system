@@ -970,4 +970,3 @@ if __name__ == '__main__':
     result = analyzer.analyze(symbol)
     
     print(json.dumps(result, indent=2, default=str))
-"""

@@ -218,7 +218,8 @@ class ComprehensiveFundamentalsV2:
             return {'error': str(e), 'symbol': symbol}
     
     def _calculate_valuation_metrics(self, info: Dict, income_stmt, balance_sheet) -> Dict[str, Any]:
-        """Calculate comprehensive valuation metrics."""
+        """Calculate comprehensive valuation metrics with fallback calculations."""
+        # Primary sources from info dict
         pe_ratio = info.get('trailingPE') or info.get('forwardPE', 0)
         forward_pe = info.get('forwardPE', 0)
         peg_ratio = info.get('pegRatio', 0)
@@ -227,6 +228,53 @@ class ComprehensiveFundamentalsV2:
         enterprise_value = info.get('enterpriseValue', 0)
         ev_to_ebitda = info.get('enterpriseToEbitda', 0)
         ev_to_revenue = info.get('enterpriseToRevenue', 0)
+        
+        # Get basic info for fallback calculations
+        current_price = info.get('currentPrice') or info.get('regularMarketPrice', 0)
+        market_cap = info.get('marketCap', 0)
+        shares_outstanding = info.get('sharesOutstanding', 0)
+        
+        # FALLBACK: Calculate P/S from financial statements
+        if not price_to_sales or price_to_sales == 0:
+            try:
+                if not income_stmt.empty and market_cap > 0:
+                    revenue = income_stmt.loc['Total Revenue'].iloc[0] if 'Total Revenue' in income_stmt.index else 0
+                    if revenue and revenue > 0:
+                        price_to_sales = market_cap / revenue
+            except Exception:
+                pass
+        
+        # FALLBACK: Calculate P/B from financial statements
+        if not price_to_book or price_to_book == 0:
+            try:
+                if not balance_sheet.empty and market_cap > 0:
+                    book_value = balance_sheet.loc['Stockholders Equity'].iloc[0] if 'Stockholders Equity' in balance_sheet.index else 0
+                    if book_value and book_value > 0:
+                        price_to_book = market_cap / book_value
+            except Exception:
+                pass
+        
+        # FALLBACK: Calculate EV/EBITDA from financial statements
+        if not ev_to_ebitda or ev_to_ebitda == 0:
+            try:
+                if not income_stmt.empty and not balance_sheet.empty:
+                    # Calculate Enterprise Value
+                    total_debt = balance_sheet.loc['Total Debt'].iloc[0] if 'Total Debt' in balance_sheet.index else 0
+                    cash = balance_sheet.loc['Cash And Cash Equivalents'].iloc[0] if 'Cash And Cash Equivalents' in balance_sheet.index else 0
+                    if not enterprise_value or enterprise_value == 0:
+                        enterprise_value = market_cap + (total_debt or 0) - (cash or 0)
+                    
+                    # Calculate EBITDA
+                    ebitda = income_stmt.loc['EBITDA'].iloc[0] if 'EBITDA' in income_stmt.index else 0
+                    if not ebitda or ebitda == 0:
+                        operating_income = income_stmt.loc['Operating Income'].iloc[0] if 'Operating Income' in income_stmt.index else 0
+                        depreciation = income_stmt.loc['Depreciation And Amortization'].iloc[0] if 'Depreciation And Amortization' in income_stmt.index else 0
+                        ebitda = (operating_income or 0) + (depreciation or 0)
+                    
+                    if ebitda and ebitda > 0 and enterprise_value > 0:
+                        ev_to_ebitda = enterprise_value / ebitda
+            except Exception:
+                pass
         
         # Determine valuation status
         valuation_signals = []
