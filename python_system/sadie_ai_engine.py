@@ -1884,6 +1884,165 @@ One comprehensive paragraph that synthesizes EVERYTHING above - BOTH MACRO AND M
         
         return response
     
+    def chat_with_image(self, user_message: str, image_paths: List[str]) -> Dict[str, Any]:
+        """
+        Process a user message with attached images using Vision AI.
+        
+        Supports chart analysis, screenshot interpretation, and document reading.
+        Uses GPT-4o Vision for image understanding.
+        """
+        import base64
+        
+        response = {
+            "success": False,
+            "message": "",
+            "data": {},
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        try:
+            # Read and encode images
+            image_contents = []
+            for img_path in image_paths:
+                if os.path.exists(img_path):
+                    with open(img_path, 'rb') as f:
+                        img_data = base64.b64encode(f.read()).decode('utf-8')
+                        # Detect image type from extension
+                        ext = img_path.lower().split('.')[-1]
+                        mime_type = {
+                            'png': 'image/png',
+                            'jpg': 'image/jpeg',
+                            'jpeg': 'image/jpeg',
+                            'gif': 'image/gif',
+                            'webp': 'image/webp'
+                        }.get(ext, 'image/png')
+                        
+                        image_contents.append({
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:{mime_type};base64,{img_data}",
+                                "detail": "high"  # High detail for chart analysis
+                            }
+                        })
+            
+            if not image_contents:
+                response["message"] = "No valid images found to analyze."
+                return response
+            
+            # Build the vision prompt
+            vision_system_prompt = """You are SADIE (Strategic Analysis & Dynamic Investment Engine), the world's most advanced financial AI assistant with VISION capabilities.
+
+You can analyze:
+- Stock charts and technical patterns
+- Options chains and Greeks tables
+- Financial statements and reports
+- Trading platform screenshots
+- Any financial document or visualization
+
+When analyzing charts, identify:
+1. **Trend Direction**: Uptrend, downtrend, or consolidation
+2. **Key Levels**: Support, resistance, moving averages
+3. **Patterns**: Head & shoulders, triangles, flags, wedges, double tops/bottoms
+4. **Indicators**: RSI, MACD, Bollinger Bands, volume patterns if visible
+5. **Candlestick Patterns**: Doji, engulfing, hammer, shooting star, etc.
+6. **Volume Analysis**: Accumulation/distribution, volume spikes
+7. **Timeframe Context**: What timeframe appears to be shown
+
+Provide actionable insights:
+- Entry/exit zones based on what you see
+- Risk levels and stop-loss suggestions
+- Probability assessment of pattern completion
+- What to watch for next
+
+Be specific and quantitative. Reference exact price levels when visible."""
+            
+            # Build message content with text and images
+            user_content = [
+                {
+                    "type": "text",
+                    "text": f"{user_message}\n\nPlease analyze the attached image(s) thoroughly and provide detailed financial insights."
+                }
+            ]
+            user_content.extend(image_contents)
+            
+            messages = [
+                {
+                    "role": "system",
+                    "content": vision_system_prompt
+                },
+                {
+                    "role": "user",
+                    "content": user_content
+                }
+            ]
+            
+            # Call OpenRouter API with GPT-4o Vision
+            headers = {
+                "Authorization": f"Bearer {self.OPENROUTER_API_KEY}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://sadie-ai.com",
+                "X-Title": "SadieAI Vision Analysis"
+            }
+            
+            # Use GPT-4o for vision (it has excellent vision capabilities)
+            vision_model = "openai/gpt-4o"
+            
+            payload = {
+                "model": vision_model,
+                "messages": messages,
+                "max_tokens": 4096,
+                "temperature": 0.7,
+            }
+            
+            api_response = requests.post(
+                self.OPENROUTER_URL,
+                headers=headers,
+                json=payload,
+                timeout=120
+            )
+            
+            if api_response.status_code == 200:
+                result = api_response.json()
+                assistant_message = result.get('choices', [{}])[0].get('message', {}).get('content', '')
+                
+                if assistant_message:
+                    # Add vision indicator
+                    assistant_message = f"📷 **Vision Analysis**\n\n{assistant_message}"
+                    
+                    # Update conversation history
+                    self.conversation_history.append({
+                        "role": "user",
+                        "content": f"[Image Analysis Request] {user_message}"
+                    })
+                    self.conversation_history.append({
+                        "role": "assistant",
+                        "content": assistant_message
+                    })
+                    
+                    response["success"] = True
+                    response["message"] = assistant_message
+                    response["data"] = {
+                        "symbol_detected": self._extract_symbol_from_query(user_message),
+                        "model_used": vision_model,
+                        "tokens_used": result.get('usage', {}),
+                        "vision_used": True,
+                        "images_analyzed": len(image_contents)
+                    }
+                else:
+                    response["message"] = "I couldn't analyze the image. Please try again with a clearer image."
+            else:
+                error_detail = api_response.text
+                response["message"] = f"Vision API error: {api_response.status_code}. Please try again."
+                import sys as _sys
+                print(f"Vision API error: {error_detail}", file=_sys.stderr)
+                
+        except Exception as e:
+            response["message"] = f"Error analyzing image: {str(e)}"
+            import sys as _sys
+            print(f"Vision error: {e}", file=_sys.stderr)
+        
+        return response
+    
     def _get_perplexity_research(self, query: str, symbol: Optional[str] = None) -> Optional[str]:
         """
         Get real-time financial research from Perplexity AI.

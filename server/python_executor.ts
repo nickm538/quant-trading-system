@@ -464,6 +464,11 @@ export interface SadieChatParams {
   message: string;
 }
 
+export interface SadieChatWithImageParams {
+  message: string;
+  images: string[];  // Base64 encoded images
+}
+
 export interface SadieChatResult {
   success: boolean;
   message: string;
@@ -511,6 +516,77 @@ export async function sadieChat(params: SadieChatParams): Promise<SadieChatResul
     return {
       success: false,
       message: `Sadie encountered an error: ${error.message}`,
+      data: {},
+      timestamp: new Date().toISOString(),
+    };
+  }
+}
+
+/**
+ * Chat with Sadie AI with image analysis - Vision-enabled financial assistant
+ */
+export async function sadieChatWithImage(params: SadieChatWithImageParams): Promise<SadieChatResult> {
+  const { message, images } = params;
+  
+  try {
+    console.log('🐿️📷 Sadie AI Vision is analyzing image...');
+    
+    // Write images to temp files and pass paths to Python
+    const fs = await import('fs/promises');
+    const os = await import('os');
+    const tempDir = os.tmpdir();
+    const imagePaths: string[] = [];
+    
+    for (let i = 0; i < images.length; i++) {
+      const base64Data = images[i];
+      // Extract the actual base64 data (remove data:image/...;base64, prefix)
+      const base64Match = base64Data.match(/^data:image\/\w+;base64,(.+)$/);
+      const pureBase64 = base64Match ? base64Match[1] : base64Data;
+      
+      const imagePath = path.join(tempDir, `sadie_image_${Date.now()}_${i}.png`);
+      await fs.writeFile(imagePath, Buffer.from(pureBase64, 'base64'));
+      imagePaths.push(imagePath);
+    }
+    
+    // Escape the message for shell
+    const escapedMessage = message.replace(/'/g, "'\\''")
+    const escapedPaths = imagePaths.join(',');
+    
+    const command = `${PYTHON_BIN} run_sadie_chat.py chat_with_image '${escapedMessage}' '${escapedPaths}'`;
+    
+    const { stdout, stderr } = await execAsync(command, {
+      maxBuffer: 20 * 1024 * 1024, // 20MB buffer for long responses
+      timeout: 180000, // 3 minute timeout for vision analysis
+      cwd: PYTHON_SYSTEM_PATH,
+      env: {
+        ...process.env,
+        PYTHONPATH: '',
+        PYTHONHOME: '',
+        LD_LIBRARY_PATH: process.env.LD_LIBRARY_PATH || '',
+        OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY || '',
+        KEY: process.env.KEY || '', // Finnhub
+      },
+    });
+    
+    if (stderr && !stderr.includes('INFO') && !stderr.includes('WARNING')) {
+      console.error('Sadie Vision stderr:', stderr);
+    }
+    
+    // Clean up temp files
+    for (const imagePath of imagePaths) {
+      try {
+        await fs.unlink(imagePath);
+      } catch (e) {
+        // Ignore cleanup errors
+      }
+    }
+    
+    return JSON.parse(stdout);
+  } catch (error: any) {
+    console.error('Sadie Vision error:', error);
+    return {
+      success: false,
+      message: `Sadie Vision encountered an error: ${error.message}`,
       data: {},
       timestamp: new Date().toISOString(),
     };

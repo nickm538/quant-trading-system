@@ -3,7 +3,7 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router, protectedProcedure } from "./_core/trpc";
 import { z } from "zod";
-import { analyzeStock, analyzeOptions, scanMarket, checkPythonSystem, getGreeksHeatmap, analyzeInstitutionalOptions, scanUltimateOptions, analyzeUltimateOptions, analyzeFundamentals, getEducation, sadieChat, sadieAnalyze, sadieClearHistory } from "./python_executor";
+import { analyzeStock, analyzeOptions, scanMarket, checkPythonSystem, getGreeksHeatmap, analyzeInstitutionalOptions, scanUltimateOptions, analyzeUltimateOptions, analyzeFundamentals, getEducation, sadieChat, sadieChatWithImage, sadieAnalyze, sadieClearHistory } from "./python_executor";
 import { exec } from "child_process";
 import { promisify } from "util";
 import * as path from "path";
@@ -346,6 +346,19 @@ export const appRouter = router({
       .mutation(async ({ input }) => {
         console.log('🐿️ Sadie AI chat request:', input.message.substring(0, 100) + '...');
         return await sadieChat({ message: input.message });
+      }),
+    
+    // Sadie AI Chat with Image - Vision-enabled analysis
+    sadieChatWithImage: publicProcedure
+      .input(
+        z.object({
+          message: z.string().min(1).max(10000),
+          images: z.array(z.string()).min(1).max(5),  // Up to 5 base64 images
+        })
+      )
+      .mutation(async ({ input }) => {
+        console.log('🐿️📷 Sadie AI Vision request:', input.message.substring(0, 100) + '...', `(${input.images.length} images)`);
+        return await sadieChatWithImage({ message: input.message, images: input.images });
       }),
     
     // Sadie AI Quick Analysis

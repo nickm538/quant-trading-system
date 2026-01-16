@@ -5,18 +5,31 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Send, Trash2, Brain, TrendingUp, Bot, User, Sparkles, AlertTriangle, CheckCircle, Target, Zap } from 'lucide-react';
+import { Loader2, Send, Trash2, Brain, TrendingUp, Bot, User, Sparkles, AlertTriangle, CheckCircle, Target, Zap, Image, Paperclip, X, FileText, Upload } from 'lucide-react';
+
+interface AttachedFile {
+  id: string;
+  file: File;
+  preview?: string;
+  type: 'image' | 'document';
+}
 
 interface Message {
   id: string;
   role: 'user' | 'assistant' | 'system';
   content: string;
   timestamp: Date;
+  attachments?: {
+    type: 'image' | 'document';
+    name: string;
+    url?: string;
+  }[];
   data?: {
     symbol_detected?: string;
     model_used?: string;
     nuke_mode?: boolean;
     perplexity_used?: boolean;
+    vision_used?: boolean;
   };
 }
 
@@ -25,13 +38,17 @@ export function SadieChat() {
     {
       id: 'welcome',
       role: 'system',
-      content: `🐿️ **Welcome to Sadie AI v2.0** - Your Ultimate Financial Intelligence Assistant
+      content: `🐿️ **Welcome to Sadie AI v2.1** - Your Ultimate Financial Intelligence Assistant
 
-I'm powered by **GPT o1 Thinking Mode** + **Perplexity AI** for real-time research with deep pattern recognition and smart connections.
+I'm powered by **GPT-4o Vision** + **Perplexity AI** for real-time research with deep pattern recognition and smart connections.
+
+**NEW: Image Upload** 📷
+Upload charts, screenshots, or documents and I'll analyze them!
 
 **Commands:**
 • Regular analysis: "Analyze NVDA", "Best options for AAPL"
 • **NUKE MODE** ☢️: "Nuke $NVDA" for maximum overdrive analysis
+• **Image Analysis**: Upload a chart + "What do you see?"
 
 **Ask me anything:** Market overview, TTM Squeeze setups, 5:1 R/R trades, options flow`,
       timestamp: new Date(),
@@ -39,10 +56,13 @@ I'm powered by **GPT o1 Thinking Mode** + **Perplexity AI** for real-time resear
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const chatMutation = trpc.ml.sadieChat.useMutation();
+  const chatWithImageMutation = trpc.ml.sadieChatWithImage.useMutation();
   const clearHistoryMutation = trpc.ml.sadieClearHistory.useMutation();
 
   // Auto-scroll to bottom when new messages arrive
@@ -55,22 +75,110 @@ I'm powered by **GPT o1 Thinking Mode** + **Perplexity AI** for real-time resear
     }
   }, [messages]);
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+
+    const newFiles: AttachedFile[] = [];
+    
+    Array.from(files).forEach((file) => {
+      const isImage = file.type.startsWith('image/');
+      const isDocument = file.type === 'application/pdf' || 
+                         file.type.includes('document') ||
+                         file.type === 'text/plain';
+      
+      if (!isImage && !isDocument) {
+        alert('Please upload images (PNG, JPG, GIF, WebP) or documents (PDF, TXT)');
+        return;
+      }
+
+      const attachedFile: AttachedFile = {
+        id: `file-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        file,
+        type: isImage ? 'image' : 'document',
+      };
+
+      // Create preview for images
+      if (isImage) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          setAttachedFiles((prev) => 
+            prev.map((f) => 
+              f.id === attachedFile.id 
+                ? { ...f, preview: e.target?.result as string }
+                : f
+            )
+          );
+        };
+        reader.readAsDataURL(file);
+      }
+
+      newFiles.push(attachedFile);
+    });
+
+    setAttachedFiles((prev) => [...prev, ...newFiles]);
+    
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const removeFile = (fileId: string) => {
+    setAttachedFiles((prev) => prev.filter((f) => f.id !== fileId));
+  };
+
   const handleSend = async () => {
-    if (!input.trim() || isLoading) return;
+    if ((!input.trim() && attachedFiles.length === 0) || isLoading) return;
+
+    // Prepare attachments info for display
+    const messageAttachments = attachedFiles.map((f) => ({
+      type: f.type,
+      name: f.file.name,
+      url: f.preview,
+    }));
 
     const userMessage: Message = {
       id: `user-${Date.now()}`,
       role: 'user',
-      content: input.trim(),
+      content: input.trim() || (attachedFiles.length > 0 ? 'Analyze this image' : ''),
       timestamp: new Date(),
+      attachments: messageAttachments.length > 0 ? messageAttachments : undefined,
     };
 
     setMessages((prev) => [...prev, userMessage]);
+    const currentInput = input.trim();
+    const currentFiles = [...attachedFiles];
     setInput('');
+    setAttachedFiles([]);
     setIsLoading(true);
 
     try {
-      const response = await chatMutation.mutateAsync({ message: userMessage.content });
+      let response;
+
+      if (currentFiles.length > 0) {
+        // Convert files to base64 for sending
+        const imagePromises = currentFiles
+          .filter((f) => f.type === 'image')
+          .map(async (f) => {
+            return new Promise<string>((resolve) => {
+              const reader = new FileReader();
+              reader.onload = (e) => resolve(e.target?.result as string);
+              reader.readAsDataURL(f.file);
+            });
+          });
+
+        const imageBase64Array = await Promise.all(imagePromises);
+
+        // Use vision-enabled endpoint
+        response = await chatWithImageMutation.mutateAsync({
+          message: currentInput || 'Analyze this image and provide insights',
+          images: imageBase64Array,
+        });
+      } else {
+        // Regular text chat
+        response = await chatMutation.mutateAsync({ message: currentInput });
+      }
 
       const assistantMessage: Message = {
         id: `assistant-${Date.now()}`,
@@ -79,7 +187,10 @@ I'm powered by **GPT o1 Thinking Mode** + **Perplexity AI** for real-time resear
           ? response.message
           : `⚠️ Sorry, I encountered an error: ${response.message}`,
         timestamp: new Date(),
-        data: response.data,
+        data: {
+          ...response.data,
+          vision_used: currentFiles.length > 0,
+        },
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
@@ -108,6 +219,7 @@ I'm powered by **GPT o1 Thinking Mode** + **Perplexity AI** for real-time resear
           timestamp: new Date(),
         },
       ]);
+      setAttachedFiles([]);
     } catch (error) {
       console.error('Failed to clear history:', error);
     }
@@ -122,6 +234,7 @@ I'm powered by **GPT o1 Thinking Mode** + **Perplexity AI** for real-time resear
 
   // Check if current input is NUKE mode
   const isNukeMode = input.toLowerCase().includes('nuke');
+  const hasAttachments = attachedFiles.length > 0;
 
   return (
     <div className="flex flex-col h-[calc(100vh-180px)]">
@@ -139,7 +252,7 @@ I'm powered by **GPT o1 Thinking Mode** + **Perplexity AI** for real-time resear
               Sadie AI
               <Badge variant="secondary" className="bg-gradient-to-r from-purple-500 to-pink-500 text-white text-[10px] px-1.5 py-0">
                 <Brain className="w-2.5 h-2.5 mr-0.5" />
-                o1 Thinking
+                Vision + o1
               </Badge>
             </h2>
           </div>
@@ -200,7 +313,35 @@ I'm powered by **GPT o1 Thinking Mode** + **Perplexity AI** for real-time resear
                         ☢️ MAXIMUM OVERDRIVE
                       </Badge>
                     )}
+                    {message.data?.vision_used && (
+                      <Badge className="bg-blue-600 text-white text-[10px] px-1.5 py-0">
+                        <Image className="w-2.5 h-2.5 mr-0.5" />
+                        Vision
+                      </Badge>
+                    )}
                   </div>
+
+                  {/* Attachments Display */}
+                  {message.attachments && message.attachments.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mb-3">
+                      {message.attachments.map((att, idx) => (
+                        <div key={idx} className="relative">
+                          {att.type === 'image' && att.url ? (
+                            <img 
+                              src={att.url} 
+                              alt={att.name}
+                              className="max-w-[200px] max-h-[150px] rounded-lg border border-white/20 object-cover"
+                            />
+                          ) : (
+                            <div className="flex items-center gap-2 bg-black/20 rounded-lg px-3 py-2">
+                              <FileText className="w-4 h-4" />
+                              <span className="text-xs">{att.name}</span>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
 
                   {/* Message Content - Enhanced Formatting */}
                   <div className="text-sm leading-relaxed">
@@ -219,6 +360,12 @@ I'm powered by **GPT o1 Thinking Mode** + **Perplexity AI** for real-time resear
                           <span className="flex items-center gap-1 text-blue-400">
                             <Zap className="w-2.5 h-2.5" />
                             + Perplexity
+                          </span>
+                        )}
+                        {message.data.vision_used && (
+                          <span className="flex items-center gap-1 text-green-400">
+                            <Image className="w-2.5 h-2.5" />
+                            + Vision
                           </span>
                         )}
                       </span>
@@ -243,12 +390,19 @@ I'm powered by **GPT o1 Thinking Mode** + **Perplexity AI** for real-time resear
                     </div>
                     <div>
                       <p className="text-sm font-medium">
-                        {isNukeMode ? '☢️ NUKE MODE: Deep analysis in progress...' : 'Sadie is thinking deeply...'}
+                        {hasAttachments 
+                          ? '📷 Analyzing image with Vision AI...'
+                          : isNukeMode 
+                            ? '☢️ NUKE MODE: Deep analysis in progress...' 
+                            : 'Sadie is thinking deeply...'
+                        }
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {isNukeMode 
-                          ? 'Running 14-section comprehensive analysis, multi-timeframe forecasts, smart money tracking...'
-                          : 'Running pattern analysis, smart connections, forecasting models...'
+                        {hasAttachments
+                          ? 'Processing visual data, identifying patterns, extracting insights...'
+                          : isNukeMode 
+                            ? 'Running 14-section comprehensive analysis, multi-timeframe forecasts, smart money tracking...'
+                            : 'Running pattern analysis, smart connections, forecasting models...'
                         }
                       </p>
                     </div>
@@ -260,28 +414,99 @@ I'm powered by **GPT o1 Thinking Mode** + **Perplexity AI** for real-time resear
         </ScrollArea>
       </Card>
 
+      {/* Attached Files Preview */}
+      {attachedFiles.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-2 px-1">
+          {attachedFiles.map((file) => (
+            <div 
+              key={file.id} 
+              className="relative group bg-muted/50 rounded-lg border border-border overflow-hidden"
+            >
+              {file.type === 'image' && file.preview ? (
+                <img 
+                  src={file.preview} 
+                  alt={file.file.name}
+                  className="w-16 h-16 object-cover"
+                />
+              ) : (
+                <div className="w-16 h-16 flex flex-col items-center justify-center p-2">
+                  <FileText className="w-6 h-6 text-muted-foreground" />
+                  <span className="text-[8px] text-muted-foreground truncate max-w-full mt-1">
+                    {file.file.name.slice(0, 8)}...
+                  </span>
+                </div>
+              )}
+              <button
+                onClick={() => removeFile(file.id)}
+                className="absolute -top-1 -right-1 w-5 h-5 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Input Area */}
       <div className="mt-3 flex gap-2">
+        {/* Hidden file input */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*,.pdf,.txt"
+          multiple
+          onChange={handleFileSelect}
+          className="hidden"
+        />
+        
+        {/* Attachment button */}
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={isLoading}
+          className="h-11 w-11 shrink-0 border-orange-500/30 hover:bg-orange-500/10 hover:border-orange-500"
+          title="Attach image or document"
+        >
+          <Paperclip className="w-4 h-4" />
+        </Button>
+
         <Input
           ref={inputRef}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyPress={handleKeyPress}
-          placeholder={isNukeMode ? '☢️ NUKE MODE: Maximum overdrive analysis...' : 'Ask Sadie about stocks, options, patterns, or type "Nuke $SYMBOL" for full analysis...'}
-          className={`flex-1 h-11 ${isNukeMode ? 'border-red-500/50 bg-red-950/20' : ''}`}
+          placeholder={
+            hasAttachments 
+              ? 'Describe what you want to know about the image...'
+              : isNukeMode 
+                ? '☢️ NUKE MODE: Maximum overdrive analysis...' 
+                : 'Ask Sadie about stocks, options, patterns, or type "Nuke $SYMBOL" for full analysis...'
+          }
+          className={`flex-1 h-11 ${
+            hasAttachments 
+              ? 'border-blue-500/50 bg-blue-950/20'
+              : isNukeMode 
+                ? 'border-red-500/50 bg-red-950/20' 
+                : ''
+          }`}
           disabled={isLoading}
         />
         <Button
           onClick={handleSend}
-          disabled={!input.trim() || isLoading}
+          disabled={(!input.trim() && attachedFiles.length === 0) || isLoading}
           className={`h-11 px-5 ${
-            isNukeMode 
-              ? 'bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700'
-              : 'bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600'
+            hasAttachments
+              ? 'bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700'
+              : isNukeMode 
+                ? 'bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700'
+                : 'bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600'
           }`}
         >
           {isLoading ? (
             <Loader2 className="w-4 h-4 animate-spin" />
+          ) : hasAttachments ? (
+            <Upload className="w-4 h-4" />
           ) : isNukeMode ? (
             <Zap className="w-4 h-4" />
           ) : (
@@ -353,13 +578,18 @@ function MessageContent({ content, isNukeMode }: { content: string; isNukeMode?:
     );
   };
 
-  lines.forEach((line, index) => {
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const key = `line-${i}`;
+
     // Code block handling
-    if (line.trim().startsWith('```')) {
+    if (line.startsWith('```')) {
       if (inCodeBlock) {
         elements.push(
-          <pre key={`code-${index}`} className="bg-slate-900 text-slate-100 p-3 rounded-lg text-xs font-mono overflow-x-auto my-2">
-            <code>{codeBlockContent.join('\n')}</code>
+          <pre key={key} className="bg-slate-900 rounded-lg p-3 my-2 overflow-x-auto">
+            <code className="text-xs font-mono text-green-400">
+              {codeBlockContent.join('\n')}
+            </code>
           </pre>
         );
         codeBlockContent = [];
@@ -367,12 +597,12 @@ function MessageContent({ content, isNukeMode }: { content: string; isNukeMode?:
       } else {
         inCodeBlock = true;
       }
-      return;
+      continue;
     }
 
     if (inCodeBlock) {
       codeBlockContent.push(line);
-      return;
+      continue;
     }
 
     // Table handling
@@ -382,161 +612,100 @@ function MessageContent({ content, isNukeMode }: { content: string; isNukeMode?:
         tableRows = [];
       }
       tableRows.push(line);
-      return;
-    } else if (inTable) {
-      elements.push(
-        <div key={`table-${index}`}>
-          {renderTable(tableRows)}
-        </div>
-      );
-      tableRows = [];
-      inTable = false;
+      
+      // Check if next line is not a table row
+      if (i === lines.length - 1 || !lines[i + 1]?.includes('|')) {
+        if (tableRows.length >= 2) {
+          elements.push(<div key={key}>{renderTable(tableRows)}</div>);
+        }
+        inTable = false;
+        tableRows = [];
+      }
+      continue;
     }
 
-    // Section headers with special styling
-    if (line.startsWith('===') && line.endsWith('===')) {
-      const headerText = line.replace(/=/g, '').trim();
-      elements.push(
-        <div key={index} className={`mt-4 mb-2 p-2 rounded-lg ${isNukeMode ? 'bg-red-950/30 border border-red-500/30' : 'bg-orange-500/10 border border-orange-500/20'}`}>
-          <h3 className="font-bold text-sm flex items-center gap-2">
-            {headerText.includes('🕵️') || headerText.includes('SMART') ? <Target className="w-4 h-4 text-purple-500" /> : null}
-            {headerText.includes('🎯') || headerText.includes('BOHEN') ? <Target className="w-4 h-4 text-green-500" /> : null}
-            {headerText.includes('☢️') || headerText.includes('NUKE') ? <span>☢️</span> : null}
-            <span dangerouslySetInnerHTML={{ __html: processInlineFormatting(headerText) }} />
-          </h3>
-        </div>
-      );
-      return;
-    }
-
-    // H1 Headers
-    if (line.startsWith('# ')) {
-      elements.push(
-        <h1 key={index} className="font-bold text-xl mt-4 mb-2 text-foreground border-b border-border/50 pb-1">
-          {line.replace(/^#\s*/, '')}
-        </h1>
-      );
-      return;
-    }
-
-    // H2 Headers
-    if (line.startsWith('## ')) {
-      elements.push(
-        <h2 key={index} className="font-bold text-lg mt-4 mb-2 text-foreground">
-          {line.replace(/^##\s*/, '')}
-        </h2>
-      );
-      return;
-    }
-
-    // H3 Headers
+    // Headers
     if (line.startsWith('### ')) {
       elements.push(
-        <h3 key={index} className="font-semibold text-base mt-3 mb-1.5 text-foreground">
-          {line.replace(/^###\s*/, '')}
+        <h3 key={key} className={`text-base font-bold mt-4 mb-2 ${isNukeMode ? 'text-red-400' : 'text-orange-400'}`}>
+          {line.replace('### ', '')}
         </h3>
       );
-      return;
+      continue;
     }
-
-    // H4 Headers (--- Section ---)
-    if (line.startsWith('---') && line.endsWith('---') && line.length > 6) {
-      const headerText = line.replace(/^-+\s*/, '').replace(/\s*-+$/, '');
+    if (line.startsWith('## ')) {
       elements.push(
-        <h4 key={index} className="font-semibold text-sm mt-3 mb-1 text-muted-foreground border-b border-border/30 pb-1">
-          {headerText}
-        </h4>
+        <h2 key={key} className={`text-lg font-bold mt-4 mb-2 ${isNukeMode ? 'text-red-400' : 'text-orange-400'}`}>
+          {line.replace('## ', '')}
+        </h2>
       );
-      return;
+      continue;
+    }
+    if (line.startsWith('# ')) {
+      elements.push(
+        <h1 key={key} className={`text-xl font-bold mt-4 mb-2 ${isNukeMode ? 'text-red-400' : 'text-orange-400'}`}>
+          {line.replace('# ', '')}
+        </h1>
+      );
+      continue;
     }
 
     // Horizontal rule
-    if (line.trim() === '---' || line.trim() === '***' || line.trim() === '___') {
-      elements.push(<hr key={index} className="my-3 border-border/50" />);
-      return;
+    if (line.match(/^[-=]{3,}$/)) {
+      elements.push(<hr key={key} className="my-4 border-border/50" />);
+      continue;
     }
 
-    // Numbered lists
-    const numberedMatch = line.match(/^(\d+)\.\s+(.*)$/);
-    if (numberedMatch) {
+    // Blockquote
+    if (line.startsWith('> ')) {
       elements.push(
-        <div key={index} className="flex items-start gap-2 ml-1 my-1">
-          <span className="font-semibold text-orange-500 min-w-[20px]">{numberedMatch[1]}.</span>
-          <span dangerouslySetInnerHTML={{ __html: processInlineFormatting(numberedMatch[2]) }} />
+        <blockquote 
+          key={key} 
+          className="border-l-4 border-orange-500/50 pl-3 my-2 italic text-muted-foreground"
+          dangerouslySetInnerHTML={{ __html: processInlineFormatting(line.replace('> ', '')) }}
+        />
+      );
+      continue;
+    }
+
+    // List items
+    if (line.match(/^[-•*]\s/)) {
+      elements.push(
+        <div key={key} className="flex gap-2 my-1">
+          <span className="text-orange-500">•</span>
+          <span dangerouslySetInnerHTML={{ __html: processInlineFormatting(line.replace(/^[-•*]\s/, '')) }} />
         </div>
       );
-      return;
+      continue;
     }
 
-    // Bullet points
-    if (line.trim().startsWith('•') || line.trim().startsWith('-') || line.trim().startsWith('*')) {
-      const bulletContent = line.replace(/^[\s•\-\*]+/, '').trim();
-      
-      // Check for special indicators
-      let bulletColor = 'text-orange-500';
-      let icon = null;
-      
-      if (bulletContent.includes('✅') || bulletContent.toLowerCase().includes('bullish') || bulletContent.toLowerCase().includes('buy')) {
-        bulletColor = 'text-green-500';
-      } else if (bulletContent.includes('❌') || bulletContent.toLowerCase().includes('bearish') || bulletContent.toLowerCase().includes('sell')) {
-        bulletColor = 'text-red-500';
-      } else if (bulletContent.includes('⚠️') || bulletContent.toLowerCase().includes('caution') || bulletContent.toLowerCase().includes('warning')) {
-        bulletColor = 'text-yellow-500';
-      }
-      
+    // Numbered list
+    if (line.match(/^\d+\.\s/)) {
+      const num = line.match(/^(\d+)\./)?.[1];
       elements.push(
-        <div key={index} className="flex items-start gap-2 ml-2 my-0.5">
-          <span className={`${bulletColor} mt-1`}>•</span>
-          <span dangerouslySetInnerHTML={{ __html: processInlineFormatting(bulletContent) }} />
+        <div key={key} className="flex gap-2 my-1">
+          <span className="text-orange-500 font-semibold min-w-[1.5rem]">{num}.</span>
+          <span dangerouslySetInnerHTML={{ __html: processInlineFormatting(line.replace(/^\d+\.\s/, '')) }} />
         </div>
       );
-      return;
+      continue;
     }
 
-    // Blockquotes
-    if (line.startsWith('>')) {
-      elements.push(
-        <blockquote key={index} className="border-l-4 border-orange-500/50 pl-3 my-2 italic text-muted-foreground">
-          <span dangerouslySetInnerHTML={{ __html: processInlineFormatting(line.replace(/^>\s*/, '')) }} />
-        </blockquote>
-      );
-      return;
+    // Empty line
+    if (line.trim() === '') {
+      elements.push(<div key={key} className="h-2" />);
+      continue;
     }
 
-    // Key-value pairs (Label: Value)
-    const kvMatch = line.match(/^([A-Za-z\s]+):\s*(.+)$/);
-    if (kvMatch && !line.includes('http')) {
-      elements.push(
-        <div key={index} className="flex items-start gap-2 my-0.5">
-          <span className="text-muted-foreground min-w-[120px]">{kvMatch[1]}:</span>
-          <span className="font-medium" dangerouslySetInnerHTML={{ __html: processInlineFormatting(kvMatch[2]) }} />
-        </div>
-      );
-      return;
-    }
-
-    // Empty lines
-    if (!line.trim()) {
-      elements.push(<div key={index} className="h-2" />);
-      return;
-    }
-
-    // Regular paragraphs
+    // Regular paragraph
     elements.push(
-      <p key={index} className="my-1" dangerouslySetInnerHTML={{ __html: processInlineFormatting(line) }} />
-    );
-  });
-
-  // Handle any remaining table
-  if (inTable && tableRows.length > 0) {
-    elements.push(
-      <div key="final-table">
-        {renderTable(tableRows)}
-      </div>
+      <p 
+        key={key} 
+        className="my-1"
+        dangerouslySetInnerHTML={{ __html: processInlineFormatting(line) }}
+      />
     );
   }
 
-  return <div className="space-y-0.5">{elements}</div>;
+  return <>{elements}</>;
 }
-
-export default SadieChat;

@@ -43,6 +43,22 @@ def main():
             message = " ".join(sys.argv[2:])
             result = engine.chat(message)
             print(json.dumps(result, default=str))
+        
+        elif action == "chat_with_image":
+            # Chat with image action - expects message and image paths
+            if len(sys.argv) < 4:
+                print(json.dumps({
+                    "success": False,
+                    "message": "chat_with_image action requires message and image paths",
+                    "data": {}
+                }))
+                return
+            
+            message = sys.argv[2]
+            image_paths = sys.argv[3].split(',')
+            
+            result = engine.chat_with_image(message, image_paths)
+            print(json.dumps(result, default=str))
             
         elif action == "analyze":
             # Quick analysis action - expects symbol as argument
@@ -70,7 +86,7 @@ def main():
         else:
             print(json.dumps({
                 "success": False,
-                "message": f"Unknown action: {action}. Valid actions: chat, analyze, clear",
+                "message": f"Unknown action: {action}. Valid actions: chat, chat_with_image, analyze, clear",
                 "data": {}
             }))
             
