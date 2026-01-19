@@ -18,6 +18,11 @@ from advanced_options_analyzer import AdvancedOptionsAnalyzer
 from advanced_technicals import AdvancedTechnicals
 from candlestick_patterns import CandlestickPatternDetector
 from enhanced_fundamentals import EnhancedFundamentalsAnalyzer
+try:
+    from vision_chart_analyzer import VisionChartAnalyzer
+    HAS_VISION = True
+except ImportError:
+    HAS_VISION = False
 
 def generate_monte_carlo_forecast(current_price, volatility, forecast_days=30, num_simulations=20000, fat_tail_df=5.0):
     """
@@ -433,10 +438,34 @@ def main():
         except Exception as e:
             output['advanced_technicals'] = {'error': str(e)}
         
-        # Run Candlestick Pattern Detection
+        # Run Candlestick Pattern Detection with Vision AI Enhancement
         try:
             candle_detector = CandlestickPatternDetector()
-            output['candlestick_patterns'] = candle_detector.analyze(symbol)
+            candlestick_result = candle_detector.analyze(symbol)
+            
+            # Enhance with Vision AI chart analysis if available
+            if HAS_VISION:
+                try:
+                    vision_analyzer = VisionChartAnalyzer()
+                    vision_result = vision_analyzer.analyze(symbol)
+                    if vision_result.get('success'):
+                        # Merge Vision AI patterns with algorithmic patterns
+                        candlestick_result['vision_ai_analysis'] = {
+                            'candlestick_patterns': vision_result.get('candlestick_patterns', []),
+                            'trend': vision_result.get('trend', {}),
+                            'support_levels': vision_result.get('support_levels', []),
+                            'resistance_levels': vision_result.get('resistance_levels', []),
+                            'volume_analysis': vision_result.get('volume_analysis', {}),
+                            'recommendation': vision_result.get('recommendation', {}),
+                            'overall_bias': vision_result.get('overall_bias', 'NEUTRAL'),
+                            'key_observations': vision_result.get('key_observations', []),
+                            'chart_source': vision_result.get('chart_source', 'Finviz'),
+                            'ai_model': vision_result.get('ai_model', 'Vision AI')
+                        }
+                except Exception as ve:
+                    candlestick_result['vision_ai_error'] = str(ve)
+            
+            output['candlestick_patterns'] = candlestick_result
         except Exception as e:
             output['candlestick_patterns'] = {'error': str(e)}
         

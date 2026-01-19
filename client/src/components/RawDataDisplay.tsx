@@ -22,7 +22,7 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
         <Tabs defaultValue="technical" className="w-full">
           <TabsList className="grid w-full grid-cols-4 lg:grid-cols-8">
             <TabsTrigger value="technical">Technical</TabsTrigger>
-            <TabsTrigger value="advanced">R2/Pivot/Fib</TabsTrigger>
+            <TabsTrigger value="advanced">Pivot/Fib</TabsTrigger>
             <TabsTrigger value="candlestick">Candlesticks</TabsTrigger>
             <TabsTrigger value="fundamentals">Cash Flow</TabsTrigger>
             <TabsTrigger value="garch">GARCH</TabsTrigger>
@@ -54,22 +54,22 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
             </div>
           </TabsContent>
 
-          {/* Advanced Technicals - R2, Pivot Points, Fibonacci */}
+          {/* Pivot Points & Fibonacci - R2 moved to ML/Quant page */}
           <TabsContent value="advanced" className="space-y-4">
             <div className="mb-4 p-4 bg-indigo-50 dark:bg-indigo-950 rounded-lg border border-indigo-200 dark:border-indigo-800">
-              <h4 className="font-semibold mb-2 text-indigo-900 dark:text-indigo-100">R2 Score, Pivot Points & Fibonacci Levels</h4>
+              <h4 className="font-semibold mb-2 text-indigo-900 dark:text-indigo-100">Pivot Points & Fibonacci Levels</h4>
               <p className="text-sm text-indigo-800 dark:text-indigo-200">
-                R2 measures trend predictability (0-1). Pivot points and Fibonacci levels identify key support/resistance zones.
+                Pivot points and Fibonacci levels identify key support/resistance zones. R2 Score is available on the ML/Quant page.
               </p>
             </div>
             
             {analysis.advanced_technicals ? (
               <div className="space-y-4">
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <DataItem label="R2 Score" value={analysis.advanced_technicals.r2_score?.toFixed(4) || 'N/A'} />
-                  <DataItem label="Predictability" value={analysis.advanced_technicals.predictability_rating || 'N/A'} />
-                  <DataItem label="Trend Direction" value={analysis.advanced_technicals.trend_direction || 'N/A'} />
-                  <DataItem label="Slope" value={analysis.advanced_technicals.slope?.toFixed(4) || 'N/A'} />
+                  <DataItem label="Trend Direction" value={analysis.advanced_technicals.r2_analysis?.trend_direction || analysis.advanced_technicals.trend_direction || 'N/A'} />
+                  <DataItem label="Trend Strength" value={analysis.advanced_technicals.r2_analysis?.trend_strength || 'N/A'} />
+                  <DataItem label="Current Price" value={`$${analysis.advanced_technicals.current_price?.toFixed(2) || 'N/A'}`} />
+                  <DataItem label="Nearest Support" value={`$${analysis.advanced_technicals.key_levels?.nearest_support?.toFixed(2) || 'N/A'}`} />
                 </div>
                 
                 {analysis.advanced_technicals.pivot_points && (
@@ -151,6 +151,118 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
                       <DataItem label="Cloud Color" value={analysis.candlestick_patterns.ichimoku.cloud_color || 'N/A'} />
                       <DataItem label="Price vs Cloud" value={analysis.candlestick_patterns.ichimoku.price_vs_cloud || 'N/A'} />
                     </div>
+                  </div>
+                )}
+                
+                {/* Vision AI Chart Analysis */}
+                {analysis.candlestick_patterns.vision_ai_analysis && (
+                  <div className="mt-6 p-4 bg-purple-50 dark:bg-purple-950 rounded-lg border border-purple-200 dark:border-purple-800">
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="text-purple-600 dark:text-purple-400">🤖</span>
+                      <h5 className="font-semibold text-purple-900 dark:text-purple-100">Vision AI Chart Analysis</h5>
+                      <span className="text-xs bg-purple-100 dark:bg-purple-900 px-2 py-0.5 rounded text-purple-700 dark:text-purple-300">
+                        {analysis.candlestick_patterns.vision_ai_analysis.chart_source} + {analysis.candlestick_patterns.vision_ai_analysis.ai_model}
+                      </span>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                      <DataItem label="AI Bias" value={analysis.candlestick_patterns.vision_ai_analysis.overall_bias || 'N/A'} />
+                      <DataItem label="Trend Direction" value={analysis.candlestick_patterns.vision_ai_analysis.trend?.direction || 'N/A'} />
+                      <DataItem label="Trend Strength" value={analysis.candlestick_patterns.vision_ai_analysis.trend?.strength || 'N/A'} />
+                      <DataItem label="Momentum" value={analysis.candlestick_patterns.vision_ai_analysis.trend?.momentum || 'N/A'} />
+                    </div>
+                    
+                    {/* AI Recommendation */}
+                    {analysis.candlestick_patterns.vision_ai_analysis.recommendation && (
+                      <div className="mb-4 p-3 bg-white dark:bg-gray-800 rounded border">
+                        <h6 className="font-medium mb-2">AI Trading Recommendation</h6>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+                          <div>
+                            <span className="text-muted-foreground">Signal: </span>
+                            <span className={`font-semibold ${
+                              analysis.candlestick_patterns.vision_ai_analysis.recommendation.signal === 'BUY' ? 'text-green-600' :
+                              analysis.candlestick_patterns.vision_ai_analysis.recommendation.signal === 'SELL' ? 'text-red-600' : 'text-yellow-600'
+                            }`}>
+                              {analysis.candlestick_patterns.vision_ai_analysis.recommendation.signal}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Confidence: </span>
+                            <span className="font-semibold">{analysis.candlestick_patterns.vision_ai_analysis.recommendation.confidence}%</span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">R/R: </span>
+                            <span className="font-semibold">{analysis.candlestick_patterns.vision_ai_analysis.recommendation.risk_reward}</span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Stop Loss: </span>
+                            <span className="font-semibold">${analysis.candlestick_patterns.vision_ai_analysis.recommendation.stop_loss}</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Support/Resistance from AI */}
+                    {(analysis.candlestick_patterns.vision_ai_analysis.support_levels?.length > 0 || analysis.candlestick_patterns.vision_ai_analysis.resistance_levels?.length > 0) && (
+                      <div className="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                          <h6 className="font-medium text-green-700 dark:text-green-400 mb-1">AI Support Levels</h6>
+                          <div className="text-sm space-y-1">
+                            {analysis.candlestick_patterns.vision_ai_analysis.support_levels?.map((level: number, idx: number) => (
+                              <div key={idx} className="text-green-600">${typeof level === 'number' ? level.toFixed(2) : level}</div>
+                            ))}
+                          </div>
+                        </div>
+                        <div>
+                          <h6 className="font-medium text-red-700 dark:text-red-400 mb-1">AI Resistance Levels</h6>
+                          <div className="text-sm space-y-1">
+                            {analysis.candlestick_patterns.vision_ai_analysis.resistance_levels?.map((level: number, idx: number) => (
+                              <div key={idx} className="text-red-600">${typeof level === 'number' ? level.toFixed(2) : level}</div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* AI Key Observations */}
+                    {analysis.candlestick_patterns.vision_ai_analysis.key_observations?.length > 0 && (
+                      <div>
+                        <h6 className="font-medium mb-2">AI Key Observations</h6>
+                        <ul className="text-sm space-y-1">
+                          {analysis.candlestick_patterns.vision_ai_analysis.key_observations.map((obs: string, idx: number) => (
+                            <li key={idx} className="flex items-start gap-2">
+                              <span className="text-purple-500">•</span>
+                              <span>{obs}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    
+                    {/* AI Detected Patterns */}
+                    {analysis.candlestick_patterns.vision_ai_analysis.candlestick_patterns?.length > 0 && (
+                      <div className="mt-4">
+                        <h6 className="font-medium mb-2">AI Detected Candlestick Patterns</h6>
+                        <div className="space-y-2">
+                          {analysis.candlestick_patterns.vision_ai_analysis.candlestick_patterns.map((pattern: any, idx: number) => (
+                            <div key={idx} className={`p-2 rounded border ${
+                              pattern.signal === 'bullish' ? 'bg-green-50 dark:bg-green-950 border-green-300' :
+                              pattern.signal === 'bearish' ? 'bg-red-50 dark:bg-red-950 border-red-300' : 'bg-gray-50 dark:bg-gray-900 border-gray-300'
+                            }`}>
+                              <div className="flex justify-between">
+                                <span className="font-medium">{pattern.name}</span>
+                                <span className={`text-xs ${
+                                  pattern.signal === 'bullish' ? 'text-green-600' : pattern.signal === 'bearish' ? 'text-red-600' : 'text-gray-600'
+                                }`}>
+                                  {pattern.signal?.toUpperCase()} • {pattern.reliability}
+                                </span>
+                              </div>
+                              {pattern.description && <p className="text-xs text-muted-foreground mt-1">{pattern.description}</p>}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

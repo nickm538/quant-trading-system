@@ -27,13 +27,23 @@ interface MLPrediction {
   };
 }
 
+interface R2Analysis {
+  r2_score: number;
+  trend_direction: string;
+  trend_strength: string;
+  slope: number;
+  r2_scores?: Record<string, number>;
+  interpretation?: string;
+}
+
 interface QuantMLAnalysisProps {
   mlPrediction: MLPrediction | null;
+  r2Analysis?: R2Analysis | null;
   loading?: boolean;
 }
 
-export function QuantMLAnalysis({ mlPrediction, loading }: QuantMLAnalysisProps) {
-  console.log('📊 QuantMLAnalysis render:', { mlPrediction, loading });
+export function QuantMLAnalysis({ mlPrediction, r2Analysis, loading }: QuantMLAnalysisProps) {
+  console.log('📊 QuantMLAnalysis render:', { mlPrediction, r2Analysis, loading });
   
   if (loading) {
     return (
@@ -215,6 +225,99 @@ export function QuantMLAnalysis({ mlPrediction, loading }: QuantMLAnalysisProps)
             </p>
           </div>
         </div>
+
+        {/* R2 Score - Trend Predictability Analysis */}
+        {r2Analysis && (
+          <div className="space-y-3 pt-4 border-t">
+            <div className="flex items-center gap-2">
+              <BarChart3 className="h-5 w-5 text-indigo-500" />
+              <h4 className="font-semibold">R2 Score - Trend Predictability</h4>
+            </div>
+            
+            <div className="p-4 rounded-lg bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-950/20 dark:to-purple-950/20 border">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="text-center">
+                  <div className={`text-3xl font-bold ${
+                    r2Analysis.r2_score > 0.7 ? 'text-green-600' :
+                    r2Analysis.r2_score > 0.4 ? 'text-blue-600' :
+                    r2Analysis.r2_score > 0.2 ? 'text-yellow-600' : 'text-red-600'
+                  }`}>
+                    {(r2Analysis.r2_score * 100).toFixed(1)}%
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-1">R² Score</div>
+                  <div className="text-xs text-muted-foreground">
+                    {r2Analysis.r2_score > 0.7 ? 'Highly Predictable' :
+                     r2Analysis.r2_score > 0.4 ? 'Moderately Predictable' :
+                     r2Analysis.r2_score > 0.2 ? 'Weakly Predictable' : 'Random/Choppy'}
+                  </div>
+                </div>
+                
+                <div className="text-center">
+                  <div className={`text-2xl font-bold ${
+                    r2Analysis.trend_direction === 'UPTREND' ? 'text-green-600' :
+                    r2Analysis.trend_direction === 'DOWNTREND' ? 'text-red-600' : 'text-yellow-600'
+                  }`}>
+                    {r2Analysis.trend_direction === 'UPTREND' ? '📈' :
+                     r2Analysis.trend_direction === 'DOWNTREND' ? '📉' : '➡️'}
+                  </div>
+                  <div className="text-sm font-medium mt-1">{r2Analysis.trend_direction}</div>
+                  <div className="text-xs text-muted-foreground">Trend Direction</div>
+                </div>
+                
+                <div className="text-center">
+                  <div className={`text-2xl font-bold ${
+                    r2Analysis.trend_strength === 'STRONG' ? 'text-green-600' :
+                    r2Analysis.trend_strength === 'MODERATE' ? 'text-blue-600' : 'text-yellow-600'
+                  }`}>
+                    {r2Analysis.trend_strength}
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-1">Trend Strength</div>
+                </div>
+                
+                <div className="text-center">
+                  <div className={`text-2xl font-bold ${
+                    r2Analysis.slope > 0 ? 'text-green-600' : 'text-red-600'
+                  }`}>
+                    {r2Analysis.slope > 0 ? '+' : ''}{r2Analysis.slope.toFixed(4)}
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-1">Slope ($/day)</div>
+                </div>
+              </div>
+              
+              {/* Multi-timeframe R2 */}
+              {r2Analysis.r2_scores && (
+                <div className="mt-4 pt-4 border-t border-indigo-200 dark:border-indigo-800">
+                  <h5 className="text-sm font-medium mb-2">Multi-Timeframe R² Analysis</h5>
+                  <div className="grid grid-cols-4 gap-2">
+                    {Object.entries(r2Analysis.r2_scores).map(([tf, score]) => (
+                      <div key={tf} className="text-center p-2 bg-white dark:bg-gray-800 rounded">
+                        <div className={`font-bold ${
+                          score > 0.7 ? 'text-green-600' :
+                          score > 0.4 ? 'text-blue-600' : 'text-yellow-600'
+                        }`}>
+                          {(score * 100).toFixed(1)}%
+                        </div>
+                        <div className="text-xs text-muted-foreground">{tf}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {r2Analysis.interpretation && (
+                <p className="mt-3 text-sm text-muted-foreground">
+                  {r2Analysis.interpretation}
+                </p>
+              )}
+            </div>
+            
+            <div className="text-xs text-muted-foreground">
+              <strong>What R² Means:</strong> R² (coefficient of determination) measures how well price follows a linear trend. 
+              High R² (>70%) = price is trending predictably. Low R² (<30%) = price is choppy/random. 
+              Use high R² stocks for trend-following strategies and low R² for mean-reversion.
+            </div>
+          </div>
+        )}
 
         {/* Model Performance Metrics */}
         <div className="space-y-3 pt-4 border-t">
