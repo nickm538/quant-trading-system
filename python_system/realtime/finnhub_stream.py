@@ -127,32 +127,55 @@ class FinnhubRealtimeStream:
             logger.info(f"Unsubscribed from {symbol}")
     
     def _connect(self):
-        """Establish WebSocket connection"""
-        try:
-            self.ws = websocket.WebSocketApp(
-                self.ws_url,
-                on_message=self.on_message,
-                on_error=self.on_error,
-                on_close=self.on_close,
-                on_open=self.on_open
-            )
-            
-            # Run in separate thread
-            self.thread = threading.Thread(target=self.ws.run_forever, daemon=True)
-            self.thread.start()
-            
-            # Wait for connection
-            timeout = 10
-            start = time.time()
-            while not self.connected and (time.time() - start) < timeout:
-                time.sleep(0.1)
-            
-            if not self.connected:
-                raise Exception("Connection timeout")
+        """Establish WebSocket connection with retry logic"""
+        max_retries = 3
+        retry_delay = 2
+        
+        for attempt in range(max_retries):
+            try:
+                logger.info(f"Finnhub WebSocket connection attempt {attempt + 1}/{max_retries}...")
                 
-        except Exception as e:
-            logger.error(f"Connection error: {e}")
-            raise
+                self.ws = websocket.WebSocketApp(
+                    self.ws_url,
+                    on_message=self.on_message,
+                    on_error=self.on_error,
+                    on_close=self.on_close,
+                    on_open=self.on_open
+                )
+                
+                # Run in separate thread
+                self.thread = threading.Thread(target=self.ws.run_forever, daemon=True)
+                self.thread.start()
+                
+                # Wait for connection with longer timeout
+                timeout = 15
+                start = time.time()
+                while not self.connected and (time.time() - start) < timeout:
+                    time.sleep(0.2)
+                
+                if self.connected:
+                    logger.info("Finnhub WebSocket connected successfully")
+                    return
+                else:
+                    logger.warning(f"Connection attempt {attempt + 1} timed out")
+                    if self.ws:
+                        try:
+                            self.ws.close()
+                        except:
+                            pass
+                    
+            except Exception as e:
+                logger.error(f"Connection attempt {attempt + 1} error: {e}")
+            
+            # Wait before retry (except on last attempt)
+            if attempt < max_retries - 1:
+                logger.info(f"Retrying in {retry_delay} seconds...")
+                time.sleep(retry_delay)
+                retry_delay *= 2  # Exponential backoff
+        
+        # All retries failed
+        logger.error(f"Failed to connect to Finnhub WebSocket after {max_retries} attempts")
+        logger.warning("Continuing without real-time stream - will use polling fallback")
     
     def start(self):
         """Start the real-time stream"""
@@ -227,14 +250,18 @@ def get_realtime_stream(api_key: str = None) -> FinnhubRealtimeStream:
     """Get singleton instance of realtime stream"""
     global _stream_instance
     
+    # Hardcoded fallback API key (user preference)
+    FALLBACK_API_KEY = "d55b3ohr01qljfdeghm0d55b3ohr01qljfdeghmg"
+    
     with _stream_lock:
         if _stream_instance is None:
             if api_key is None:
-                # Try KEY first (user's env var), then FINNHUB_API_KEY
-                api_key = os.getenv('KEY', os.getenv('FINNHUB_API_KEY'))
+                # Try KEY first (user's env var), then FINNHUB_API_KEY, then fallback
+                api_key = os.getenv('KEY') or os.getenv('FINNHUB_API_KEY') or FALLBACK_API_KEY
                 if not api_key:
                     raise ValueError("Finnhub API key required (set KEY or FINNHUB_API_KEY environment variable)")
             
+            logger.info(f"Initializing Finnhub stream with API key: {api_key[:8]}...")
             _stream_instance = FinnhubRealtimeStream(api_key)
         
         return _stream_instance
