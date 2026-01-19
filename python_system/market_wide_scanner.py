@@ -163,7 +163,7 @@ class MarketWideScanner:
         
         return all_stocks
     
-    def scan_ttm_squeeze(self, max_stocks: int = 100, min_squeeze_bars: int = 3) -> Dict:
+    def scan_ttm_squeeze(self, max_stocks: int = 100, min_squeeze_bars: int = 3, min_score: int = 0) -> Dict:
         """
         Scan the market for TTM Squeeze setups.
         
@@ -175,6 +175,7 @@ class MarketWideScanner:
         Args:
             max_stocks: Maximum number of stocks to scan (for API rate limits)
             min_squeeze_bars: Minimum consecutive squeeze bars to qualify
+            min_score: Minimum squeeze score to include (0-100, default 0 = include all)
             
         Returns:
             Dict with ranked squeeze candidates
@@ -257,6 +258,10 @@ class MarketWideScanner:
         for stock in squeeze_candidates:
             stock['score'] = calculate_squeeze_score(stock)
             stock['direction'] = 'BULLISH' if stock['momentum'] > 0 else 'BEARISH'
+        
+        # Filter by min_score if specified
+        if min_score > 0:
+            squeeze_candidates = [s for s in squeeze_candidates if s['score'] >= min_score]
         
         # Sort by score descending
         squeeze_candidates.sort(key=lambda x: x['score'], reverse=True)
