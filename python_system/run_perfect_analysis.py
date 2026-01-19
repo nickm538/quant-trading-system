@@ -15,6 +15,9 @@ from pattern_recognition import PatternRecognitionEngine
 from garch_model import fit_garch_model
 from production_validator import ProductionValidator, circuit_breaker
 from advanced_options_analyzer import AdvancedOptionsAnalyzer
+from advanced_technicals import AdvancedTechnicals
+from candlestick_patterns import CandlestickPatternDetector
+from enhanced_fundamentals import EnhancedFundamentalsAnalyzer
 
 def generate_monte_carlo_forecast(current_price, volatility, forecast_days=30, num_simulations=20000, fat_tail_df=5.0):
     """
@@ -417,8 +420,32 @@ def main():
                 'position_size_pct': (position_size * current_price) / bankroll,
                 'risk_pct_of_bankroll': (position_size * abs(current_price - stop_loss)) / bankroll
             },
-            'bankroll': bankroll
+            'bankroll': bankroll,
+            'advanced_technicals': None,
+            'candlestick_patterns': None,
+            'enhanced_fundamentals': None
         }
+        
+        # Run Advanced Technicals (R2, Pivot, Fibonacci)
+        try:
+            adv_tech = AdvancedTechnicals()
+            output['advanced_technicals'] = adv_tech.analyze(symbol)
+        except Exception as e:
+            output['advanced_technicals'] = {'error': str(e)}
+        
+        # Run Candlestick Pattern Detection
+        try:
+            candle_detector = CandlestickPatternDetector()
+            output['candlestick_patterns'] = candle_detector.analyze(symbol)
+        except Exception as e:
+            output['candlestick_patterns'] = {'error': str(e)}
+        
+        # Run Enhanced Fundamentals (Cash Flow)
+        try:
+            enhanced_fund = EnhancedFundamentalsAnalyzer()
+            output['enhanced_fundamentals'] = enhanced_fund.analyze(symbol)
+        except Exception as e:
+            output['enhanced_fundamentals'] = {'error': str(e)}
         
         # PRODUCTION VALIDATION - Ensure all data is valid before returning
         validator = ProductionValidator()

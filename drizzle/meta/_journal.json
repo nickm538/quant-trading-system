@@ -43,6 +43,13 @@
       "when": 1763775232521,
       "tag": "0005_secret_iron_monger",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1768844351255,
+      "tag": "0006_marvelous_amphibian",
+      "breakpoints": true
     }
   ]
 }

@@ -46,6 +46,7 @@ import numpy as np
 from typing import Dict, Optional, List
 from datetime import datetime
 import time
+import yfinance as yf
 
 
 class TTMSqueeze:
@@ -81,10 +82,12 @@ class TTMSqueeze:
         
     def _fetch_price_data(self, symbol: str, interval: str = '1day', outputsize: int = 100) -> Optional[List[Dict]]:
         """
-        Fetch OHLCV price data from TwelveData.
+        Fetch OHLCV price data from TwelveData with yfinance fallback.
         
-        Returns raw price bars - NO FALLBACKS.
+        Primary: TwelveData API (real-time)
+        Fallback: yfinance (free, unlimited)
         """
+        # Try TwelveData first
         url = f"{self.base_url}/time_series"
         params = {
             'symbol': symbol,
@@ -99,18 +102,49 @@ class TTMSqueeze:
             data = response.json()
             
             if data.get('status') == 'error':
-                import sys; print(f"TwelveData API Error: {data.get('message')}", file=sys.stderr)
-                return None
+                # TwelveData failed - try yfinance fallback
+                return self._fetch_price_data_yfinance(symbol, outputsize)
             
             values = data.get('values', [])
             if not values:
-                import sys; print(f"No price data returned for {symbol}", file=sys.stderr)
-                return None
+                # No data - try yfinance fallback
+                return self._fetch_price_data_yfinance(symbol, outputsize)
             
             return values
             
         except Exception as e:
-            import sys; print(f"Error fetching price data: {e}", file=sys.stderr)
+            # TwelveData exception - try yfinance fallback
+            return self._fetch_price_data_yfinance(symbol, outputsize)
+    
+    def _fetch_price_data_yfinance(self, symbol: str, outputsize: int = 100) -> Optional[List[Dict]]:
+        """
+        Fallback: Fetch OHLCV price data from yfinance (free, unlimited).
+        """
+        try:
+            ticker = yf.Ticker(symbol)
+            # Fetch enough history for calculations
+            df = ticker.history(period='6mo')
+            
+            if df.empty:
+                return None
+            
+            # Convert to TwelveData format (newest first)
+            values = []
+            for idx in reversed(df.index[-outputsize:]):
+                row = df.loc[idx]
+                values.append({
+                    'datetime': idx.strftime('%Y-%m-%d'),
+                    'open': str(row['Open']),
+                    'high': str(row['High']),
+                    'low': str(row['Low']),
+                    'close': str(row['Close']),
+                    'volume': str(int(row['Volume']))
+                })
+            
+            return values if values else None
+            
+        except Exception as e:
+            import sys; print(f"yfinance fallback failed for {symbol}: {e}", file=sys.stderr)
             return None
     
     def _calculate_sma(self, prices: List[float], period: int) -> List[float]:
