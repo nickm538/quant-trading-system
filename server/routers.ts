@@ -3,7 +3,7 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router, protectedProcedure } from "./_core/trpc";
 import { z } from "zod";
-import { analyzeStock, analyzeOptions, scanMarket, checkPythonSystem, getGreeksHeatmap, analyzeInstitutionalOptions, scanUltimateOptions, analyzeUltimateOptions, analyzeFundamentals, getEducation, sadieChat, sadieChatWithImage, sadieAnalyze, sadieClearHistory, scanDarkPool, scanTTMSqueeze, scanOptionsFlow, scanBreakout, scanMarketTTMSqueeze, scanMarketBreakout, getMarketIntelligence } from "./python_executor";
+import { analyzeStock, analyzeOptions, scanMarket, checkPythonSystem, getGreeksHeatmap, analyzeInstitutionalOptions, scanUltimateOptions, analyzeUltimateOptions, analyzeFundamentals, getEducation, sadieChat, sadieChatWithImage, sadieAnalyze, sadieClearHistory, scanDarkPool, scanTTMSqueeze, scanOptionsFlow, scanBreakout, scanMarketTTMSqueeze, scanMarketBreakout, getMarketIntelligence, scanMarketDarkPool } from "./python_executor";
 import { exec } from "child_process";
 import { promisify } from "util";
 import * as path from "path";
@@ -461,6 +461,18 @@ export const appRouter = router({
       .mutation(async () => {
         console.log('Fetching market intelligence...');
         return await getMarketIntelligence();
+      }),
+
+    // Market-Wide Dark Pool Scanner - finds stocks with highest dark pool activity
+    marketDarkPool: publicProcedure
+      .input(
+        z.object({
+          limit: z.number().int().min(10).max(500).optional().default(400),
+        })
+      )
+      .mutation(async ({ input }) => {
+        console.log(`Scanning market for dark pool activity (${input.limit} stocks)...`);
+        return await scanMarketDarkPool({ maxStocks: input.limit });
       }),
   }),
 });

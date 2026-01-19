@@ -9,6 +9,7 @@ Runs the 4 scanner modules from financial-analysis-system:
 4. Breakout Detector
 5. Market-Wide TTM Squeeze Scanner (NEW)
 6. Market-Wide Breakout Scanner (NEW)
+7. Market-Wide Dark Pool Scanner (NEW)
 
 Usage:
     python run_scanners.py dark_pool AAPL
@@ -17,6 +18,7 @@ Usage:
     python run_scanners.py breakout AAPL
     python run_scanners.py market_ttm_squeeze 100
     python run_scanners.py market_breakout 100
+    python run_scanners.py market_dark_pool 50
 """
 
 import sys
@@ -127,6 +129,26 @@ def run_market_breakout(max_stocks: int = 100) -> dict:
         return {"error": str(e), "status": "error"}
 
 
+def run_market_dark_pool(max_stocks: int = 400) -> dict:
+    """Run Market-Wide Dark Pool Scanner - finds stocks with highest dark pool activity"""
+    try:
+        from market_dark_pool_scanner import MarketDarkPoolScanner
+        scanner = MarketDarkPoolScanner()
+        result = scanner.scan_market(limit=max_stocks)
+        
+        # Add status field for consistency
+        if 'error' not in result or result.get('error') is None:
+            result['status'] = 'success'
+        else:
+            result['status'] = 'error'
+        
+        return result
+    except Exception as e:
+        import sys
+        print(f"Dark pool scanner error: {e}", file=sys.stderr)
+        return {"error": str(e), "status": "error"}
+
+
 def run_market_intelligence() -> dict:
     """Run Market Intelligence - VIX, regime, sentiment, catalysts"""
     try:
@@ -158,6 +180,8 @@ def main():
         result = run_market_ttm_squeeze(int(arg))
     elif scanner_type == "market_breakout":
         result = run_market_breakout(int(arg))
+    elif scanner_type == "market_dark_pool":
+        result = run_market_dark_pool(int(arg))
     elif scanner_type == "market_intelligence":
         result = run_market_intelligence()
     else:

@@ -930,3 +930,40 @@ export async function getMarketIntelligence(): Promise<any> {
     };
   }
 }
+
+
+/**
+ * Market-Wide Dark Pool Scanner - Scans entire market for dark pool activity
+ * Finds stocks with highest institutional/dark pool volume and sentiment
+ */
+export async function scanMarketDarkPool(params: { maxStocks?: number }): Promise<any> {
+  const { maxStocks = 50 } = params;
+  const command = `${PYTHON_BIN} ${SCANNER_SCRIPT} market_dark_pool ${maxStocks}`;
+  
+  try {
+    console.log(`Scanning market for Dark Pool activity (${maxStocks} stocks)...`);
+    const { stdout, stderr } = await execAsync(command, {
+      maxBuffer: 50 * 1024 * 1024, // 50MB buffer for large results
+      timeout: 300000, // 5 minute timeout
+      cwd: PYTHON_SYSTEM_PATH,
+      env: {
+        ...process.env,
+        PYTHONPATH: '',
+        PYTHONHOME: '',
+        LD_LIBRARY_PATH: process.env.LD_LIBRARY_PATH || '',
+      },
+    });
+    
+    if (stderr && !stderr.includes('INFO') && !stderr.includes('WARNING')) {
+      console.error('Market Dark Pool scanner stderr:', stderr);
+    }
+    
+    return JSON.parse(stdout);
+  } catch (error: any) {
+    console.error('Market Dark Pool scanner error:', error);
+    return {
+      error: `Market Dark Pool scan failed: ${error.message}`,
+      status: 'error',
+    };
+  }
+}

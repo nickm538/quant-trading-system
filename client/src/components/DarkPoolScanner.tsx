@@ -10,6 +10,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 export function DarkPoolScanner() {
   const [symbol, setSymbol] = useState("");
   const [result, setResult] = useState<any>(null);
+  const [marketResult, setMarketResult] = useState<any>(null);
   
   const darkPoolMutation = trpc.scanners.darkPool.useMutation({
     onSuccess: (data) => {
@@ -17,10 +18,20 @@ export function DarkPoolScanner() {
     },
   });
 
+  const marketDarkPoolMutation = trpc.scanners.marketDarkPool.useMutation({
+    onSuccess: (data) => {
+      setMarketResult(data);
+    },
+  });
+
   const handleScan = () => {
     if (symbol.trim()) {
       darkPoolMutation.mutate({ symbol: symbol.toUpperCase() });
     }
+  };
+
+  const handleMarketScan = () => {
+    marketDarkPoolMutation.mutate({ limit: 400 });
   };
 
   const getSentimentColor = (sentiment: string) => {
@@ -56,7 +67,7 @@ export function DarkPoolScanner() {
       </p>
 
       {/* Search */}
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <Input
           placeholder="Enter symbol (e.g., AAPL)"
           value={symbol}
@@ -71,6 +82,19 @@ export function DarkPoolScanner() {
             <Search className="h-4 w-4 mr-2" />
           )}
           Scan Dark Pool
+        </Button>
+        <Button 
+          onClick={handleMarketScan} 
+          disabled={marketDarkPoolMutation.isPending}
+          variant="outline"
+          className="border-purple-500 text-purple-500 hover:bg-purple-500/10"
+        >
+          {marketDarkPoolMutation.isPending ? (
+            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+          ) : (
+            <Eye className="h-4 w-4 mr-2" />
+          )}
+          Scan Market (400 Stocks)
         </Button>
       </div>
 
@@ -201,10 +225,168 @@ export function DarkPoolScanner() {
         </div>
       )}
 
+      {/* Market-Wide Dark Pool Results */}
+      {marketResult && (
+        <Card className="border-purple-500/50">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Eye className="h-5 w-5 text-purple-500" />
+              Market-Wide Dark Pool Scan
+              <Badge variant="outline" className="ml-2">
+                {marketResult.timestamp || new Date().toLocaleString('en-US', { timeZone: 'America/New_York' })} EST
+              </Badge>
+            </CardTitle>
+            <CardDescription>
+              {marketResult.stocks_scanned || 0} stocks scanned - Showing top institutional activity
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {marketResult.error ? (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{marketResult.error}</AlertDescription>
+              </Alert>
+            ) : (
+              <div className="space-y-4">
+                {/* Summary Stats */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                  <div className="text-center p-3 bg-green-500/10 rounded-lg">
+                    <div className="text-2xl font-bold text-green-500">{marketResult.bullish_count || 0}</div>
+                    <div className="text-sm text-muted-foreground">Bullish Signals</div>
+                  </div>
+                  <div className="text-center p-3 bg-red-500/10 rounded-lg">
+                    <div className="text-2xl font-bold text-red-500">{marketResult.bearish_count || 0}</div>
+                    <div className="text-sm text-muted-foreground">Bearish Signals</div>
+                  </div>
+                  <div className="text-center p-3 bg-purple-500/10 rounded-lg">
+                    <div className="text-2xl font-bold text-purple-500">{marketResult.high_activity_count || 0}</div>
+                    <div className="text-sm text-muted-foreground">High Activity</div>
+                  </div>
+                  <div className="text-center p-3 bg-blue-500/10 rounded-lg">
+                    <div className="text-2xl font-bold text-blue-500">{marketResult.unusual_volume_count || 0}</div>
+                    <div className="text-sm text-muted-foreground">Unusual Volume</div>
+                  </div>
+                </div>
+
+                {/* Top Bullish */}
+                {marketResult.top_bullish && marketResult.top_bullish.length > 0 && (
+                  <div>
+                    <h4 className="font-semibold text-green-500 mb-2 flex items-center gap-2">
+                      <TrendingUp className="h-4 w-4" />
+                      Top Bullish Dark Pool Activity
+                    </h4>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b">
+                            <th className="text-left py-2 px-2">Symbol</th>
+                            <th className="text-right py-2 px-2">Net Position</th>
+                            <th className="text-right py-2 px-2">Short Ratio</th>
+                            <th className="text-right py-2 px-2">Score</th>
+                            <th className="text-left py-2 px-2">Signal</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {marketResult.top_bullish.map((stock: any, idx: number) => (
+                            <tr key={idx} className="border-b border-border/50 hover:bg-muted/50">
+                              <td className="py-2 px-2 font-bold">{stock.symbol}</td>
+                              <td className="py-2 px-2 text-right text-green-500">
+                                {stock.net_position > 0 ? '+' : ''}{formatNumber(stock.net_position || 0)}
+                              </td>
+                              <td className="py-2 px-2 text-right">{stock.short_ratio?.toFixed(1) || 0}%</td>
+                              <td className="py-2 px-2 text-right">
+                                <Badge className="bg-green-500 text-white">{stock.score || 0}</Badge>
+                              </td>
+                              <td className="py-2 px-2 text-xs text-muted-foreground">{stock.signal || '-'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Top Bearish */}
+                {marketResult.top_bearish && marketResult.top_bearish.length > 0 && (
+                  <div>
+                    <h4 className="font-semibold text-red-500 mb-2 flex items-center gap-2">
+                      <TrendingDown className="h-4 w-4" />
+                      Top Bearish Dark Pool Activity
+                    </h4>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b">
+                            <th className="text-left py-2 px-2">Symbol</th>
+                            <th className="text-right py-2 px-2">Net Position</th>
+                            <th className="text-right py-2 px-2">Short Ratio</th>
+                            <th className="text-right py-2 px-2">Score</th>
+                            <th className="text-left py-2 px-2">Signal</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {marketResult.top_bearish.map((stock: any, idx: number) => (
+                            <tr key={idx} className="border-b border-border/50 hover:bg-muted/50">
+                              <td className="py-2 px-2 font-bold">{stock.symbol}</td>
+                              <td className="py-2 px-2 text-right text-red-500">
+                                {stock.net_position > 0 ? '+' : ''}{formatNumber(stock.net_position || 0)}
+                              </td>
+                              <td className="py-2 px-2 text-right">{stock.short_ratio?.toFixed(1) || 0}%</td>
+                              <td className="py-2 px-2 text-right">
+                                <Badge className="bg-red-500 text-white">{stock.score || 0}</Badge>
+                              </td>
+                              <td className="py-2 px-2 text-xs text-muted-foreground">{stock.signal || '-'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Unusual Activity */}
+                {marketResult.unusual_activity && marketResult.unusual_activity.length > 0 && (
+                  <div>
+                    <h4 className="font-semibold text-purple-500 mb-2 flex items-center gap-2">
+                      <AlertCircle className="h-4 w-4" />
+                      Unusual Dark Pool Activity
+                    </h4>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b">
+                            <th className="text-left py-2 px-2">Symbol</th>
+                            <th className="text-right py-2 px-2">Volume Ratio</th>
+                            <th className="text-right py-2 px-2">DP Volume</th>
+                            <th className="text-left py-2 px-2">Reason</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {marketResult.unusual_activity.map((stock: any, idx: number) => (
+                            <tr key={idx} className="border-b border-border/50 hover:bg-muted/50">
+                              <td className="py-2 px-2 font-bold">{stock.symbol}</td>
+                              <td className="py-2 px-2 text-right text-purple-500">
+                                {stock.volume_ratio?.toFixed(2) || 1}x
+                              </td>
+                              <td className="py-2 px-2 text-right">{formatNumber(stock.dp_volume || 0)}</td>
+                              <td className="py-2 px-2 text-xs text-muted-foreground">{stock.reason || '-'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Education */}
       <Card className="bg-muted/50">
         <CardHeader>
-          <CardTitle className="text-lg">📚 What is Dark Pool Trading?</CardTitle>
+          <CardTitle className="text-lg">What is Dark Pool Trading?</CardTitle>
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground space-y-2">
           <p>

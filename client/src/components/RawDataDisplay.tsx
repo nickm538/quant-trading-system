@@ -20,8 +20,11 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="technical" className="w-full">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-4 lg:grid-cols-8">
             <TabsTrigger value="technical">Technical</TabsTrigger>
+            <TabsTrigger value="advanced">R2/Pivot/Fib</TabsTrigger>
+            <TabsTrigger value="candlestick">Candlesticks</TabsTrigger>
+            <TabsTrigger value="fundamentals">Cash Flow</TabsTrigger>
             <TabsTrigger value="garch">GARCH</TabsTrigger>
             <TabsTrigger value="montecarlo">Monte Carlo</TabsTrigger>
             <TabsTrigger value="position">Position</TabsTrigger>
@@ -49,6 +52,186 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
                 Volatility = 100 - (Historical Vol * 100)
               </code>
             </div>
+          </TabsContent>
+
+          {/* Advanced Technicals - R2, Pivot Points, Fibonacci */}
+          <TabsContent value="advanced" className="space-y-4">
+            <div className="mb-4 p-4 bg-indigo-50 dark:bg-indigo-950 rounded-lg border border-indigo-200 dark:border-indigo-800">
+              <h4 className="font-semibold mb-2 text-indigo-900 dark:text-indigo-100">R2 Score, Pivot Points & Fibonacci Levels</h4>
+              <p className="text-sm text-indigo-800 dark:text-indigo-200">
+                R2 measures trend predictability (0-1). Pivot points and Fibonacci levels identify key support/resistance zones.
+              </p>
+            </div>
+            
+            {analysis.advanced_technicals ? (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <DataItem label="R2 Score" value={analysis.advanced_technicals.r2_score?.toFixed(4) || 'N/A'} />
+                  <DataItem label="Predictability" value={analysis.advanced_technicals.predictability_rating || 'N/A'} />
+                  <DataItem label="Trend Direction" value={analysis.advanced_technicals.trend_direction || 'N/A'} />
+                  <DataItem label="Slope" value={analysis.advanced_technicals.slope?.toFixed(4) || 'N/A'} />
+                </div>
+                
+                {analysis.advanced_technicals.pivot_points && (
+                  <div className="mt-4">
+                    <h5 className="font-semibold mb-2">Standard Pivot Points</h5>
+                    <div className="grid grid-cols-3 md:grid-cols-7 gap-2">
+                      <DataItem label="R3" value={`$${analysis.advanced_technicals.pivot_points.standard?.r3?.toFixed(2) || 'N/A'}`} />
+                      <DataItem label="R2" value={`$${analysis.advanced_technicals.pivot_points.standard?.r2?.toFixed(2) || 'N/A'}`} />
+                      <DataItem label="R1" value={`$${analysis.advanced_technicals.pivot_points.standard?.r1?.toFixed(2) || 'N/A'}`} />
+                      <DataItem label="Pivot" value={`$${analysis.advanced_technicals.pivot_points.standard?.pivot?.toFixed(2) || 'N/A'}`} />
+                      <DataItem label="S1" value={`$${analysis.advanced_technicals.pivot_points.standard?.s1?.toFixed(2) || 'N/A'}`} />
+                      <DataItem label="S2" value={`$${analysis.advanced_technicals.pivot_points.standard?.s2?.toFixed(2) || 'N/A'}`} />
+                      <DataItem label="S3" value={`$${analysis.advanced_technicals.pivot_points.standard?.s3?.toFixed(2) || 'N/A'}`} />
+                    </div>
+                  </div>
+                )}
+                
+                {analysis.advanced_technicals.fibonacci && (
+                  <div className="mt-4">
+                    <h5 className="font-semibold mb-2">Fibonacci Levels</h5>
+                    <div className="grid grid-cols-4 md:grid-cols-7 gap-2">
+                      {Object.entries(analysis.advanced_technicals.fibonacci.retracement || {}).map(([level, price]: [string, any]) => (
+                        <DataItem key={level} label={`${level}`} value={`$${price?.toFixed(2) || 'N/A'}`} />
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center text-muted-foreground py-8">
+                Advanced technicals data not available. Run a full analysis to see R2, Pivot, and Fibonacci levels.
+              </div>
+            )}
+          </TabsContent>
+
+          {/* Candlestick Patterns */}
+          <TabsContent value="candlestick" className="space-y-4">
+            <div className="mb-4 p-4 bg-amber-50 dark:bg-amber-950 rounded-lg border border-amber-200 dark:border-amber-800">
+              <h4 className="font-semibold mb-2 text-amber-900 dark:text-amber-100">Candlestick Pattern Detection</h4>
+              <p className="text-sm text-amber-800 dark:text-amber-200">
+                Expert-level pattern recognition including Doji, Hammer, Engulfing, Morning/Evening Star, Ichimoku Cloud, and more.
+              </p>
+            </div>
+            
+            {analysis.candlestick_patterns ? (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <DataItem label="Overall Bias" value={analysis.candlestick_patterns.overall_bias || 'N/A'} />
+                  <DataItem label="Confidence" value={`${(analysis.candlestick_patterns.confidence * 100)?.toFixed(1) || 'N/A'}%`} />
+                  <DataItem label="Patterns Found" value={analysis.candlestick_patterns.patterns_detected?.length || 0} />
+                  <DataItem label="Pattern Strength" value={analysis.candlestick_patterns.pattern_strength || 'N/A'} />
+                </div>
+                
+                {analysis.candlestick_patterns.patterns_detected?.length > 0 && (
+                  <div className="mt-4">
+                    <h5 className="font-semibold mb-2">Detected Patterns</h5>
+                    <div className="space-y-2">
+                      {analysis.candlestick_patterns.patterns_detected.map((pattern: any, idx: number) => (
+                        <div key={idx} className={`p-3 rounded-lg border ${pattern.signal === 'bullish' ? 'bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800' : pattern.signal === 'bearish' ? 'bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800' : 'bg-muted/20 border-border'}`}>
+                          <div className="flex justify-between items-center">
+                            <span className="font-medium">{pattern.name}</span>
+                            <span className={`text-sm ${pattern.signal === 'bullish' ? 'text-green-600' : pattern.signal === 'bearish' ? 'text-red-600' : 'text-muted-foreground'}`}>
+                              {pattern.signal?.toUpperCase()} ({pattern.reliability || 'N/A'})
+                            </span>
+                          </div>
+                          {pattern.description && <p className="text-xs text-muted-foreground mt-1">{pattern.description}</p>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {analysis.candlestick_patterns.ichimoku && (
+                  <div className="mt-4">
+                    <h5 className="font-semibold mb-2">Ichimoku Cloud</h5>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                      <DataItem label="Trend" value={analysis.candlestick_patterns.ichimoku.trend || 'N/A'} />
+                      <DataItem label="TK Cross" value={analysis.candlestick_patterns.ichimoku.tk_cross || 'N/A'} />
+                      <DataItem label="Cloud Color" value={analysis.candlestick_patterns.ichimoku.cloud_color || 'N/A'} />
+                      <DataItem label="Price vs Cloud" value={analysis.candlestick_patterns.ichimoku.price_vs_cloud || 'N/A'} />
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center text-muted-foreground py-8">
+                Candlestick pattern data not available. Run a full analysis to see pattern detection.
+              </div>
+            )}
+          </TabsContent>
+
+          {/* Enhanced Fundamentals - Cash Flow */}
+          <TabsContent value="fundamentals" className="space-y-4">
+            <div className="mb-4 p-4 bg-emerald-50 dark:bg-emerald-950 rounded-lg border border-emerald-200 dark:border-emerald-800">
+              <h4 className="font-semibold mb-2 text-emerald-900 dark:text-emerald-100">Enhanced Cash Flow & Valuation Metrics</h4>
+              <p className="text-sm text-emerald-800 dark:text-emerald-200">
+                Deep fundamental analysis including PE, PEG, GARP scoring, FCF, EBITDA/EV, Free Float, and Liquidity metrics.
+              </p>
+            </div>
+            
+            {analysis.enhanced_fundamentals ? (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <DataItem label="P/E Ratio" value={analysis.enhanced_fundamentals.valuation?.pe_ratio?.toFixed(2) || 'N/A'} />
+                  <DataItem label="Forward P/E" value={analysis.enhanced_fundamentals.valuation?.forward_pe?.toFixed(2) || 'N/A'} />
+                  <DataItem label="PEG Ratio" value={analysis.enhanced_fundamentals.valuation?.peg_ratio?.toFixed(2) || 'N/A'} />
+                  <DataItem label="EV/EBITDA" value={analysis.enhanced_fundamentals.valuation?.ev_ebitda?.toFixed(2) || 'N/A'} />
+                </div>
+                
+                {analysis.enhanced_fundamentals.cash_flow && (
+                  <div className="mt-4">
+                    <h5 className="font-semibold mb-2">Cash Flow Metrics</h5>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                      <DataItem label="Free Cash Flow" value={`$${(analysis.enhanced_fundamentals.cash_flow.free_cash_flow / 1e9)?.toFixed(2) || 'N/A'}B`} />
+                      <DataItem label="FCF Yield" value={`${(analysis.enhanced_fundamentals.cash_flow.fcf_yield * 100)?.toFixed(2) || 'N/A'}%`} />
+                      <DataItem label="FCF Margin" value={`${(analysis.enhanced_fundamentals.cash_flow.fcf_margin * 100)?.toFixed(2) || 'N/A'}%`} />
+                      <DataItem label="Op Cash Flow" value={`$${(analysis.enhanced_fundamentals.cash_flow.operating_cash_flow / 1e9)?.toFixed(2) || 'N/A'}B`} />
+                    </div>
+                  </div>
+                )}
+                
+                {analysis.enhanced_fundamentals.garp_analysis && (
+                  <div className="mt-4">
+                    <h5 className="font-semibold mb-2">GARP Analysis (Growth at Reasonable Price)</h5>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                      <DataItem label="GARP Score" value={`${analysis.enhanced_fundamentals.garp_analysis.garp_score?.toFixed(1) || 'N/A'}/100`} />
+                      <DataItem label="GARP Signal" value={analysis.enhanced_fundamentals.garp_analysis.garp_signal || 'N/A'} />
+                      <DataItem label="Growth Rate" value={`${(analysis.enhanced_fundamentals.garp_analysis.earnings_growth * 100)?.toFixed(1) || 'N/A'}%`} />
+                      <DataItem label="Value Score" value={`${analysis.enhanced_fundamentals.garp_analysis.value_score?.toFixed(1) || 'N/A'}/100`} />
+                    </div>
+                  </div>
+                )}
+                
+                {analysis.enhanced_fundamentals.liquidity && (
+                  <div className="mt-4">
+                    <h5 className="font-semibold mb-2">Liquidity & Float</h5>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                      <DataItem label="Free Float %" value={`${(analysis.enhanced_fundamentals.liquidity.free_float_pct * 100)?.toFixed(1) || 'N/A'}%`} />
+                      <DataItem label="Liquidity Score" value={`${analysis.enhanced_fundamentals.liquidity.liquidity_score?.toFixed(1) || 'N/A'}/100`} />
+                      <DataItem label="Avg Volume" value={`${(analysis.enhanced_fundamentals.liquidity.avg_volume / 1e6)?.toFixed(2) || 'N/A'}M`} />
+                      <DataItem label="Current Ratio" value={analysis.enhanced_fundamentals.liquidity.current_ratio?.toFixed(2) || 'N/A'} />
+                    </div>
+                  </div>
+                )}
+                
+                {analysis.enhanced_fundamentals.financial_health && (
+                  <div className="mt-4">
+                    <h5 className="font-semibold mb-2">Financial Health</h5>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                      <DataItem label="Altman Z-Score" value={analysis.enhanced_fundamentals.financial_health.altman_z_score?.toFixed(2) || 'N/A'} />
+                      <DataItem label="Z-Score Rating" value={analysis.enhanced_fundamentals.financial_health.z_score_rating || 'N/A'} />
+                      <DataItem label="Debt/Equity" value={analysis.enhanced_fundamentals.financial_health.debt_to_equity?.toFixed(2) || 'N/A'} />
+                      <DataItem label="Interest Coverage" value={analysis.enhanced_fundamentals.financial_health.interest_coverage?.toFixed(2) || 'N/A'} />
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center text-muted-foreground py-8">
+                Enhanced fundamentals data not available. Run a full analysis to see cash flow and valuation metrics.
+              </div>
+            )}
           </TabsContent>
 
           <TabsContent value="garch" className="space-y-4">
