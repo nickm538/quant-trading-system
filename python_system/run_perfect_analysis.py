@@ -465,6 +465,16 @@ def main():
                 except Exception as ve:
                     candlestick_result['vision_ai_error'] = str(ve)
             
+            # Add Golden/Death Cross analysis from comprehensive_technicals
+            try:
+                from comprehensive_technicals_v2 import ComprehensiveTechnicalAnalyzer
+                comp_tech = ComprehensiveTechnicalAnalyzer()
+                comp_result = comp_tech.analyze(symbol)
+                if comp_result.get('golden_death_cross'):
+                    candlestick_result['golden_death_cross'] = comp_result['golden_death_cross']
+            except Exception as gdc_e:
+                candlestick_result['golden_death_cross_error'] = str(gdc_e)
+            
             output['candlestick_patterns'] = candlestick_result
         except Exception as e:
             output['candlestick_patterns'] = {'error': str(e)}

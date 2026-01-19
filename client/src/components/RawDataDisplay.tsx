@@ -126,24 +126,29 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
               <div className="space-y-4">
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <DataItem label="Overall Bias" value={analysis.candlestick_patterns.overall_bias || 'N/A'} />
-                  <DataItem label="Confidence" value={`${safeFixed(analysis.candlestick_patterns.confidence * 100, 1)}%`} />
-                  <DataItem label="Patterns Found" value={analysis.candlestick_patterns.patterns_detected?.length || 0} />
-                  <DataItem label="Pattern Strength" value={analysis.candlestick_patterns.pattern_strength || 'N/A'} />
+                  <DataItem label="Confidence" value={analysis.candlestick_patterns.recommendation?.confidence || 'N/A'} />
+                  <DataItem label="Patterns Found" value={analysis.candlestick_patterns.patterns_found || analysis.candlestick_patterns.patterns?.length || 0} />
+                  <DataItem label="Pattern Strength" value={analysis.candlestick_patterns.recommendation?.action || 'N/A'} />
                 </div>
                 
-                {analysis.candlestick_patterns.patterns_detected?.length > 0 && (
+                {(analysis.candlestick_patterns.patterns?.length > 0 || analysis.candlestick_patterns.patterns_detected?.length > 0) && (
                   <div className="mt-4">
                     <h5 className="font-semibold mb-2">Detected Patterns</h5>
                     <div className="space-y-2">
-                      {analysis.candlestick_patterns.patterns_detected.map((pattern: any, idx: number) => (
-                        <div key={idx} className={`p-3 rounded-lg border ${pattern.signal === 'bullish' ? 'bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800' : pattern.signal === 'bearish' ? 'bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800' : 'bg-muted/20 border-border'}`}>
+                      {(analysis.candlestick_patterns.patterns || analysis.candlestick_patterns.patterns_detected || []).map((pattern: any, idx: number) => (
+                        <div key={idx} className={`p-3 rounded-lg border ${pattern.type?.includes('BULLISH') ? 'bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800' : pattern.type?.includes('BEARISH') ? 'bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800' : 'bg-muted/20 border-border'}`}>
                           <div className="flex justify-between items-center">
-                            <span className="font-medium">{pattern.name}</span>
-                            <span className={`text-sm ${pattern.signal === 'bullish' ? 'text-green-600' : pattern.signal === 'bearish' ? 'text-red-600' : 'text-muted-foreground'}`}>
-                              {pattern.signal?.toUpperCase()} ({pattern.reliability || 'N/A'})
+                            <span className="font-medium">{pattern.pattern || pattern.name}</span>
+                            <span className={`text-sm ${pattern.type?.includes('BULLISH') ? 'text-green-600' : pattern.type?.includes('BEARISH') ? 'text-red-600' : 'text-muted-foreground'}`}>
+                              {pattern.type || pattern.signal?.toUpperCase()} ({pattern.reliability || 'N/A'})
                             </span>
                           </div>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            {pattern.date && <span className="mr-2">Date: {pattern.date}</span>}
+                            {pattern.price && <span className="mr-2">Price: ${pattern.price.toFixed(2)}</span>}
+                          </div>
                           {pattern.description && <p className="text-xs text-muted-foreground mt-1">{pattern.description}</p>}
+                          {pattern.action && <p className="text-xs font-medium mt-1">{pattern.action}</p>}
                         </div>
                       ))}
                     </div>
@@ -154,10 +159,64 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
                   <div className="mt-4">
                     <h5 className="font-semibold mb-2">Ichimoku Cloud</h5>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                      <DataItem label="Trend" value={analysis.candlestick_patterns.ichimoku.trend || 'N/A'} />
+                      <DataItem label="Trend" value={analysis.candlestick_patterns.ichimoku.overall_signal || analysis.candlestick_patterns.ichimoku.trend || 'N/A'} />
                       <DataItem label="TK Cross" value={analysis.candlestick_patterns.ichimoku.tk_cross || 'N/A'} />
                       <DataItem label="Cloud Color" value={analysis.candlestick_patterns.ichimoku.cloud_color || 'N/A'} />
-                      <DataItem label="Price vs Cloud" value={analysis.candlestick_patterns.ichimoku.price_vs_cloud || 'N/A'} />
+                      <DataItem label="Price vs Cloud" value={analysis.candlestick_patterns.ichimoku.cloud_position || analysis.candlestick_patterns.ichimoku.price_vs_cloud || 'N/A'} />
+                    </div>
+                    {/* Ichimoku Explanation */}
+                    <div className="mt-3 p-3 bg-muted/30 rounded-lg text-xs text-muted-foreground">
+                      <p className="font-medium mb-1">📖 Understanding Ichimoku Cloud:</p>
+                      <ul className="space-y-1 ml-2">
+                        <li><span className="font-medium">Trend:</span> Overall signal (BULLISH/BEARISH/NEUTRAL) based on all Ichimoku components</li>
+                        <li><span className="font-medium">TK Cross:</span> Tenkan-sen (9-period) crossing Kijun-sen (26-period). Bullish when Tenkan crosses above Kijun</li>
+                        <li><span className="font-medium">Cloud Color:</span> GREEN = bullish (Senkou A &gt; Senkou B), RED = bearish (Senkou A &lt; Senkou B)</li>
+                        <li><span className="font-medium">Price vs Cloud:</span> ABOVE_CLOUD = bullish, BELOW_CLOUD = bearish, IN_CLOUD = consolidation</li>
+                      </ul>
+                      {analysis.candlestick_patterns.ichimoku.interpretation && (
+                        <p className="mt-2 italic">{analysis.candlestick_patterns.ichimoku.interpretation}</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Golden Cross / Death Cross Analysis */}
+                {analysis.candlestick_patterns.golden_death_cross && (
+                  <div className="mt-4">
+                    <h5 className="font-semibold mb-2">⚔️ Golden Cross / Death Cross Analysis</h5>
+                    <div className={`p-4 rounded-lg border ${analysis.candlestick_patterns.golden_death_cross.golden_cross ? 'bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800' : analysis.candlestick_patterns.golden_death_cross.death_cross ? 'bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800' : 'bg-muted/20 border-border'}`}>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
+                        <DataItem label="50-Day SMA" value={`$${analysis.candlestick_patterns.golden_death_cross.sma_50?.toFixed(2) || 'N/A'}`} />
+                        <DataItem label="200-Day SMA" value={`$${analysis.candlestick_patterns.golden_death_cross.sma_200?.toFixed(2) || 'N/A'}`} />
+                        <DataItem label="Signal" value={analysis.candlestick_patterns.golden_death_cross.signal || 'N/A'} />
+                        <DataItem label="Days Since Cross" value={analysis.candlestick_patterns.golden_death_cross.days_since_cross || 'N/A'} />
+                      </div>
+                      <div className="flex items-center gap-4 mb-3">
+                        <div className={`px-3 py-1 rounded-full text-sm font-medium ${analysis.candlestick_patterns.golden_death_cross.golden_cross ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300' : 'bg-muted text-muted-foreground'}`}>
+                          {analysis.candlestick_patterns.golden_death_cross.golden_cross ? '✅ Golden Cross Active' : '❌ No Golden Cross'}
+                        </div>
+                        <div className={`px-3 py-1 rounded-full text-sm font-medium ${analysis.candlestick_patterns.golden_death_cross.death_cross ? 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300' : 'bg-muted text-muted-foreground'}`}>
+                          {analysis.candlestick_patterns.golden_death_cross.death_cross ? '⚠️ Death Cross Active' : '❌ No Death Cross'}
+                        </div>
+                      </div>
+                      {analysis.candlestick_patterns.golden_death_cross.recent_golden_cross && (
+                        <div className="text-sm text-green-600 dark:text-green-400 mb-2">🔔 Recent Golden Cross detected!</div>
+                      )}
+                      {analysis.candlestick_patterns.golden_death_cross.recent_death_cross && (
+                        <div className="text-sm text-red-600 dark:text-red-400 mb-2">🔔 Recent Death Cross detected!</div>
+                      )}
+                      {analysis.candlestick_patterns.golden_death_cross.explanation && (
+                        <div className="text-sm text-muted-foreground whitespace-pre-line">{analysis.candlestick_patterns.golden_death_cross.explanation}</div>
+                      )}
+                    </div>
+                    {/* Golden/Death Cross Explanation */}
+                    <div className="mt-3 p-3 bg-muted/30 rounded-lg text-xs text-muted-foreground">
+                      <p className="font-medium mb-1">📖 Understanding Golden/Death Cross:</p>
+                      <ul className="space-y-1 ml-2">
+                        <li><span className="font-medium">Golden Cross:</span> 50-day SMA crosses ABOVE 200-day SMA - bullish signal indicating potential uptrend</li>
+                        <li><span className="font-medium">Death Cross:</span> 50-day SMA crosses BELOW 200-day SMA - bearish signal indicating potential downtrend</li>
+                        <li><span className="font-medium">Best Use:</span> Confirm with volume and other indicators. Crosses work best in trending markets, not sideways markets</li>
+                      </ul>
                     </div>
                   </div>
                 )}
