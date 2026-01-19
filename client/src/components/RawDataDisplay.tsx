@@ -419,15 +419,159 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
                   </div>
                 )}
                 
-                {/* NEW: Financial Trends */}
+                {/* CAGR Analysis Section */}
                 {analysis.enhanced_fundamentals.financial_trends && (
-                  <div className="mt-4">
-                    <h5 className="font-semibold mb-2">📊 5-Year Financial Trends</h5>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                      <DataItem label="Revenue CAGR" value={analysis.enhanced_fundamentals.financial_trends.revenue_5yr_cagr ? `${safeFixed(analysis.enhanced_fundamentals.financial_trends.revenue_5yr_cagr)}%` : 'N/A'} />
-                      <DataItem label="Earnings CAGR" value={analysis.enhanced_fundamentals.financial_trends.earnings_5yr_cagr ? `${safeFixed(analysis.enhanced_fundamentals.financial_trends.earnings_5yr_cagr)}%` : 'N/A'} />
-                      <DataItem label="FCF CAGR" value={analysis.enhanced_fundamentals.financial_trends.fcf_5yr_cagr ? `${safeFixed(analysis.enhanced_fundamentals.financial_trends.fcf_5yr_cagr)}%` : 'N/A'} />
+                  <div className="mt-4 space-y-4">
+                    {/* CAGR Summary */}
+                    {analysis.enhanced_fundamentals.financial_trends.cagr_summary && (
+                      <div className="p-4 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950 dark:to-purple-950 rounded-lg border border-blue-200 dark:border-blue-800">
+                        <div className="flex items-center justify-between mb-2">
+                          <h5 className="font-semibold text-blue-900 dark:text-blue-100">📈 CAGR Summary</h5>
+                          <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                            analysis.enhanced_fundamentals.financial_trends.cagr_summary.assessment === 'Exceptional Growth' ? 'bg-green-500 text-white' :
+                            analysis.enhanced_fundamentals.financial_trends.cagr_summary.assessment === 'Strong Growth' ? 'bg-emerald-500 text-white' :
+                            analysis.enhanced_fundamentals.financial_trends.cagr_summary.assessment === 'Moderate Growth' ? 'bg-yellow-500 text-black' :
+                            analysis.enhanced_fundamentals.financial_trends.cagr_summary.assessment === 'Slow Growth' ? 'bg-orange-500 text-white' :
+                            'bg-red-500 text-white'
+                          }`}>
+                            {analysis.enhanced_fundamentals.financial_trends.cagr_summary.assessment}
+                          </span>
+                        </div>
+                        <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">
+                          {safeFixed(analysis.enhanced_fundamentals.financial_trends.cagr_summary.average_5yr_cagr)}% <span className="text-sm font-normal">Avg 5-Year CAGR</span>
+                        </p>
+                      </div>
+                    )}
+                    
+                    {/* Revenue CAGR */}
+                    <div>
+                      <h5 className="font-semibold mb-2">💰 Revenue CAGR</h5>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="p-2 bg-muted rounded text-center">
+                          <p className="text-xs text-muted-foreground">1-Year</p>
+                          <p className={`font-bold ${(analysis.enhanced_fundamentals.financial_trends.revenue_1yr_cagr || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {analysis.enhanced_fundamentals.financial_trends.revenue_1yr_cagr !== null ? `${safeFixed(analysis.enhanced_fundamentals.financial_trends.revenue_1yr_cagr)}%` : 'N/A'}
+                          </p>
+                        </div>
+                        <div className="p-2 bg-muted rounded text-center">
+                          <p className="text-xs text-muted-foreground">3-Year</p>
+                          <p className={`font-bold ${(analysis.enhanced_fundamentals.financial_trends.revenue_3yr_cagr || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {analysis.enhanced_fundamentals.financial_trends.revenue_3yr_cagr !== null ? `${safeFixed(analysis.enhanced_fundamentals.financial_trends.revenue_3yr_cagr)}%` : 'N/A'}
+                          </p>
+                        </div>
+                        <div className="p-2 bg-muted rounded text-center">
+                          <p className="text-xs text-muted-foreground">5-Year</p>
+                          <p className={`font-bold ${(analysis.enhanced_fundamentals.financial_trends.revenue_5yr_cagr || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {analysis.enhanced_fundamentals.financial_trends.revenue_5yr_cagr !== null ? `${safeFixed(analysis.enhanced_fundamentals.financial_trends.revenue_5yr_cagr)}%` : 'N/A'}
+                          </p>
+                        </div>
+                      </div>
                     </div>
+                    
+                    {/* Earnings CAGR */}
+                    <div>
+                      <h5 className="font-semibold mb-2">📊 Earnings CAGR</h5>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="p-2 bg-muted rounded text-center">
+                          <p className="text-xs text-muted-foreground">1-Year</p>
+                          <p className={`font-bold ${(analysis.enhanced_fundamentals.financial_trends.earnings_1yr_cagr || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {analysis.enhanced_fundamentals.financial_trends.earnings_1yr_cagr !== null ? `${safeFixed(analysis.enhanced_fundamentals.financial_trends.earnings_1yr_cagr)}%` : 'N/A'}
+                          </p>
+                        </div>
+                        <div className="p-2 bg-muted rounded text-center">
+                          <p className="text-xs text-muted-foreground">3-Year</p>
+                          <p className={`font-bold ${(analysis.enhanced_fundamentals.financial_trends.earnings_3yr_cagr || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {analysis.enhanced_fundamentals.financial_trends.earnings_3yr_cagr !== null ? `${safeFixed(analysis.enhanced_fundamentals.financial_trends.earnings_3yr_cagr)}%` : 'N/A'}
+                          </p>
+                        </div>
+                        <div className="p-2 bg-muted rounded text-center">
+                          <p className="text-xs text-muted-foreground">5-Year</p>
+                          <p className={`font-bold ${(analysis.enhanced_fundamentals.financial_trends.earnings_5yr_cagr || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {analysis.enhanced_fundamentals.financial_trends.earnings_5yr_cagr !== null ? `${safeFixed(analysis.enhanced_fundamentals.financial_trends.earnings_5yr_cagr)}%` : 'N/A'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Stock Price CAGR */}
+                    <div>
+                      <h5 className="font-semibold mb-2">📈 Stock Price CAGR</h5>
+                      <div className="grid grid-cols-4 gap-2">
+                        <div className="p-2 bg-muted rounded text-center">
+                          <p className="text-xs text-muted-foreground">1-Year</p>
+                          <p className={`font-bold ${(analysis.enhanced_fundamentals.financial_trends.stock_price_1yr_cagr || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {analysis.enhanced_fundamentals.financial_trends.stock_price_1yr_cagr !== null ? `${safeFixed(analysis.enhanced_fundamentals.financial_trends.stock_price_1yr_cagr)}%` : 'N/A'}
+                          </p>
+                        </div>
+                        <div className="p-2 bg-muted rounded text-center">
+                          <p className="text-xs text-muted-foreground">3-Year</p>
+                          <p className={`font-bold ${(analysis.enhanced_fundamentals.financial_trends.stock_price_3yr_cagr || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {analysis.enhanced_fundamentals.financial_trends.stock_price_3yr_cagr !== null ? `${safeFixed(analysis.enhanced_fundamentals.financial_trends.stock_price_3yr_cagr)}%` : 'N/A'}
+                          </p>
+                        </div>
+                        <div className="p-2 bg-muted rounded text-center">
+                          <p className="text-xs text-muted-foreground">5-Year</p>
+                          <p className={`font-bold ${(analysis.enhanced_fundamentals.financial_trends.stock_price_5yr_cagr || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {analysis.enhanced_fundamentals.financial_trends.stock_price_5yr_cagr !== null ? `${safeFixed(analysis.enhanced_fundamentals.financial_trends.stock_price_5yr_cagr)}%` : 'N/A'}
+                          </p>
+                        </div>
+                        <div className="p-2 bg-muted rounded text-center">
+                          <p className="text-xs text-muted-foreground">10-Year</p>
+                          <p className={`font-bold ${(analysis.enhanced_fundamentals.financial_trends.stock_price_10yr_cagr || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {analysis.enhanced_fundamentals.financial_trends.stock_price_10yr_cagr !== null ? `${safeFixed(analysis.enhanced_fundamentals.financial_trends.stock_price_10yr_cagr)}%` : 'N/A'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Other CAGR Metrics */}
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                      <DataItem 
+                        label="FCF 3yr CAGR" 
+                        value={analysis.enhanced_fundamentals.financial_trends.fcf_3yr_cagr !== null ? `${safeFixed(analysis.enhanced_fundamentals.financial_trends.fcf_3yr_cagr)}%` : 'N/A'} 
+                      />
+                      <DataItem 
+                        label="FCF 5yr CAGR" 
+                        value={analysis.enhanced_fundamentals.financial_trends.fcf_5yr_cagr !== null ? `${safeFixed(analysis.enhanced_fundamentals.financial_trends.fcf_5yr_cagr)}%` : 'N/A'} 
+                      />
+                      <DataItem 
+                        label="Dividend 5yr CAGR" 
+                        value={analysis.enhanced_fundamentals.financial_trends.dividend_5yr_cagr !== null ? `${safeFixed(analysis.enhanced_fundamentals.financial_trends.dividend_5yr_cagr)}%` : 'N/A'} 
+                      />
+                    </div>
+                    
+                    {/* Revenue Trend Table */}
+                    {analysis.enhanced_fundamentals.financial_trends.revenue_trend?.length > 0 && (
+                      <div>
+                        <h5 className="font-semibold mb-2">📋 Historical Revenue & Margins</h5>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="border-b">
+                                <th className="text-left p-2">Year</th>
+                                <th className="text-right p-2">Revenue</th>
+                                <th className="text-right p-2">Net Income</th>
+                                <th className="text-right p-2">Gross Margin</th>
+                                <th className="text-right p-2">Op Margin</th>
+                                <th className="text-right p-2">Net Margin</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {analysis.enhanced_fundamentals.financial_trends.revenue_trend.slice(0, 5).map((item: any, idx: number) => (
+                                <tr key={idx} className="border-b border-muted">
+                                  <td className="p-2 font-medium">{item.year}</td>
+                                  <td className="p-2 text-right">{item.revenue ? `$${(item.revenue / 1e9).toFixed(1)}B` : 'N/A'}</td>
+                                  <td className="p-2 text-right">{item.net_income ? `$${(item.net_income / 1e9).toFixed(1)}B` : 'N/A'}</td>
+                                  <td className="p-2 text-right">{item.gross_margin ? `${safeFixed(item.gross_margin)}%` : 'N/A'}</td>
+                                  <td className="p-2 text-right">{item.operating_margin ? `${safeFixed(item.operating_margin)}%` : 'N/A'}</td>
+                                  <td className="p-2 text-right">{item.net_margin ? `${safeFixed(item.net_margin)}%` : 'N/A'}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

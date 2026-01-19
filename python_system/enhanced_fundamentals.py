@@ -319,7 +319,7 @@ class EnhancedFundamentalsAnalyzer:
     def _fetch_fmp_data(self, symbol: str) -> Optional[Dict]:
         """Fetch data from Financial Modeling Prep."""
         try:
-            url = f'https://financialmodelingprep.com/api/v3/profile/{symbol}?apikey={self.fmp_key}'
+            url = f'https://financialmodelingprep.com/stable/profile?symbol={symbol}&apikey={self.fmp_key}'
             response = requests.get(url, timeout=10)
             if response.status_code == 200:
                 data = response.json()
@@ -781,7 +781,7 @@ class EnhancedFundamentalsAnalyzer:
                         })
             
             # FMP earnings surprises
-            url = f'https://financialmodelingprep.com/api/v3/earnings-surprises/{symbol}?apikey={self.fmp_key}'
+            url = f'https://financialmodelingprep.com/stable/earnings-surprises?symbol={symbol}&apikey={self.fmp_key}'
             response = requests.get(url, timeout=10)
             if response.status_code == 200:
                 data = response.json()
@@ -795,7 +795,7 @@ class EnhancedFundamentalsAnalyzer:
                         })
             
             # FMP analyst estimates
-            url = f'https://financialmodelingprep.com/api/v3/analyst-estimates/{symbol}?apikey={self.fmp_key}'
+            url = f'https://financialmodelingprep.com/stable/analyst-estimates?symbol={symbol}&apikey={self.fmp_key}'
             response = requests.get(url, timeout=10)
             if response.status_code == 200:
                 data = response.json()
@@ -837,7 +837,7 @@ class EnhancedFundamentalsAnalyzer:
             dividend_data['ex_dividend_date'] = info.get('exDividendDate')
             
             # FMP dividend history
-            url = f'https://financialmodelingprep.com/api/v3/historical-price-full/stock_dividend/{symbol}?apikey={self.fmp_key}'
+            url = f'https://financialmodelingprep.com/stable/historical-price-eod-dividend?symbol={symbol}&apikey={self.fmp_key}'
             response = requests.get(url, timeout=10)
             if response.status_code == 200:
                 data = response.json()
@@ -992,61 +992,309 @@ class EnhancedFundamentalsAnalyzer:
         
         return analyst_data
     
+    def _calculate_cagr(self, beginning_value: float, ending_value: float, years: int) -> Optional[float]:
+        """
+        Calculate Compound Annual Growth Rate (CAGR).
+        
+        Formula: CAGR = (Ending Value / Beginning Value)^(1/n) - 1
+        
+        Args:
+            beginning_value: Starting value
+            ending_value: Final value
+            years: Number of years
+            
+        Returns:
+            CAGR as a percentage, or None if calculation not possible
+        """
+        try:
+            if beginning_value <= 0 or ending_value <= 0 or years <= 0:
+                # Handle negative to positive transitions specially
+                if beginning_value < 0 and ending_value > 0:
+                    return None  # Can't calculate CAGR for sign changes
+                if beginning_value > 0 and ending_value < 0:
+                    return None
+                return None
+            
+            cagr = (pow(ending_value / beginning_value, 1 / years) - 1) * 100
+            return round(cagr, 2)
+        except Exception:
+            return None
+    
     def _fetch_financial_trends(self, symbol: str) -> Dict:
         """
-        Fetch historical financial trends (5-year CAGR for revenue/earnings).
+        Fetch historical financial trends and calculate CAGR metrics.
+        Uses yfinance as primary source (free, reliable).
+        Calculates: Revenue CAGR, Earnings CAGR, FCF CAGR, EPS CAGR, Stock Price CAGR
+        For multiple timeframes: 1-year, 3-year, 5-year, 10-year
         """
         trends = {
+            # Multi-timeframe CAGR
+            'revenue_1yr_cagr': None,
+            'revenue_3yr_cagr': None,
             'revenue_5yr_cagr': None,
+            'earnings_1yr_cagr': None,
+            'earnings_3yr_cagr': None,
             'earnings_5yr_cagr': None,
+            'fcf_3yr_cagr': None,
             'fcf_5yr_cagr': None,
+            'eps_3yr_cagr': None,
+            'eps_5yr_cagr': None,
+            'stock_price_1yr_cagr': None,
+            'stock_price_3yr_cagr': None,
+            'stock_price_5yr_cagr': None,
+            'stock_price_10yr_cagr': None,
+            'dividend_5yr_cagr': None,
+            # Trend data
             'revenue_trend': [],
             'earnings_trend': [],
-            'margin_trend': []
+            'margin_trend': [],
+            # Summary
+            'cagr_summary': None
         }
         
         try:
-            # FMP income statement
-            url = f'https://financialmodelingprep.com/api/v3/income-statement/{symbol}?limit=6&apikey={self.fmp_key}'
-            response = requests.get(url, timeout=10)
-            if response.status_code == 200:
-                data = response.json()
-                if data and len(data) >= 2:
-                    for item in data[:6]:
-                        trends['revenue_trend'].append({
-                            'year': item.get('calendarYear'),
-                            'revenue': item.get('revenue'),
-                            'net_income': item.get('netIncome'),
-                            'eps': item.get('eps'),
-                            'gross_margin': round(item.get('grossProfit', 0) / item.get('revenue', 1) * 100, 2) if item.get('revenue') else None,
-                            'operating_margin': round(item.get('operatingIncome', 0) / item.get('revenue', 1) * 100, 2) if item.get('revenue') else None,
-                            'net_margin': round(item.get('netIncome', 0) / item.get('revenue', 1) * 100, 2) if item.get('revenue') else None
-                        })
-                    
-                    # Calculate 5-year CAGR
-                    if len(data) >= 5:
-                        recent_rev = data[0].get('revenue', 0)
-                        old_rev = data[4].get('revenue', 0)
-                        if old_rev > 0 and recent_rev > 0:
-                            trends['revenue_5yr_cagr'] = round((pow(recent_rev / old_rev, 0.2) - 1) * 100, 2)
-                        
-                        recent_earn = data[0].get('netIncome', 0)
-                        old_earn = data[4].get('netIncome', 0)
-                        if old_earn > 0 and recent_earn > 0:
-                            trends['earnings_5yr_cagr'] = round((pow(recent_earn / old_earn, 0.2) - 1) * 100, 2)
+            if not yf:
+                return trends
             
-            # FMP cash flow statement for FCF trend
-            url = f'https://financialmodelingprep.com/api/v3/cash-flow-statement/{symbol}?limit=6&apikey={self.fmp_key}'
-            response = requests.get(url, timeout=10)
-            if response.status_code == 200:
-                data = response.json()
-                if data and len(data) >= 5:
-                    recent_fcf = data[0].get('freeCashFlow', 0)
-                    old_fcf = data[4].get('freeCashFlow', 0)
-                    if old_fcf > 0 and recent_fcf > 0:
-                        trends['fcf_5yr_cagr'] = round((pow(recent_fcf / old_fcf, 0.2) - 1) * 100, 2)
-        except Exception:
+            ticker = yf.Ticker(symbol)
+            
+            # Get income statement for revenue and earnings
+            try:
+                income_stmt = ticker.income_stmt
+                if income_stmt is not None and not income_stmt.empty:
+                    # Get annual data (columns are dates, most recent first)
+                    years_available = len(income_stmt.columns)
+                    
+                    # Extract revenue data
+                    revenue_row = None
+                    for row_name in ['Total Revenue', 'Revenue', 'Operating Revenue']:
+                        if row_name in income_stmt.index:
+                            revenue_row = income_stmt.loc[row_name]
+                            break
+                    
+                    # Extract net income data
+                    earnings_row = None
+                    for row_name in ['Net Income', 'Net Income Common Stockholders', 'Net Income From Continuing Operations']:
+                        if row_name in income_stmt.index:
+                            earnings_row = income_stmt.loc[row_name]
+                            break
+                    
+                    # Extract EPS data
+                    eps_row = None
+                    for row_name in ['Basic EPS', 'Diluted EPS', 'Basic Average Shares']:
+                        if row_name in income_stmt.index:
+                            eps_row = income_stmt.loc[row_name]
+                            break
+                    
+                    # Calculate Revenue CAGR for different timeframes
+                    if revenue_row is not None:
+                        revenue_values = revenue_row.dropna().values
+                        if len(revenue_values) >= 2:
+                            trends['revenue_1yr_cagr'] = self._calculate_cagr(revenue_values[1], revenue_values[0], 1)
+                        if len(revenue_values) >= 4:
+                            trends['revenue_3yr_cagr'] = self._calculate_cagr(revenue_values[3], revenue_values[0], 3)
+                        if len(revenue_values) >= 5:
+                            trends['revenue_5yr_cagr'] = self._calculate_cagr(revenue_values[4], revenue_values[0], 4)
+                    
+                    # Calculate Earnings CAGR
+                    if earnings_row is not None:
+                        earnings_values = earnings_row.dropna().values
+                        if len(earnings_values) >= 2:
+                            trends['earnings_1yr_cagr'] = self._calculate_cagr(earnings_values[1], earnings_values[0], 1)
+                        if len(earnings_values) >= 4:
+                            trends['earnings_3yr_cagr'] = self._calculate_cagr(earnings_values[3], earnings_values[0], 3)
+                        if len(earnings_values) >= 5:
+                            trends['earnings_5yr_cagr'] = self._calculate_cagr(earnings_values[4], earnings_values[0], 4)
+                    
+                    # Build revenue trend
+                    if revenue_row is not None and earnings_row is not None:
+                        for i, col in enumerate(income_stmt.columns[:6]):
+                            year = col.year if hasattr(col, 'year') else str(col)[:4]
+                            rev = revenue_row.iloc[i] if i < len(revenue_row) else None
+                            earn = earnings_row.iloc[i] if i < len(earnings_row) else None
+                            
+                            # Get margins
+                            gross_profit = income_stmt.loc['Gross Profit'].iloc[i] if 'Gross Profit' in income_stmt.index and i < len(income_stmt.columns) else None
+                            op_income = income_stmt.loc['Operating Income'].iloc[i] if 'Operating Income' in income_stmt.index and i < len(income_stmt.columns) else None
+                            
+                            trends['revenue_trend'].append({
+                                'year': year,
+                                'revenue': float(rev) if rev is not None else None,
+                                'net_income': float(earn) if earn is not None else None,
+                                'gross_margin': round(float(gross_profit) / float(rev) * 100, 2) if gross_profit and rev and float(rev) > 0 else None,
+                                'operating_margin': round(float(op_income) / float(rev) * 100, 2) if op_income and rev and float(rev) > 0 else None,
+                                'net_margin': round(float(earn) / float(rev) * 100, 2) if earn and rev and float(rev) > 0 else None
+                            })
+            except Exception as e:
+                pass
+            
+            # Get cash flow statement for FCF
+            try:
+                cashflow = ticker.cashflow
+                if cashflow is not None and not cashflow.empty:
+                    fcf_row = None
+                    for row_name in ['Free Cash Flow', 'Operating Cash Flow']:
+                        if row_name in cashflow.index:
+                            fcf_row = cashflow.loc[row_name]
+                            break
+                    
+                    if fcf_row is not None:
+                        fcf_values = fcf_row.dropna().values
+                        if len(fcf_values) >= 4:
+                            trends['fcf_3yr_cagr'] = self._calculate_cagr(fcf_values[3], fcf_values[0], 3)
+                        if len(fcf_values) >= 5:
+                            trends['fcf_5yr_cagr'] = self._calculate_cagr(fcf_values[4], fcf_values[0], 4)
+            except Exception:
+                pass
+            
+            # Get historical stock price for price CAGR
+            try:
+                hist = ticker.history(period='10y')
+                if hist is not None and not hist.empty and 'Close' in hist.columns:
+                    current_price = hist['Close'].iloc[-1]
+                    
+                    # 1-year CAGR
+                    if len(hist) >= 252:
+                        price_1yr_ago = hist['Close'].iloc[-252]
+                        trends['stock_price_1yr_cagr'] = self._calculate_cagr(price_1yr_ago, current_price, 1)
+                    
+                    # 3-year CAGR
+                    if len(hist) >= 756:
+                        price_3yr_ago = hist['Close'].iloc[-756]
+                        trends['stock_price_3yr_cagr'] = self._calculate_cagr(price_3yr_ago, current_price, 3)
+                    
+                    # 5-year CAGR
+                    if len(hist) >= 1260:
+                        price_5yr_ago = hist['Close'].iloc[-1260]
+                        trends['stock_price_5yr_cagr'] = self._calculate_cagr(price_5yr_ago, current_price, 5)
+                    
+                    # 10-year CAGR
+                    if len(hist) >= 2520:
+                        price_10yr_ago = hist['Close'].iloc[-2520]
+                        trends['stock_price_10yr_cagr'] = self._calculate_cagr(price_10yr_ago, current_price, 10)
+            except Exception:
+                pass
+            
+            # Get dividend history for dividend CAGR
+            try:
+                dividends = ticker.dividends
+                if dividends is not None and len(dividends) > 0:
+                    # Get annual dividends
+                    annual_divs = dividends.resample('YE').sum()
+                    if len(annual_divs) >= 6:
+                        recent_div = annual_divs.iloc[-1]
+                        old_div = annual_divs.iloc[-6]
+                        if old_div > 0 and recent_div > 0:
+                            trends['dividend_5yr_cagr'] = self._calculate_cagr(old_div, recent_div, 5)
+            except Exception:
+                pass
+            
+            # Create CAGR summary
+            cagr_values = []
+            if trends['revenue_5yr_cagr'] is not None:
+                cagr_values.append(('Revenue', trends['revenue_5yr_cagr']))
+            if trends['earnings_5yr_cagr'] is not None:
+                cagr_values.append(('Earnings', trends['earnings_5yr_cagr']))
+            if trends['stock_price_5yr_cagr'] is not None:
+                cagr_values.append(('Stock Price', trends['stock_price_5yr_cagr']))
+            
+            if cagr_values:
+                avg_cagr = sum(v[1] for v in cagr_values) / len(cagr_values)
+                if avg_cagr > 20:
+                    assessment = 'Exceptional Growth'
+                elif avg_cagr > 10:
+                    assessment = 'Strong Growth'
+                elif avg_cagr > 5:
+                    assessment = 'Moderate Growth'
+                elif avg_cagr > 0:
+                    assessment = 'Slow Growth'
+                else:
+                    assessment = 'Declining'
+                
+                trends['cagr_summary'] = {
+                    'average_5yr_cagr': round(avg_cagr, 2),
+                    'assessment': assessment,
+                    'components': cagr_values
+                }
+        
+        except Exception as e:
             pass
+        
+        # FMP fallback for CAGR if yfinance data is incomplete
+        if trends['revenue_5yr_cagr'] is None or trends['earnings_5yr_cagr'] is None:
+            try:
+                # Fetch income statement from FMP stable API
+                url = f'https://financialmodelingprep.com/stable/income-statement?symbol={symbol}&limit=5&apikey={self.fmp_key}'
+                response = requests.get(url, timeout=15)
+                if response.status_code == 200:
+                    fmp_data = response.json()
+                    if fmp_data and len(fmp_data) >= 2:
+                        # Sort by date (oldest first for CAGR calculation)
+                        fmp_data = sorted(fmp_data, key=lambda x: x.get('date', ''), reverse=False)
+                        
+                        # Calculate Revenue CAGR from FMP
+                        revenues = [d.get('revenue') for d in fmp_data if d.get('revenue')]
+                        if len(revenues) >= 2 and trends['revenue_1yr_cagr'] is None:
+                            trends['revenue_1yr_cagr'] = self._calculate_cagr(revenues[-2], revenues[-1], 1)
+                        if len(revenues) >= 4 and trends['revenue_3yr_cagr'] is None:
+                            trends['revenue_3yr_cagr'] = self._calculate_cagr(revenues[-4], revenues[-1], 3)
+                        if len(revenues) >= 5 and trends['revenue_5yr_cagr'] is None:
+                            trends['revenue_5yr_cagr'] = self._calculate_cagr(revenues[0], revenues[-1], len(revenues)-1)
+                        
+                        # Calculate Earnings CAGR from FMP
+                        earnings = [d.get('netIncome') for d in fmp_data if d.get('netIncome')]
+                        if len(earnings) >= 2 and trends['earnings_1yr_cagr'] is None:
+                            trends['earnings_1yr_cagr'] = self._calculate_cagr(earnings[-2], earnings[-1], 1)
+                        if len(earnings) >= 4 and trends['earnings_3yr_cagr'] is None:
+                            trends['earnings_3yr_cagr'] = self._calculate_cagr(earnings[-4], earnings[-1], 3)
+                        if len(earnings) >= 5 and trends['earnings_5yr_cagr'] is None:
+                            trends['earnings_5yr_cagr'] = self._calculate_cagr(earnings[0], earnings[-1], len(earnings)-1)
+                        
+                        # Build revenue trend from FMP if not already populated
+                        if not trends['revenue_trend']:
+                            for d in reversed(fmp_data[:6]):
+                                rev = d.get('revenue')
+                                earn = d.get('netIncome')
+                                gross = d.get('grossProfit')
+                                op_inc = d.get('operatingIncome')
+                                trends['revenue_trend'].append({
+                                    'year': d.get('fiscalYear') or d.get('date', '')[:4],
+                                    'revenue': rev,
+                                    'net_income': earn,
+                                    'gross_margin': round(gross / rev * 100, 2) if gross and rev else None,
+                                    'operating_margin': round(op_inc / rev * 100, 2) if op_inc and rev else None,
+                                    'net_margin': round(earn / rev * 100, 2) if earn and rev else None
+                                })
+                        
+                        # Recalculate CAGR summary
+                        cagr_values = []
+                        if trends['revenue_5yr_cagr'] is not None:
+                            cagr_values.append(('Revenue', trends['revenue_5yr_cagr']))
+                        if trends['earnings_5yr_cagr'] is not None:
+                            cagr_values.append(('Earnings', trends['earnings_5yr_cagr']))
+                        if trends['stock_price_5yr_cagr'] is not None:
+                            cagr_values.append(('Stock Price', trends['stock_price_5yr_cagr']))
+                        
+                        if cagr_values:
+                            avg_cagr = sum(v[1] for v in cagr_values) / len(cagr_values)
+                            if avg_cagr > 20:
+                                assessment = 'Exceptional Growth'
+                            elif avg_cagr > 10:
+                                assessment = 'Strong Growth'
+                            elif avg_cagr > 5:
+                                assessment = 'Moderate Growth'
+                            elif avg_cagr > 0:
+                                assessment = 'Slow Growth'
+                            else:
+                                assessment = 'Declining'
+                            
+                            trends['cagr_summary'] = {
+                                'average_5yr_cagr': round(avg_cagr, 2),
+                                'assessment': assessment,
+                                'components': cagr_values
+                            }
+            except Exception:
+                pass
         
         return trends
 
