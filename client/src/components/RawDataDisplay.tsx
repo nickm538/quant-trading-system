@@ -77,7 +77,7 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
                   <DataItem label="Trend Direction" value={analysis.advanced_technicals.r2_analysis?.trend_direction || analysis.advanced_technicals.trend_direction || 'N/A'} />
                   <DataItem label="Trend Strength" value={analysis.advanced_technicals.r2_analysis?.trend_strength || 'N/A'} />
                   <DataItem label="Current Price" value={`$${safeFixed(analysis.advanced_technicals.current_price)}`} />
-                  <DataItem label="Nearest Support" value={`$${safeFixed(analysis.advanced_technicals.key_levels?.nearest_support)}`} />
+                  <DataItem label="Nearest Support" value={`$${safeFixed(analysis.advanced_technicals.key_levels?.nearest_support?.price)}`} />
                 </div>
                 
                 {analysis.advanced_technicals.pivot_points && (
