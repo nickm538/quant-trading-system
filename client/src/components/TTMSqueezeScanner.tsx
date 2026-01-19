@@ -13,6 +13,7 @@ export function TTMSqueezeScanner() {
   const [symbol, setSymbol] = useState("");
   const [result, setResult] = useState<any>(null);
   const [marketResults, setMarketResults] = useState<any>(null);
+  const [marketIntel, setMarketIntel] = useState<any>(null);
   const [scanMode, setScanMode] = useState<'single' | 'market'>('single');
   
   const squeezeMutation = trpc.scanners.ttmSqueeze.useMutation({
@@ -26,6 +27,16 @@ export function TTMSqueezeScanner() {
       setMarketResults(data);
     },
   });
+
+  const marketIntelMutation = trpc.scanners.marketIntelligence.useMutation({
+    onSuccess: (data) => {
+      setMarketIntel(data);
+    },
+  });
+
+  const handleMarketIntel = () => {
+    marketIntelMutation.mutate();
+  };
 
   const handleScan = () => {
     if (symbol.trim()) {
@@ -456,6 +467,147 @@ export function TTMSqueezeScanner() {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Market Intelligence Section */}
+      <Card className="bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border-blue-500/20">
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Globe className="h-5 w-5 text-blue-500" />
+            Market Intelligence
+          </CardTitle>
+          <CardDescription>
+            Real-time market context: VIX, regime detection, sentiment, catalysts, and geopolitics
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Button 
+            onClick={handleMarketIntel} 
+            disabled={marketIntelMutation.isPending}
+            variant="outline"
+            className="border-blue-500/50 hover:bg-blue-500/10"
+          >
+            {marketIntelMutation.isPending ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                Fetching Market Intelligence...
+              </>
+            ) : (
+              <>
+                <Radar className="h-4 w-4 mr-2" />
+                Get Live Market Context
+              </>
+            )}
+          </Button>
+
+          {/* Market Intel Results */}
+          {marketIntel && !marketIntel.error && (
+            <div className="space-y-4">
+              {/* Market Status Row */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="p-3 bg-muted rounded-lg text-center">
+                  <div className="text-xs text-muted-foreground mb-1">Market Status</div>
+                  <Badge className={marketIntel.market_status?.is_open ? 'bg-green-500' : 'bg-red-500'}>
+                    {marketIntel.market_status?.is_open ? 'OPEN' : 'CLOSED'}
+                  </Badge>
+                  <div className="text-xs mt-1 text-muted-foreground">
+                    {marketIntel.market_status?.day_of_week} {marketIntel.market_status?.current_time_est}
+                  </div>
+                </div>
+                <div className="p-3 bg-muted rounded-lg text-center">
+                  <div className="text-xs text-muted-foreground mb-1">VIX</div>
+                  <div className="text-2xl font-bold">{marketIntel.vix?.value?.toFixed(2) || 'N/A'}</div>
+                  <Badge variant="outline" className="text-xs">
+                    {marketIntel.vix?.regime || 'Unknown'}
+                  </Badge>
+                </div>
+                <div className="p-3 bg-muted rounded-lg text-center">
+                  <div className="text-xs text-muted-foreground mb-1">Market Regime</div>
+                  <Badge className={
+                    marketIntel.regime?.current === 'BULL' ? 'bg-green-500' :
+                    marketIntel.regime?.current === 'BEAR' ? 'bg-red-500' :
+                    marketIntel.regime?.current === 'VOLATILE' ? 'bg-orange-500' : 'bg-gray-500'
+                  }>
+                    {marketIntel.regime?.current || 'Unknown'}
+                  </Badge>
+                  <div className="text-xs mt-1 text-muted-foreground">
+                    Confidence: {marketIntel.regime?.confidence || 'N/A'}%
+                  </div>
+                </div>
+                <div className="p-3 bg-muted rounded-lg text-center">
+                  <div className="text-xs text-muted-foreground mb-1">Sentiment</div>
+                  <Badge className={
+                    marketIntel.sentiment?.overall === 'BULLISH' ? 'bg-green-500' :
+                    marketIntel.sentiment?.overall === 'BEARISH' ? 'bg-red-500' : 'bg-yellow-500'
+                  }>
+                    {marketIntel.sentiment?.overall || 'Neutral'}
+                  </Badge>
+                  <div className="text-xs mt-1 text-muted-foreground">
+                    Score: {marketIntel.sentiment?.score || 0}/100
+                  </div>
+                </div>
+              </div>
+
+              {/* Historical Pattern Match */}
+              {marketIntel.historical_pattern && (
+                <div className="p-3 bg-muted/50 rounded-lg">
+                  <div className="text-sm font-medium mb-1">Historical Pattern Match</div>
+                  <div className="text-sm text-muted-foreground">
+                    {marketIntel.historical_pattern.description || 'No significant pattern detected'}
+                  </div>
+                  {marketIntel.historical_pattern.similarity && (
+                    <div className="text-xs text-muted-foreground mt-1">
+                      Similarity: {marketIntel.historical_pattern.similarity}% | 
+                      Historical Outcome: {marketIntel.historical_pattern.outcome || 'N/A'}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Catalysts */}
+              {marketIntel.catalysts?.length > 0 && (
+                <div className="p-3 bg-muted/50 rounded-lg">
+                  <div className="text-sm font-medium mb-2">Active Catalysts</div>
+                  <div className="space-y-1">
+                    {marketIntel.catalysts.slice(0, 5).map((catalyst: any, idx: number) => (
+                      <div key={idx} className="text-xs flex items-center gap-2">
+                        <Badge variant="outline" className="text-xs">{catalyst.type}</Badge>
+                        <span className="text-muted-foreground">{catalyst.description}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Geopolitical */}
+              {marketIntel.geopolitical && (
+                <div className="p-3 bg-muted/50 rounded-lg">
+                  <div className="text-sm font-medium mb-1">Geopolitical Context</div>
+                  <div className="text-xs text-muted-foreground">
+                    Risk Level: <Badge variant="outline">{marketIntel.geopolitical.risk_level || 'Normal'}</Badge>
+                  </div>
+                  {marketIntel.geopolitical.summary && (
+                    <div className="text-xs text-muted-foreground mt-1">
+                      {marketIntel.geopolitical.summary}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="text-xs text-muted-foreground">
+                Last updated: {new Date(marketIntel.timestamp).toLocaleString('en-US', { timeZone: 'America/New_York', hour12: true })} EST
+              </div>
+            </div>
+          )}
+
+          {/* Market Intel Error */}
+          {marketIntel?.error && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{marketIntel.error}</AlertDescription>
+            </Alert>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Education */}
       <Card className="bg-muted/50">

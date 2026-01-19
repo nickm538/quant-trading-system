@@ -127,6 +127,17 @@ def run_market_breakout(max_stocks: int = 100) -> dict:
         return {"error": str(e), "status": "error"}
 
 
+def run_market_intelligence() -> dict:
+    """Run Market Intelligence - VIX, regime, sentiment, catalysts"""
+    try:
+        from market_intelligence import MarketIntelligence
+        mi = MarketIntelligence()
+        result = mi.get_full_market_intelligence()
+        return result
+    except Exception as e:
+        return {"error": str(e), "status": "error"}
+
+
 def main():
     if len(sys.argv) < 3:
         print(json.dumps({"error": "Usage: python run_scanners.py <scanner_type> <symbol_or_count>"}))
@@ -147,6 +158,8 @@ def main():
         result = run_market_ttm_squeeze(int(arg))
     elif scanner_type == "market_breakout":
         result = run_market_breakout(int(arg))
+    elif scanner_type == "market_intelligence":
+        result = run_market_intelligence()
     else:
         result = {"error": f"Unknown scanner type: {scanner_type}"}
     

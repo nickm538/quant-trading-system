@@ -3,7 +3,7 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router, protectedProcedure } from "./_core/trpc";
 import { z } from "zod";
-import { analyzeStock, analyzeOptions, scanMarket, checkPythonSystem, getGreeksHeatmap, analyzeInstitutionalOptions, scanUltimateOptions, analyzeUltimateOptions, analyzeFundamentals, getEducation, sadieChat, sadieChatWithImage, sadieAnalyze, sadieClearHistory, scanDarkPool, scanTTMSqueeze, scanOptionsFlow, scanBreakout, scanMarketTTMSqueeze, scanMarketBreakout } from "./python_executor";
+import { analyzeStock, analyzeOptions, scanMarket, checkPythonSystem, getGreeksHeatmap, analyzeInstitutionalOptions, scanUltimateOptions, analyzeUltimateOptions, analyzeFundamentals, getEducation, sadieChat, sadieChatWithImage, sadieAnalyze, sadieClearHistory, scanDarkPool, scanTTMSqueeze, scanOptionsFlow, scanBreakout, scanMarketTTMSqueeze, scanMarketBreakout, getMarketIntelligence } from "./python_executor";
 import { exec } from "child_process";
 import { promisify } from "util";
 import * as path from "path";
@@ -452,8 +452,15 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ input }) => {
-        console.log(`🚀 Market-wide Breakout scan (${input.maxStocks} stocks)...`);
+        console.log(`Market-wide Breakout scan (${input.maxStocks} stocks)...`);
         return await scanMarketBreakout({ maxStocks: input.maxStocks });
+      }),
+
+    // Market Intelligence - VIX, regime, sentiment, catalysts
+    marketIntelligence: publicProcedure
+      .mutation(async () => {
+        console.log('Fetching market intelligence...');
+        return await getMarketIntelligence();
       }),
   }),
 });

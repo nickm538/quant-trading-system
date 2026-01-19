@@ -890,3 +890,43 @@ export async function scanMarketBreakout(params: { maxStocks?: number }): Promis
     };
   }
 }
+
+
+/**
+ * Market Intelligence - VIX, regime detection, sentiment, catalysts, geopolitics
+ * Real-time market context awareness with live data
+ */
+export async function getMarketIntelligence(): Promise<any> {
+  const command = `${PYTHON_BIN} ${SCANNER_SCRIPT} market_intelligence _`;
+  
+  try {
+    console.log('Fetching market intelligence...');
+    const { stdout, stderr } = await execAsync(command, {
+      maxBuffer: 10 * 1024 * 1024,
+      timeout: 120000, // 2 minute timeout
+      cwd: PYTHON_SYSTEM_PATH,
+      env: {
+        ...process.env,
+        PYTHONPATH: '',
+        PYTHONHOME: '',
+        LD_LIBRARY_PATH: process.env.LD_LIBRARY_PATH || '',
+        KEY: process.env.KEY || '',
+        FINNHUB_API_KEY: process.env.KEY || process.env.FINNHUB_API_KEY || '',
+        POLYGON_API_KEY: process.env.POLYGON_API_KEY || '',
+        PERPLEXITY_API_KEY: process.env.PERPLEXITY_API_KEY || '',
+      },
+    });
+    
+    if (stderr && !stderr.includes('INFO') && !stderr.includes('WARNING')) {
+      console.error('Market intelligence stderr:', stderr);
+    }
+    
+    return JSON.parse(stdout);
+  } catch (error: any) {
+    console.error('Market intelligence error:', error);
+    return {
+      error: `Market intelligence failed: ${error.message}`,
+      status: 'error',
+    };
+  }
+}
