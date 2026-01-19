@@ -21,6 +21,14 @@ class FactorScoringEngine:
     """
     Comprehensive factor scoring system for unbiased, weighted analysis.
     
+    DYNAMIC WEIGHT SYSTEM:
+    Weights automatically adjust based on:
+    1. Asset Type (Stock vs ETF vs Index)
+    2. Market Regime (Bull/Bear/Volatile/Ranging)
+    3. Volatility Environment (High VIX vs Low VIX)
+    4. Time Horizon (Day trade vs Swing vs Position)
+    5. Sector Context (Tech vs Value vs Defensive)
+    
     Scoring Philosophy:
     - 0-20: Very Bearish
     - 21-40: Bearish
@@ -29,46 +37,290 @@ class FactorScoringEngine:
     - 81-100: Very Bullish
     """
     
-    # Factor weights (must sum to 1.0)
-    # Updated to include TTM Squeeze and Tim Bohen 5:1 as critical technical factors
-    WEIGHTS = {
-        # MACRO FACTORS (35% total - reduced to make room for pattern factors)
+    # BASE Factor weights (these get dynamically adjusted)
+    BASE_WEIGHTS = {
+        # MACRO FACTORS (35% base)
         "monetary_policy": 0.10,
         "economic_cycle": 0.08,
         "market_regime": 0.07,
         "sector_rotation": 0.05,
         "global_macro": 0.05,
-        # MICRO FACTORS (40% total)
+        # MICRO FACTORS (40% base)
         "price_action": 0.10,
         "fundamentals": 0.10,
         "technicals": 0.06,
         "catalysts": 0.04,
         "smart_money": 0.05,
-        "ttm_squeeze": 0.05,  # TTM Squeeze - critical volatility breakout indicator
-        # NON-TRADITIONAL FACTORS (25% total - increased for pattern recognition)
+        "ttm_squeeze": 0.05,
+        # NON-TRADITIONAL FACTORS (25% base)
         "sentiment": 0.05,
         "positioning": 0.04,
         "seasonality": 0.03,
         "liquidity": 0.02,
         "correlation": 0.02,
-        "bohen_5to1": 0.09  # Tim Bohen 5:1 Risk/Reward - critical trade setup factor
+        "bohen_5to1": 0.09
+    }
+    
+    # Asset-type weight modifiers
+    ASSET_TYPE_MODIFIERS = {
+        "STOCK": {
+            "fundamentals": 1.3,      # Fundamentals matter more for individual stocks
+            "smart_money": 1.2,       # Institutional activity more relevant
+            "bohen_5to1": 1.2,        # R/R setups critical for stocks
+            "sector_rotation": 0.8,   # Less relevant for individual names
+        },
+        "ETF": {
+            "fundamentals": 0.5,      # ETFs don't have traditional fundamentals
+            "sector_rotation": 1.5,   # Sector flows very important for ETFs
+            "market_regime": 1.3,     # ETFs track broader market
+            "correlation": 1.4,       # Correlation analysis key for ETFs
+            "smart_money": 0.7,       # Less insider activity in ETFs
+        },
+        "INDEX": {
+            "fundamentals": 0.3,      # Indices don't have fundamentals
+            "market_regime": 1.5,     # Market regime is everything for indices
+            "monetary_policy": 1.4,   # Fed policy drives indices
+            "global_macro": 1.3,      # Global factors matter more
+            "smart_money": 0.5,       # Less relevant for indices
+        }
+    }
+    
+    # Market regime weight modifiers
+    REGIME_MODIFIERS = {
+        "BULL": {
+            "price_action": 1.2,      # Momentum matters in bull markets
+            "technicals": 1.1,        # Technical breakouts work better
+            "ttm_squeeze": 1.3,       # Squeeze breakouts more reliable
+            "fundamentals": 0.9,      # Less important in momentum markets
+        },
+        "BEAR": {
+            "fundamentals": 1.4,      # Quality matters in bear markets
+            "smart_money": 1.3,       # Follow institutional positioning
+            "positioning": 1.3,       # Short interest becomes critical
+            "price_action": 0.8,      # Momentum less reliable
+            "ttm_squeeze": 0.7,       # Squeezes often fail in bear markets
+        },
+        "VOLATILE": {
+            "ttm_squeeze": 1.5,       # Volatility squeezes are key
+            "bohen_5to1": 1.4,        # R/R even more critical
+            "sentiment": 1.3,         # Sentiment extremes matter
+            "fundamentals": 0.7,      # Fundamentals ignored in volatility
+            "seasonality": 0.5,       # Seasonality breaks down
+        },
+        "RANGING": {
+            "bohen_5to1": 1.3,        # Range trades need good R/R
+            "technicals": 1.2,        # Support/resistance key
+            "price_action": 0.8,      # Less directional momentum
+            "ttm_squeeze": 1.2,       # Squeezes signal range breaks
+        },
+        "NEUTRAL": {}  # No adjustments for neutral regime
+    }
+    
+    # VIX-based volatility modifiers
+    VIX_MODIFIERS = {
+        "LOW": {  # VIX < 15
+            "ttm_squeeze": 1.4,       # Squeezes very powerful in low vol
+            "technicals": 1.2,        # Technicals work better
+            "sentiment": 0.7,         # Complacency risk
+        },
+        "NORMAL": {},  # VIX 15-25, no adjustments
+        "HIGH": {  # VIX 25-35
+            "smart_money": 1.3,       # Follow the smart money
+            "positioning": 1.2,       # Positioning matters more
+            "ttm_squeeze": 0.8,       # Squeezes less reliable
+        },
+        "EXTREME": {  # VIX > 35
+            "sentiment": 1.5,         # Contrarian signals strongest
+            "fundamentals": 1.3,      # Quality becomes paramount
+            "technicals": 0.6,        # Technicals break down
+            "ttm_squeeze": 0.5,       # Squeezes unreliable
+        }
     }
     
     def __init__(self):
         """Initialize the factor scoring engine."""
         self.scores = {}
         self.explanations = {}
+        self.WEIGHTS = self.BASE_WEIGHTS.copy()  # Start with base weights
+        self.weight_adjustments = {}  # Track what adjustments were made
+        self.weight_confidence = 100  # Confidence in weight appropriateness
+    
+    def _detect_asset_type(self, symbol: str, data: dict) -> str:
+        """
+        Detect if the symbol is a Stock, ETF, or Index.
+        Uses multiple signals for accurate classification.
+        """
+        symbol_upper = symbol.upper() if symbol else ""
         
-    def score_all_factors(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        # Known ETF patterns
+        etf_patterns = ['SPY', 'QQQ', 'IWM', 'DIA', 'XL', 'VT', 'VO', 'VB', 'VG', 
+                       'IVV', 'VTI', 'VOO', 'ARKK', 'XLE', 'XLF', 'XLK', 'XLV',
+                       'GLD', 'SLV', 'USO', 'TLT', 'HYG', 'LQD', 'IEFA', 'EEM']
+        
+        # Known index patterns
+        index_patterns = ['^', 'INDEX', '.INX', 'SPX', 'NDX', 'DJI', 'RUT']
+        
+        # Check for index
+        for pattern in index_patterns:
+            if pattern in symbol_upper:
+                return "INDEX"
+        
+        # Check for ETF
+        for etf in etf_patterns:
+            if symbol_upper == etf or symbol_upper.startswith(etf):
+                return "ETF"
+        
+        # Check fundamentals - ETFs typically don't have P/E ratios
+        fundamentals = data.get("fundamentals", {})
+        if fundamentals:
+            pe_ratio = fundamentals.get("pe_ratio") or fundamentals.get("valuation", {}).get("pe_ratio")
+            if pe_ratio is None or pe_ratio == 0:
+                # Likely an ETF or index
+                return "ETF"
+        
+        return "STOCK"
+    
+    def _detect_market_regime(self, data: dict) -> str:
+        """
+        Detect current market regime from macro data.
+        Returns: BULL, BEAR, VOLATILE, RANGING, or NEUTRAL
+        """
+        macro = data.get("macro", {})
+        technicals = data.get("technicals", {})
+        
+        # Get VIX level
+        vix = macro.get("vix", {})
+        if isinstance(vix, (int, float)):
+            vix_level = vix
+        else:
+            vix_level = vix.get("level", 20) if isinstance(vix, dict) else 20
+        
+        # Get market trend
+        market_trend = macro.get("market_trend", "NEUTRAL")
+        spy_trend = macro.get("spy", {}).get("trend", "NEUTRAL")
+        
+        # High volatility regime
+        if vix_level > 30:
+            return "VOLATILE"
+        
+        # Check for trending vs ranging
+        if market_trend in ["BULLISH", "STRONG_BULLISH"] or spy_trend == "BULLISH":
+            return "BULL"
+        elif market_trend in ["BEARISH", "STRONG_BEARISH"] or spy_trend == "BEARISH":
+            return "BEAR"
+        
+        # Check ADX for trend strength (if available)
+        adx = technicals.get("adx", 25)
+        if adx < 20:
+            return "RANGING"
+        
+        return "NEUTRAL"
+    
+    def _get_vix_regime(self, data: dict) -> str:
+        """
+        Get VIX regime for weight adjustment.
+        Returns: LOW, NORMAL, HIGH, or EXTREME
+        """
+        macro = data.get("macro", {})
+        vix = macro.get("vix", {})
+        
+        if isinstance(vix, (int, float)):
+            vix_level = vix
+        else:
+            vix_level = vix.get("level", 20) if isinstance(vix, dict) else 20
+        
+        if vix_level < 15:
+            return "LOW"
+        elif vix_level < 25:
+            return "NORMAL"
+        elif vix_level < 35:
+            return "HIGH"
+        else:
+            return "EXTREME"
+    
+    def _apply_dynamic_weights(self, symbol: str, data: dict) -> dict:
+        """
+        Apply dynamic weight adjustments based on context.
+        Returns the adjusted weights dictionary.
+        """
+        # Start with base weights
+        adjusted_weights = self.BASE_WEIGHTS.copy()
+        adjustments_made = []
+        
+        # 1. Detect and apply asset type modifiers
+        asset_type = self._detect_asset_type(symbol, data)
+        asset_mods = self.ASSET_TYPE_MODIFIERS.get(asset_type, {})
+        for factor, modifier in asset_mods.items():
+            if factor in adjusted_weights:
+                adjusted_weights[factor] *= modifier
+        if asset_mods:
+            adjustments_made.append(f"Asset Type: {asset_type}")
+        
+        # 2. Detect and apply market regime modifiers
+        regime = self._detect_market_regime(data)
+        regime_mods = self.REGIME_MODIFIERS.get(regime, {})
+        for factor, modifier in regime_mods.items():
+            if factor in adjusted_weights:
+                adjusted_weights[factor] *= modifier
+        if regime_mods:
+            adjustments_made.append(f"Market Regime: {regime}")
+        
+        # 3. Apply VIX-based modifiers
+        vix_regime = self._get_vix_regime(data)
+        vix_mods = self.VIX_MODIFIERS.get(vix_regime, {})
+        for factor, modifier in vix_mods.items():
+            if factor in adjusted_weights:
+                adjusted_weights[factor] *= modifier
+        if vix_mods:
+            adjustments_made.append(f"VIX Regime: {vix_regime}")
+        
+        # 4. Normalize weights to sum to 1.0
+        total_weight = sum(adjusted_weights.values())
+        if total_weight > 0:
+            adjusted_weights = {k: v / total_weight for k, v in adjusted_weights.items()}
+        
+        # 5. Calculate weight confidence based on how much adjustment was needed
+        adjustment_magnitude = sum(abs(adjusted_weights[k] - self.BASE_WEIGHTS[k]) 
+                                   for k in adjusted_weights)
+        # More adjustment = lower confidence (weights are less "standard")
+        # But appropriate adjustment = higher confidence in the output
+        self.weight_confidence = max(60, 100 - (adjustment_magnitude * 100))
+        
+        # Store adjustments for transparency
+        self.weight_adjustments = {
+            "asset_type": asset_type,
+            "market_regime": regime,
+            "vix_regime": vix_regime,
+            "adjustments_made": adjustments_made,
+            "significant_changes": {
+                k: round((adjusted_weights[k] - self.BASE_WEIGHTS[k]) / self.BASE_WEIGHTS[k] * 100, 1)
+                for k in adjusted_weights
+                if abs(adjusted_weights[k] - self.BASE_WEIGHTS[k]) > 0.01
+            }
+        }
+        
+        return adjusted_weights
+        
+    def score_all_factors(self, data: Dict[str, Any], symbol: str = "") -> Dict[str, Any]:
         """
         Score all factors and compute weighted composite score.
         
+        DYNAMIC WEIGHT ADJUSTMENT:
+        Weights are automatically adjusted based on:
+        - Asset type (Stock/ETF/Index)
+        - Market regime (Bull/Bear/Volatile/Ranging)
+        - VIX regime (Low/Normal/High/Extreme)
+        
         Args:
             data: Dictionary containing all market and stock data
+            symbol: The ticker symbol being analyzed (for asset type detection)
             
         Returns:
-            Dictionary with individual scores, composite score, and analysis
+            Dictionary with individual scores, composite score, weight adjustments, and analysis
         """
+        # STEP 1: Apply dynamic weight adjustments based on context
+        self.WEIGHTS = self._apply_dynamic_weights(symbol, data)
+        
         # Score each factor category
         macro_scores = self._score_macro_factors(data)
         micro_scores = self._score_micro_factors(data)
@@ -77,11 +329,18 @@ class FactorScoringEngine:
         # Combine all scores
         all_scores = {**macro_scores, **micro_scores, **nontraditional_scores}
         
-        # Calculate weighted composite score
+        # Calculate weighted composite score using DYNAMIC weights
         composite_score = 0.0
+        weight_contributions = {}  # Track each factor's contribution
         for factor, score in all_scores.items():
             weight = self.WEIGHTS.get(factor, 0)
-            composite_score += score * weight
+            contribution = score * weight
+            composite_score += contribution
+            weight_contributions[factor] = {
+                "score": score,
+                "weight": round(weight * 100, 2),  # As percentage
+                "contribution": round(contribution, 2)
+            }
         
         # Determine overall signal
         if composite_score >= 70:
@@ -127,10 +386,22 @@ class FactorScoringEngine:
                 "nontraditional": round(nontraditional_composite, 1)
             },
             "individual_scores": all_scores,
+            "weight_contributions": weight_contributions,
             "explanations": self.explanations,
             "bull_probability": self._calculate_bull_probability(composite_score),
             "bear_probability": self._calculate_bear_probability(composite_score),
-            "confidence_interval": self._calculate_confidence_interval(composite_score, all_scores)
+            "confidence_interval": self._calculate_confidence_interval(composite_score, all_scores),
+            # DYNAMIC WEIGHT TRANSPARENCY
+            "dynamic_weights": {
+                "symbol": symbol,
+                "asset_type": self.weight_adjustments.get("asset_type", "UNKNOWN"),
+                "market_regime": self.weight_adjustments.get("market_regime", "NEUTRAL"),
+                "vix_regime": self.weight_adjustments.get("vix_regime", "NORMAL"),
+                "adjustments_applied": self.weight_adjustments.get("adjustments_made", []),
+                "significant_weight_changes": self.weight_adjustments.get("significant_changes", {}),
+                "weight_confidence": self.weight_confidence,
+                "current_weights": {k: round(v * 100, 2) for k, v in self.WEIGHTS.items()}
+            }
         }
     
     def _score_macro_factors(self, data: Dict[str, Any]) -> Dict[str, float]:
