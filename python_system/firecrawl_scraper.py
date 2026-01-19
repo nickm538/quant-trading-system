@@ -3,8 +3,27 @@ FIRECRAWL WEB SCRAPER FOR SADIE AI
 ===================================
 Real-time web scraping to fill API data gaps.
 
+⚠️ CRITICAL: OPTIONS DATA FLOW ⚠️
+================================
+OPTIONS CHAIN DATA MUST ONLY COME FROM FIRECRAWL WEB SCRAPING.
+
+Gemini and Perplexity APIs DO NOT have real-time options data.
+They WILL hallucinate contract details (strikes, premiums, IV, volume) if asked directly.
+
+Data Flow for Options Queries:
+1. User asks about options/options chain/put-call data
+2. Firecrawl scrapes REAL-TIME data from:
+   - Barchart.com (primary source - most reliable)
+   - Yahoo Finance (backup source)
+3. Scraped data is injected into the LLM context
+4. Gemini/Perplexity ONLY ANALYZE the scraped data
+5. LLM is explicitly instructed to use ONLY the Firecrawl numbers
+
+This ensures ZERO hallucinations for options data.
+
 Scrapes:
 - Yahoo Finance options chains (live put/call data)
+- Barchart options chains (backup)
 - Real-time analyst ratings and price targets
 - Breaking news and catalysts
 - Insider trading activity
@@ -14,6 +33,7 @@ This ensures Sadie NEVER hallucinates - all data is scraped in real-time.
 """
 
 import os
+import sys
 import json
 import requests
 from datetime import datetime
@@ -25,6 +45,9 @@ class FirecrawlScraper:
     """
     Real-time web scraper using Firecrawl API.
     Fills gaps in traditional financial APIs with live web data.
+    
+    CRITICAL: This is the ONLY source for options chain data.
+    DO NOT use LLM APIs (Gemini, Perplexity, GPT) for options data - they will hallucinate.
     """
     
     def __init__(self, api_key: Optional[str] = None):
@@ -34,6 +57,7 @@ class FirecrawlScraper:
     def _make_request(self, endpoint: str, payload: Dict) -> Optional[Dict]:
         """Make a request to Firecrawl API."""
         if not self.api_key:
+            print("Firecrawl API key not set", file=sys.stderr)
             return None
             
         headers = {
@@ -52,18 +76,27 @@ class FirecrawlScraper:
             if response.status_code == 200:
                 return response.json()
             else:
-                import sys as _sys
-                print(f"Firecrawl error: {response.status_code} - {response.text}", file=_sys.stderr)
+                print(f"Firecrawl error: {response.status_code} - {response.text}", file=sys.stderr)
                 return None
         except Exception as e:
-            import sys as _sys
-            print(f"Firecrawl request failed: {e}", file=_sys.stderr)
+            print(f"Firecrawl request failed: {e}", file=sys.stderr)
             return None
     
     def scrape_options_chain(self, symbol: str) -> Dict[str, Any]:
         """
-        Scrape live options chain from Yahoo Finance.
+        ⚠️ CRITICAL: OPTIONS DATA MUST COME FROM FIRECRAWL - NOT LLM APIs ⚠️
+        
+        Scrape live options chain from multiple sources (Barchart primary, Yahoo backup).
         Returns calls, puts, put/call ratio, max pain, unusual activity.
+        
+        IMPORTANT: Gemini and Perplexity APIs DO NOT have real-time options data.
+        They will hallucinate contract details if asked directly.
+        ALL options chain data MUST be scraped via Firecrawl from:
+        - Barchart.com (primary - most reliable)
+        - Yahoo Finance (backup)
+        
+        The LLM APIs should ONLY be used to ANALYZE the scraped data,
+        never to generate or provide options contract information.
         """
         result = {
             "status": "error",
@@ -71,13 +104,16 @@ class FirecrawlScraper:
             "timestamp": datetime.now().isoformat(),
             "calls": [],
             "puts": [],
-            "summary": {}
+            "summary": {},
+            "data_source": None,
+            "error_message": None
         }
         
-        url = f"https://finance.yahoo.com/quote/{symbol}/options"
+        # Try Barchart first (more reliable options data)
+        barchart_url = f"https://www.barchart.com/stocks/quotes/{symbol}/options"
         
         payload = {
-            "url": url,
+            "url": barchart_url,
             "formats": ["markdown"],
             "onlyMainContent": True
         }
@@ -89,59 +125,82 @@ class FirecrawlScraper:
             
             # Parse options data from markdown
             parsed = self._parse_options_markdown(content, symbol)
-            result.update(parsed)
-            result["status"] = "success"
+            if parsed.get("calls") or parsed.get("puts"):
+                result.update(parsed)
+                result["status"] = "success"
+                result["data_source"] = "Barchart"
+                return result
+        
+        # Fallback to Yahoo Finance if Barchart fails
+        yahoo_url = f"https://finance.yahoo.com/quote/{symbol}/options"
+        
+        payload = {
+            "url": yahoo_url,
+            "formats": ["markdown"],
+            "onlyMainContent": True
+        }
+        
+        response = self._make_request("scrape", payload)
+        
+        if response and response.get("success"):
+            content = response.get("data", {}).get("markdown", "")
+            
+            # Parse options data from markdown
+            parsed = self._parse_options_markdown(content, symbol)
+            if parsed.get("calls") or parsed.get("puts"):
+                result.update(parsed)
+                result["status"] = "success"
+                result["data_source"] = "Yahoo Finance"
+            else:
+                result["error_message"] = "Scraped page but could not parse options data"
+        else:
+            result["error_message"] = "Failed to scrape options page from both Barchart and Yahoo Finance"
             
         return result
     
     def _parse_options_markdown(self, content: str, symbol: str) -> Dict:
-        """Parse options chain data from scraped markdown."""
+        """
+        Parse options chain data from scraped markdown.
+        Handles Yahoo Finance table format with columns:
+        Contract Name | Last Trade Date | Strike | Last Price | Bid | Ask | Change | % Change | Volume | Open Interest | Implied Volatility
+        
+        The strike price is embedded in links like [145](https://finance.yahoo.com/quote/AAPL/options/?...) 
+        """
         calls = []
         puts = []
         
         lines = content.split('\n')
         current_section = None
         
-        for line in lines:
+        for i, line in enumerate(lines):
             line_lower = line.lower()
             
-            # Detect section
-            if 'calls' in line_lower and ('|' in line or 'strike' in line_lower):
+            # Detect section headers - "### Calls" or "### Puts"
+            if '### calls' in line_lower:
                 current_section = 'calls'
                 continue
-            elif 'puts' in line_lower and ('|' in line or 'strike' in line_lower):
+            elif '### puts' in line_lower:
                 current_section = 'puts'
                 continue
             
-            # Parse table rows
+            # Skip header and separator rows
+            if 'contract name' in line_lower or '---' in line:
+                continue
+            
+            # Parse table data rows - they contain | and contract links
             if '|' in line and current_section:
-                parts = [p.strip() for p in line.split('|') if p.strip()]
-                
-                # Skip header rows
-                if any(h in line.lower() for h in ['strike', 'last', 'bid', 'ask', '---']):
-                    continue
-                
-                # Try to extract option data
-                try:
-                    # Look for numeric values
-                    numbers = re.findall(r'[\d,]+\.?\d*', line)
-                    if len(numbers) >= 4:
-                        option = {
-                            "strike": float(numbers[0].replace(',', '')),
-                            "last_price": float(numbers[1].replace(',', '')),
-                            "bid": float(numbers[2].replace(',', '')),
-                            "ask": float(numbers[3].replace(',', '')),
-                            "volume": int(float(numbers[4].replace(',', ''))) if len(numbers) > 4 else 0,
-                            "open_interest": int(float(numbers[5].replace(',', ''))) if len(numbers) > 5 else 0,
-                            "implied_volatility": float(numbers[6].replace(',', '').replace('%', '')) if len(numbers) > 6 else 0
-                        }
-                        
-                        if current_section == 'calls':
-                            calls.append(option)
-                        else:
-                            puts.append(option)
-                except (ValueError, IndexError):
-                    continue
+                # Check if this looks like a data row (contains option contract pattern)
+                if f'{symbol.upper()}' in line.upper() and ('C00' in line.upper() or 'P00' in line.upper()):
+                    try:
+                        option = self._parse_option_row(line)
+                        if option and option.get('strike'):
+                            if current_section == 'calls':
+                                calls.append(option)
+                            else:
+                                puts.append(option)
+                    except Exception as e:
+                        print(f"Parse error: {e}", file=sys.stderr)
+                        continue
         
         # Calculate summary statistics
         total_call_volume = sum(c.get('volume', 0) for c in calls)
@@ -205,6 +264,79 @@ class FirecrawlScraper:
             }
         }
     
+    def _parse_option_row(self, line: str) -> Optional[Dict]:
+        """
+        Parse a single option row from Yahoo Finance markdown.
+        
+        Example line:
+        | [AAPL260123C00145000](https://...) | 1/6/2026 3:08 PM | [145](https://...) | 118.08 | 109.45 | 112.70 | 0.00 | 0.00% | 1 | 70 | 249.71% |
+        
+        Columns: Contract | Date | Strike | Last | Bid | Ask | Change | %Change | Volume | OI | IV
+        """
+        parts = [p.strip() for p in line.split('|')]
+        parts = [p for p in parts if p]  # Remove empty strings
+        
+        if len(parts) < 8:
+            return None
+        
+        try:
+            # Extract strike from the strike column (usually 3rd column)
+            # Strike is in format [145](https://...) or just a number
+            strike = None
+            for i, part in enumerate(parts):
+                # Look for strike pattern - a bracketed number that's a reasonable strike price
+                strike_match = re.search(r'\[(\d+\.?\d*)\]', part)
+                if strike_match:
+                    potential_strike = float(strike_match.group(1))
+                    # Strike prices are typically between 1 and 5000
+                    if 1 <= potential_strike <= 5000:
+                        strike = potential_strike
+                        # The next columns after strike should be: Last, Bid, Ask, Change, %Change, Volume, OI, IV
+                        remaining_parts = parts[i+1:]
+                        break
+            
+            if not strike or not remaining_parts:
+                return None
+            
+            # Extract numeric values from remaining parts
+            # Expected order: Last, Bid, Ask, Change, %Change, Volume, OI, IV
+            numeric_values = []
+            for part in remaining_parts:
+                # Clean the part - remove commas, %, $, and handle dashes
+                clean = part.replace(',', '').replace('$', '').replace('%', '').strip()
+                if clean == '-' or clean == '\\-' or clean == '':
+                    numeric_values.append(0)
+                else:
+                    try:
+                        numeric_values.append(float(clean))
+                    except ValueError:
+                        # Try to extract just the number
+                        num_match = re.search(r'([\d.]+)', clean)
+                        if num_match:
+                            numeric_values.append(float(num_match.group(1)))
+                        else:
+                            numeric_values.append(0)
+            
+            # We need at least Last, Bid, Ask
+            if len(numeric_values) < 3:
+                return None
+            
+            return {
+                "strike": strike,
+                "last_price": numeric_values[0] if len(numeric_values) > 0 else 0,
+                "bid": numeric_values[1] if len(numeric_values) > 1 else 0,
+                "ask": numeric_values[2] if len(numeric_values) > 2 else 0,
+                "change": numeric_values[3] if len(numeric_values) > 3 else 0,
+                "change_pct": numeric_values[4] if len(numeric_values) > 4 else 0,
+                "volume": int(numeric_values[5]) if len(numeric_values) > 5 else 0,
+                "open_interest": int(numeric_values[6]) if len(numeric_values) > 6 else 0,
+                "implied_volatility": numeric_values[7] if len(numeric_values) > 7 else 0
+            }
+            
+        except Exception as e:
+            print(f"Error parsing option row: {e}", file=sys.stderr)
+            return None
+    
     def scrape_analyst_ratings(self, symbol: str) -> Dict[str, Any]:
         """Scrape analyst ratings and price targets."""
         result = {
@@ -232,51 +364,58 @@ class FirecrawlScraper:
             
             # Try to extract specific values
             patterns = {
-                "avg_price_target": r'(?:average|mean)\s*(?:price)?\s*target[:\s]*\$?([\d,.]+)',
-                "high_target": r'high\s*(?:price)?\s*target[:\s]*\$?([\d,.]+)',
-                "low_target": r'low\s*(?:price)?\s*target[:\s]*\$?([\d,.]+)',
-                "buy_ratings": r'(\d+)\s*(?:strong\s*)?buy',
-                "hold_ratings": r'(\d+)\s*hold',
-                "sell_ratings": r'(\d+)\s*(?:strong\s*)?sell'
+                "avg_price_target": r"Average.*?Target.*?(\d+\.?\d*)",
+                "high_target": r"High.*?Target.*?(\d+\.?\d*)",
+                "low_target": r"Low.*?Target.*?(\d+\.?\d*)",
+                "buy_ratings": r"Buy.*?(\d+)",
+                "hold_ratings": r"Hold.*?(\d+)",
+                "sell_ratings": r"Sell.*?(\d+)"
             }
             
             for key, pattern in patterns.items():
-                match = re.search(pattern, content.lower())
+                match = re.search(pattern, content, re.IGNORECASE)
                 if match:
                     try:
-                        result[key] = float(match.group(1).replace(',', ''))
-                    except:
+                        result[key] = float(match.group(1))
+                    except ValueError:
                         pass
         
         return result
     
-    def scrape_news(self, symbol: str, limit: int = 5) -> Dict[str, Any]:
+    def scrape_news(self, symbol: str) -> Dict[str, Any]:
         """Scrape latest news for a symbol."""
         result = {
             "status": "error",
             "symbol": symbol,
             "timestamp": datetime.now().isoformat(),
-            "articles": []
+            "headlines": []
         }
         
-        # Use Firecrawl search for news
+        url = f"https://finance.yahoo.com/quote/{symbol}/news"
+        
         payload = {
-            "query": f"{symbol} stock news today",
-            "limit": limit
+            "url": url,
+            "formats": ["markdown"],
+            "onlyMainContent": True
         }
         
-        response = self._make_request("search", payload)
+        response = self._make_request("scrape", payload)
         
         if response and response.get("success"):
-            results = response.get("data", [])
+            content = response.get("data", {}).get("markdown", "")
             
-            for item in results:
-                result["articles"].append({
-                    "title": item.get("title", ""),
-                    "url": item.get("url", ""),
-                    "snippet": item.get("description", "")[:200]
-                })
+            # Extract headlines (lines that look like news titles)
+            headlines = []
+            for line in content.split('\n'):
+                # Headlines are typically in markdown links or headers
+                if line.strip() and len(line) > 20 and len(line) < 200:
+                    # Remove markdown formatting
+                    clean = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', line)
+                    clean = re.sub(r'[#*_]', '', clean).strip()
+                    if clean and not clean.startswith('|'):
+                        headlines.append(clean)
             
+            result["headlines"] = headlines[:10]  # Top 10 headlines
             result["status"] = "success"
         
         return result
@@ -339,7 +478,13 @@ class FirecrawlScraper:
         return result
     
     def format_for_prompt(self, data: Dict) -> str:
-        """Format scraped data for LLM prompt injection."""
+        """
+        Format scraped data for LLM prompt injection.
+        
+        CRITICAL: This formatted output is what the LLM sees.
+        The LLM MUST use these exact numbers for options data.
+        If options retrieval failed, the LLM MUST tell the user.
+        """
         sections = []
         symbol = data.get("symbol", "UNKNOWN")
         
@@ -348,23 +493,56 @@ class FirecrawlScraper:
         sections.append("⚠️ THIS IS LIVE DATA - USE THESE EXACT NUMBERS, DO NOT HALLUCINATE")
         sections.append("")
         
-        # Options data
+        # Options data - CRITICAL: Must report success/failure honestly
         opts = data.get("options", {})
         if opts.get("status") == "success":
             summary = opts.get("summary", {})
-            sections.append("📊 LIVE OPTIONS CHAIN:")
-            sections.append(f"  Put/Call Ratio: {summary.get('put_call_ratio', 'N/A')}")
-            sections.append(f"  Max Pain Strike: ${summary.get('max_pain_strike', 'N/A')}")
-            sections.append(f"  Total Call Volume: {summary.get('total_call_volume', 0):,}")
-            sections.append(f"  Total Put Volume: {summary.get('total_put_volume', 0):,}")
-            sections.append(f"  Total Call OI: {summary.get('total_call_oi', 0):,}")
-            sections.append(f"  Total Put OI: {summary.get('total_put_oi', 0):,}")
+            data_source = opts.get("data_source", "Unknown")
             
-            unusual = summary.get("unusual_activity", [])
-            if unusual:
-                sections.append("  🚨 UNUSUAL OPTIONS ACTIVITY:")
-                for u in unusual[:3]:
-                    sections.append(f"    - {u['type'].upper()} ${u['strike']}: Vol {u['volume']:,}, OI {u['open_interest']:,}, Vol/OI: {u['vol_oi_ratio']}x")
+            # Check if we actually got meaningful data
+            has_data = (summary.get('total_call_volume', 0) > 0 or 
+                       summary.get('total_put_volume', 0) > 0 or
+                       opts.get('calls') or opts.get('puts'))
+            
+            if has_data:
+                sections.append("✅ OPTIONS DATA SUCCESSFULLY RETRIEVED")
+                sections.append(f"📊 LIVE OPTIONS CHAIN (Source: {data_source}):")
+                sections.append(f"  Put/Call Ratio: {summary.get('put_call_ratio', 'N/A')}")
+                sections.append(f"  Max Pain Strike: ${summary.get('max_pain_strike', 'N/A')}")
+                sections.append(f"  Total Call Volume: {summary.get('total_call_volume', 0):,}")
+                sections.append(f"  Total Put Volume: {summary.get('total_put_volume', 0):,}")
+                sections.append(f"  Total Call OI: {summary.get('total_call_oi', 0):,}")
+                sections.append(f"  Total Put OI: {summary.get('total_put_oi', 0):,}")
+                
+                # Include actual contract details if available
+                calls = opts.get('calls', [])
+                puts = opts.get('puts', [])
+                if calls:
+                    sections.append("  TOP CALL CONTRACTS:")
+                    for c in calls[:5]:
+                        sections.append(f"    Strike ${c.get('strike')}: Last ${c.get('last_price', 'N/A')}, Bid ${c.get('bid', 'N/A')}, Ask ${c.get('ask', 'N/A')}, Vol {c.get('volume', 0):,}, OI {c.get('open_interest', 0):,}")
+                if puts:
+                    sections.append("  TOP PUT CONTRACTS:")
+                    for p in puts[:5]:
+                        sections.append(f"    Strike ${p.get('strike')}: Last ${p.get('last_price', 'N/A')}, Bid ${p.get('bid', 'N/A')}, Ask ${p.get('ask', 'N/A')}, Vol {p.get('volume', 0):,}, OI {p.get('open_interest', 0):,}")
+                
+                unusual = summary.get("unusual_activity", [])
+                if unusual:
+                    sections.append("  🚨 UNUSUAL OPTIONS ACTIVITY:")
+                    for u in unusual[:3]:
+                        sections.append(f"    - {u['type'].upper()} ${u['strike']}: Vol {u['volume']:,}, OI {u['open_interest']:,}, Vol/OI: {u['vol_oi_ratio']}x")
+            else:
+                sections.append("⚠️ OPTIONS DATA: Scrape succeeded but no contract data found")
+                sections.append("  This may be due to market hours or the symbol not having active options.")
+                sections.append("  DO NOT hallucinate options data - tell user options data is unavailable.")
+            sections.append("")
+        else:
+            sections.append("❌ OPTIONS DATA RETRIEVAL FAILED")
+            error_msg = opts.get("error_message", "Unknown error")
+            sections.append(f"  Error: {error_msg}")
+            sections.append("  Firecrawl could not scrape options data from Barchart or Yahoo Finance.")
+            sections.append("  DO NOT hallucinate or make up options contract details.")
+            sections.append("  Tell the user: 'I was unable to retrieve live options data at this time.'")
             sections.append("")
         
         # Analyst ratings
@@ -387,41 +565,31 @@ class FirecrawlScraper:
         
         # News
         news = data.get("news", {})
-        if news.get("status") == "success" and news.get("articles"):
-            sections.append("📰 LATEST NEWS:")
-            for article in news.get("articles", [])[:3]:
-                sections.append(f"  - {article.get('title', 'N/A')}")
+        if news.get("status") == "success" and news.get("headlines"):
+            sections.append("📰 LATEST NEWS HEADLINES:")
+            for headline in news.get("headlines", [])[:5]:
+                sections.append(f"  • {headline}")
             sections.append("")
         
         # Insider activity
         insider = data.get("insider_activity", {})
         if insider.get("status") == "success":
             sections.append("👔 INSIDER ACTIVITY:")
-            sections.append(f"  Recent Buys: {insider.get('buy_count', 0)}")
-            sections.append(f"  Recent Sells: {insider.get('sell_count', 0)}")
             sections.append(f"  Net Sentiment: {insider.get('net_sentiment', 'N/A').upper()}")
+            sections.append(f"  Buy Transactions: {insider.get('buy_count', 0)}")
+            sections.append(f"  Sell Transactions: {insider.get('sell_count', 0)}")
             sections.append("")
         
         return "\n".join(sections)
 
 
-# Singleton instance
-_scraper_instance = None
-
-def get_firecrawl_scraper() -> FirecrawlScraper:
-    """Get or create the Firecrawl scraper instance."""
-    global _scraper_instance
-    if _scraper_instance is None:
-        _scraper_instance = FirecrawlScraper()
-    return _scraper_instance
-
-
+# Test function
 if __name__ == "__main__":
-    # Test the scraper
     scraper = FirecrawlScraper()
     
+    # Test with AAPL
     print("Testing Firecrawl scraper for AAPL...")
-    data = scraper.get_complete_analysis("AAPL")
+    result = scraper.get_complete_analysis("AAPL")
     
-    print("\nFormatted for prompt:")
-    print(scraper.format_for_prompt(data))
+    print("\n" + "="*50)
+    print(scraper.format_for_prompt(result))

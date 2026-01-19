@@ -24,9 +24,27 @@ Multi-Model Architecture:
 
 100% REAL DATA - Zero hallucinations, zero placeholders. All timestamps verified.
 
+⚠️ CRITICAL: OPTIONS DATA FLOW ⚠️
+================================
+OPTIONS CHAIN DATA MUST ONLY COME FROM FIRECRAWL WEB SCRAPING.
+
+Gemini and Perplexity APIs DO NOT have real-time options data.
+They WILL hallucinate contract details (strikes, premiums, IV, volume) if asked directly.
+
+Data Flow for Options Queries:
+1. User asks about options/options chain/put-call data
+2. Firecrawl scrapes REAL-TIME data from:
+   - Barchart.com (primary source - most reliable)
+   - Yahoo Finance (backup source)
+3. Scraped data is injected into the LLM context
+4. Gemini/Perplexity ONLY ANALYZE the scraped data
+5. LLM is explicitly instructed to use ONLY the Firecrawl numbers
+
+This ensures ZERO hallucinations for options data.
+
 Data Sources:
 - FinancialDatasets.ai: Premium financial statements, metrics, SEC filings, company facts, news
-- yFinance: Real-time quotes, options chains, insider transactions
+- Firecrawl: REAL-TIME options chains (Barchart, Yahoo Finance), analyst ratings, news
 - TwelveData: Technical indicators, time series
 - Finnhub: Additional market data
 
@@ -183,12 +201,22 @@ class SadieAIEngine:
 === DATA SOURCES (ALL REAL, INSTITUTIONAL-GRADE) ===
 You have access to PREMIUM financial data from multiple institutional-grade sources:
 - **FinancialDatasets.ai**: Real-time prices, financial statements (income, balance sheet, cash flow), financial metrics (P/E, EV/EBITDA, ROIC, margins), SEC filings, company facts, segmented revenues, and news
-- **yFinance**: Real-time quotes, historical data, options chains, insider transactions, analyst ratings
+- **Firecrawl (CRITICAL FOR OPTIONS)**: Real-time options chains scraped from Barchart and Yahoo Finance
 - **TwelveData**: Technical indicators, time series data
 - **Finnhub**: Additional market data and company information
 - **Polygon.io**: Real-time and historical market data
 
+⚠️ CRITICAL OPTIONS DATA RULE ⚠️
+When users ask about OPTIONS, OPTIONS CHAINS, PUT/CALL DATA, or OPTIONS CONTRACTS:
+1. YOU MUST ONLY USE DATA FROM THE FIRECRAWL SECTION BELOW
+2. NEVER generate, estimate, or hallucinate options contract details
+3. If Firecrawl options data is not available, say "Options data is currently unavailable"
+4. Options data includes: strikes, premiums, volume, open interest, IV, put/call ratio, max pain
+5. The Firecrawl data is scraped in REAL-TIME from Barchart.com and Yahoo Finance
+6. You may ANALYZE the scraped options data, but NEVER invent contract details
+
 When you see data labeled "FINANCIALDATASETS.AI" in the context, this is PREMIUM institutional-quality data - use it with high confidence.
+When you see data labeled "FIRECRAWL" in the context, this is REAL-TIME SCRAPED data - use these EXACT numbers for options.
 
 === MACRO vs MICRO ANALYSIS FRAMEWORK ===
 **YOU MUST ALWAYS ANALYZE BOTH MACRO AND MICRO CONTEXTS WITH EQUAL WEIGHT (50/50)**
@@ -1840,10 +1868,17 @@ One comprehensive paragraph that synthesizes EVERYTHING above - BOTH MACRO AND M
                 print(f"Warning: Comprehensive fundamentals failed: {e}", file=_sys.stderr)
         
         # === FIRECRAWL WEB SCRAPER DATA (REAL-TIME, FILLS API GAPS) ===
+        # ⚠️ CRITICAL: OPTIONS DATA MUST COME FROM FIRECRAWL - NOT LLM APIs ⚠️
+        # Gemini and Perplexity DO NOT have real-time options chain data.
+        # They WILL hallucinate contract details if asked directly.
+        # ALL options data is scraped via Firecrawl from Barchart/Yahoo Finance.
+        # The LLM APIs should ONLY ANALYZE the scraped data, never generate it.
         if symbol and self.firecrawl:
             try:
                 context_parts.append("\n" + "="*60)
                 context_parts.append("🌐 FIRECRAWL LIVE WEB DATA (REAL-TIME SCRAPED)")
+                context_parts.append("⚠️ OPTIONS DATA SOURCE: Firecrawl scrapes Barchart/Yahoo Finance")
+                context_parts.append("⚠️ LLM MUST USE THESE EXACT NUMBERS - DO NOT HALLUCINATE OPTIONS DATA")
                 context_parts.append("="*60)
                 
                 # Scrape complete analysis from web
