@@ -501,8 +501,17 @@ export async function sadieChat(params: SadieChatParams): Promise<SadieChatResul
         PYTHONPATH: '',
         PYTHONHOME: '',
         LD_LIBRARY_PATH: process.env.LD_LIBRARY_PATH || '',
+        // LLM API Keys
+        GEMINI_API_KEY: process.env.GEMINI_API_KEY || '',
+        PERPLEXITY_API_KEY: process.env.PERPLEXITY_API_KEY || '',
         OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY || '',
+        FIRECRAWL_API_KEY: process.env.FIRECRAWL_API_KEY || '',
+        // Financial Data API Keys
         KEY: process.env.KEY || '', // Finnhub
+        FINNHUB_API_KEY: process.env.KEY || process.env.FINNHUB_API_KEY || '',
+        POLYGON_API_KEY: process.env.POLYGON_API_KEY || '',
+        TWELVEDATA_API_KEY: process.env.TWELVEDATA_API_KEY || '',
+        FINANCIAL_DATASETS_API_KEY: process.env.FINANCIAL_DATASETS_API_KEY || '',
       },
     });
     
@@ -563,8 +572,17 @@ export async function sadieChatWithImage(params: SadieChatWithImageParams): Prom
         PYTHONPATH: '',
         PYTHONHOME: '',
         LD_LIBRARY_PATH: process.env.LD_LIBRARY_PATH || '',
+        // LLM API Keys
+        GEMINI_API_KEY: process.env.GEMINI_API_KEY || '',
+        PERPLEXITY_API_KEY: process.env.PERPLEXITY_API_KEY || '',
         OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY || '',
+        FIRECRAWL_API_KEY: process.env.FIRECRAWL_API_KEY || '',
+        // Financial Data API Keys
         KEY: process.env.KEY || '', // Finnhub
+        FINNHUB_API_KEY: process.env.KEY || process.env.FINNHUB_API_KEY || '',
+        POLYGON_API_KEY: process.env.POLYGON_API_KEY || '',
+        TWELVEDATA_API_KEY: process.env.TWELVEDATA_API_KEY || '',
+        FINANCIAL_DATASETS_API_KEY: process.env.FINANCIAL_DATASETS_API_KEY || '',
       },
     });
     
