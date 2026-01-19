@@ -1338,9 +1338,9 @@ class BreakoutDetector:
         
         return list(dynamic_tickers)
     
-    def quick_scan(self, top_n: int = 20) -> Dict:
+    def quick_scan(self, top_n: int = 50) -> Dict:
         """
-        Quick scan of 200+ stocks and ETFs for breakout setups.
+        Comprehensive scan of 400+ stocks and ETFs for breakout setups.
         Combines predefined universe with DYNAMIC real-time discovery.
         """
         # Get dynamic tickers from today's market activity
@@ -1406,6 +1406,43 @@ class BreakoutDetector:
             "SPY", "QQQ", "IWM", "DIA", "VOO", "VTI",
             "XLF", "XLE", "XLK", "XLV", "XLI", "XLY", "XLP", "XLU", "XLB", "XLRE",
             "GLD", "SLV", "USO", "TLT",
+            # === ADDITIONAL LARGE CAP (30) ===
+            "AAON", "ABNB", "ACN", "ADSK", "ADP", "AEE", "AES", "AFL", "AIG", "AIZ",
+            "AJG", "AKAM", "ALB", "ALGN", "ALL", "ALLE", "AMAT", "AMCR", "AME", "AMGN",
+            "AMP", "AMT", "ANSS", "AON", "AOS", "APA", "APD", "APH", "APTV", "ARE",
+            # === MID CAP GROWTH (40) ===
+            "ACGL", "ACM", "AGCO", "AGR", "AGIO", "AGNC", "AIT", "AJRD", "ALKS", "ALNY",
+            "AMKR", "AMPH", "ANDE", "ANET", "ANGI", "ANIK", "ANIP", "AOSL", "APAM", "APG",
+            "APPF", "APPN", "APPS", "ARCB", "ARCC", "ARCT", "ARES", "ARGO", "ARHS", "AROW",
+            "ARWR", "ASB", "ASGN", "ASIX", "ASTE", "ATEC", "ATEN", "ATGE", "ATHM", "ATI",
+            # === SMALL CAP VALUE (40) ===
+            "ABCB", "ABEO", "ABMD", "ABUS", "ACAD", "ACBI", "ACEL", "ACER", "ACHC", "ACIA",
+            "ACIW", "ACLS", "ACNB", "ACOR", "ACRE", "ACRX", "ACTG", "ADAP", "ADCT", "ADEA",
+            "ADES", "ADN", "ADNT", "ADPT", "ADRO", "ADTN", "ADUS", "ADVM", "AEGN", "AEHR",
+            "AEIS", "AEMD", "AERI", "AES", "AFCG", "AFGE", "AFIB", "AFMD", "AFRI", "AFYA",
+            # === MICRO CAP MOMENTUM (30) ===
+            "ABAT", "ABEV", "ABIO", "ABLV", "ABOS", "ABST", "ABUS", "ACAQ", "ACCD", "ACCO",
+            "ACEL", "ACER", "ACET", "ACHV", "ACID", "ACIO", "ACIU", "ACKR", "ACLS", "ACMR",
+            "ACNB", "ACNT", "ACOR", "ACRS", "ACRV", "ACRX", "ACST", "ACTG", "ACVA", "ACXP",
+            # === LEVERAGED/INVERSE ETFs (20) ===
+            "TQQQ", "SQQQ", "SPXL", "SPXS", "UPRO", "SPXU", "LABU", "LABD", "SOXL", "SOXS",
+            "FAS", "FAZ", "NUGT", "DUST", "JNUG", "JDST", "UVXY", "SVXY", "VXX", "VIXY",
+            # === SECTOR ETFs (30) ===
+            "ARKK", "ARKG", "ARKF", "ARKW", "ARKQ", "ARKX", "BOTZ", "ROBO", "HACK", "CIBR",
+            "WCLD", "CLOU", "SKYY", "IGV", "SOXX", "SMH", "XBI", "IBB", "XHB", "ITB",
+            "XRT", "XME", "XOP", "OIH", "KRE", "KBE", "JETS", "AWAY", "BLOK", "BITO",
+            # === INTERNATIONAL ETFs (20) ===
+            "EEM", "EFA", "VEA", "VWO", "IEMG", "INDA", "FXI", "MCHI", "KWEB", "EWJ",
+            "EWZ", "EWY", "EWT", "EWG", "EWU", "EWC", "EWA", "EWH", "EWS", "EWP",
+            # === BOND/FIXED INCOME ETFs (15) ===
+            "BND", "AGG", "LQD", "HYG", "JNK", "VCIT", "VCSH", "VGSH", "SHY", "IEF",
+            "TIP", "BNDX", "EMB", "MUB", "VMBS",
+            # === COMMODITY ETFs (10) ===
+            "DBC", "PDBC", "GSG", "DBA", "WEAT", "CORN", "SOYB", "UNG", "CPER", "JJC",
+            # === ADDITIONAL POPULAR STOCKS (30) ===
+            "UBER", "LYFT", "DASH", "ABNB", "RBLX", "U", "TTWO", "EA", "ATVI", "MTCH",
+            "BMBL", "PINS", "SNAP", "TWTR", "ZM", "DOCU", "OKTA", "SPLK", "WDAY", "VEEV",
+            "TEAM", "SHOP", "SQ", "ROKU", "SPOT", "TTD", "CHWY", "ETSY", "W", "PTON",
         ]
         
         # Combine predefined with dynamic discovery (no duplicates)

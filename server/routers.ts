@@ -436,7 +436,7 @@ export const appRouter = router({
     marketTTMSqueeze: publicProcedure
       .input(
         z.object({
-          maxStocks: z.number().int().min(10).max(500).optional().default(100),
+          maxStocks: z.number().int().min(10).max(500).optional().default(400),
         })
       )
       .mutation(async ({ input }) => {
@@ -448,7 +448,7 @@ export const appRouter = router({
     marketBreakout: publicProcedure
       .input(
         z.object({
-          maxStocks: z.number().int().min(10).max(500).optional().default(100),
+          maxStocks: z.number().int().min(10).max(500).optional().default(400),
         })
       )
       .mutation(async ({ input }) => {

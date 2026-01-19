@@ -34,7 +34,7 @@ export function BreakoutDetector() {
   };
 
   const handleMarketScan = () => {
-    marketScanMutation.mutate({ maxStocks: 100 });
+    marketScanMutation.mutate({ maxStocks: 400 });
   };
 
   const getScoreColor = (score: number) => {
