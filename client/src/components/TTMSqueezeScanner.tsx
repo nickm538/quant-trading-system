@@ -34,7 +34,7 @@ export function TTMSqueezeScanner() {
   };
 
   const handleMarketScan = () => {
-    marketScanMutation.mutate({ maxStocks: 100 });
+    marketScanMutation.mutate({ maxStocks: 500 });
   };
 
   const getMomentumColor = (momentum: number) => {
@@ -311,7 +311,7 @@ export function TTMSqueezeScanner() {
                     </div>
                   </div>
                   <div className="mt-4 text-sm text-muted-foreground">
-                    Scan completed in {marketResults.scan_time_seconds}s at {new Date(marketResults.timestamp).toLocaleString()}
+                    Scan completed in {marketResults.scan_time_seconds}s at {new Date(marketResults.timestamp).toLocaleString('en-US', { timeZone: 'America/New_York', hour12: true, month: 'numeric', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', second: '2-digit' })} EST
                   </div>
                 </CardContent>
               </Card>
