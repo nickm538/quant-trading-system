@@ -69,10 +69,24 @@ class FinalProductionAnalyzer:
         result = chart_data['chart']['result'][0]
         meta = result['meta']
         
-        # Extract current price
-        current_price = float(meta['regularMarketPrice'])
-        prev_close = float(meta['chartPreviousClose'])
-        price_change_pct = ((current_price - prev_close) / prev_close * 100)
+        # Extract current price with fallbacks for different data sources
+        current_price = float(meta.get('regularMarketPrice', 0))
+        prev_close = float(meta.get('chartPreviousClose', meta.get('previousClose', current_price)))
+        
+        # If current_price is 0, try to get from the last close in the data
+        if current_price == 0 and 'indicators' in result:
+            quotes = result['indicators']['quote'][0]
+            closes = [c for c in quotes.get('close', []) if c is not None]
+            if closes:
+                current_price = float(closes[-1])
+                if len(closes) > 1:
+                    prev_close = float(closes[-2])
+        
+        # Calculate price change
+        if prev_close and prev_close != 0:
+            price_change_pct = ((current_price - prev_close) / prev_close * 100)
+        else:
+            price_change_pct = 0.0
         
         analysis['current_price'] = current_price
         analysis['price_change_pct'] = price_change_pct

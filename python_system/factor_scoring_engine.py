@@ -143,7 +143,11 @@ class FactorScoringEngine:
         mp_explanation = []
         
         vix = macro.get("vix", {})
-        vix_level = vix.get("level", 20)
+        # Handle both dict format and direct float value
+        if isinstance(vix, (int, float)):
+            vix_level = vix
+        else:
+            vix_level = vix.get("level", 20) if isinstance(vix, dict) else 20
         
         # VIX-based Fed policy proxy
         if vix_level < 15:
@@ -476,7 +480,19 @@ class FactorScoringEngine:
         sent_explanation = []
         
         vix = macro.get("vix", {})
-        vix_regime = vix.get("regime", "NEUTRAL")
+        # Handle both dict format and direct float value
+        if isinstance(vix, (int, float)):
+            # Derive regime from VIX level
+            if vix > 30:
+                vix_regime = "EXTREME_FEAR"
+            elif vix > 25:
+                vix_regime = "HIGH_FEAR"
+            elif vix < 15:
+                vix_regime = "LOW_FEAR"
+            else:
+                vix_regime = "NEUTRAL"
+        else:
+            vix_regime = vix.get("regime", "NEUTRAL") if isinstance(vix, dict) else "NEUTRAL"
         
         # VIX as sentiment proxy (contrarian)
         if vix_regime == "EXTREME_FEAR":
