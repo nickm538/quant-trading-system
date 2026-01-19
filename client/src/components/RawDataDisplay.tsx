@@ -296,7 +296,7 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
                   <DataItem label="P/E Ratio" value={safeFixed(analysis.enhanced_fundamentals.valuation?.pe_ratio)} />
                   <DataItem label="Forward P/E" value={safeFixed(analysis.enhanced_fundamentals.valuation?.forward_pe)} />
                   <DataItem label="PEG Ratio" value={safeFixed(analysis.enhanced_fundamentals.valuation?.peg_ratio)} />
-                  <DataItem label="EV/EBITDA" value={safeFixed(analysis.enhanced_fundamentals.valuation?.ev_ebitda)} />
+                  <DataItem label="EV/EBITDA" value={safeFixed(analysis.enhanced_fundamentals.valuation?.ev_to_ebitda)} />
                 </div>
                 
                 {analysis.enhanced_fundamentals.cash_flow && (
@@ -304,8 +304,8 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
                     <h5 className="font-semibold mb-2">Cash Flow Metrics</h5>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                       <DataItem label="Free Cash Flow" value={`$${safeFixed(analysis.enhanced_fundamentals.cash_flow.free_cash_flow / 1e9)}B`} />
-                      <DataItem label="FCF Yield" value={`${safeFixed(analysis.enhanced_fundamentals.cash_flow.fcf_yield * 100)}%`} />
-                      <DataItem label="FCF Margin" value={`${safeFixed(analysis.enhanced_fundamentals.cash_flow.fcf_margin * 100)}%`} />
+                      <DataItem label="FCF Yield" value={`${safeFixed(analysis.enhanced_fundamentals.cash_flow.fcf_yield_pct)}%`} />
+                      <DataItem label="FCF Margin" value={`${safeFixed(analysis.enhanced_fundamentals.cash_flow.fcf_margin_pct)}%`} />
                       <DataItem label="Op Cash Flow" value={`$${safeFixed(analysis.enhanced_fundamentals.cash_flow.operating_cash_flow / 1e9)}B`} />
                     </div>
                   </div>
@@ -315,9 +315,9 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
                   <div className="mt-4">
                     <h5 className="font-semibold mb-2">GARP Analysis (Growth at Reasonable Price)</h5>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                      <DataItem label="GARP Score" value={`${safeFixed(analysis.enhanced_fundamentals.garp_analysis.garp_score, 1)}/100`} />
-                      <DataItem label="GARP Signal" value={analysis.enhanced_fundamentals.garp_analysis.garp_signal || 'N/A'} />
-                      <DataItem label="Growth Rate" value={`${safeFixed(analysis.enhanced_fundamentals.garp_analysis.earnings_growth * 100, 1)}%`} />
+                      <DataItem label="GARP Score" value={`${safeFixed(analysis.enhanced_fundamentals.garp_analysis.score, 1)}/100`} />
+                      <DataItem label="GARP Signal" value={analysis.enhanced_fundamentals.garp_analysis.verdict || 'N/A'} />
+                      <DataItem label="Growth Rate" value={`${safeFixed(analysis.enhanced_fundamentals.garp_analysis.growth_rate_used, 1)}%`} />
                       <DataItem label="Value Score" value={`${safeFixed(analysis.enhanced_fundamentals.garp_analysis.value_score, 1)}/100`} />
                     </div>
                   </div>
