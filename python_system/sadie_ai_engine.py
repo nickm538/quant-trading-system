@@ -123,6 +123,20 @@ try:
 except ImportError:
     HAS_COMPREHENSIVE_FUNDAMENTALS = False
 
+# Import Firecrawl web scraper for real-time data gaps
+try:
+    from firecrawl_scraper import FirecrawlScraper, get_firecrawl_scraper
+    HAS_FIRECRAWL = True
+except ImportError:
+    HAS_FIRECRAWL = False
+
+# Import Gemini provider for primary LLM
+try:
+    from gemini_provider import GeminiProvider, MultiModelOrchestrator, get_multi_model_orchestrator
+    HAS_GEMINI = True
+except ImportError:
+    HAS_GEMINI = False
+
 
 class SadieAIEngine:
     """
@@ -792,6 +806,24 @@ One comprehensive paragraph that synthesizes EVERYTHING above - BOTH MACRO AND M
             except Exception as e:
                 import sys as _sys
                 print(f"Warning: Could not initialize FinancialDatasets client: {e}", file=_sys.stderr)
+        
+        # Initialize Firecrawl web scraper for real-time data gaps
+        self.firecrawl = None
+        if HAS_FIRECRAWL:
+            try:
+                self.firecrawl = get_firecrawl_scraper()
+            except Exception as e:
+                import sys as _sys
+                print(f"Warning: Could not initialize Firecrawl scraper: {e}", file=_sys.stderr)
+        
+        # Initialize Gemini/Multi-Model Orchestrator as primary LLM
+        self.multi_model = None
+        if HAS_GEMINI:
+            try:
+                self.multi_model = get_multi_model_orchestrator()
+            except Exception as e:
+                import sys as _sys
+                print(f"Warning: Could not initialize Multi-Model Orchestrator: {e}", file=_sys.stderr)
         
         # Conversation history for context
         self.conversation_history = []
@@ -1804,6 +1836,24 @@ One comprehensive paragraph that synthesizes EVERYTHING above - BOTH MACRO AND M
                 import sys as _sys
                 print(f"Warning: Comprehensive fundamentals failed: {e}", file=_sys.stderr)
         
+        # === FIRECRAWL WEB SCRAPER DATA (REAL-TIME, FILLS API GAPS) ===
+        if symbol and self.firecrawl:
+            try:
+                context_parts.append("\n" + "="*60)
+                context_parts.append("🌐 FIRECRAWL LIVE WEB DATA (REAL-TIME SCRAPED)")
+                context_parts.append("="*60)
+                
+                # Scrape complete analysis from web
+                firecrawl_data = self.firecrawl.get_complete_analysis(symbol)
+                
+                # Format and add to context
+                firecrawl_context = self.firecrawl.format_for_prompt(firecrawl_data)
+                context_parts.append(firecrawl_context)
+                
+            except Exception as e:
+                import sys as _sys
+                print(f"Warning: Firecrawl scraping failed: {e}", file=_sys.stderr)
+        
         return "\n".join(context_parts)
     
     def _extract_symbol_from_query(self, query: str) -> Optional[str]:
@@ -1958,16 +2008,58 @@ One comprehensive paragraph that synthesizes EVERYTHING above - BOTH MACRO AND M
                 "content": enhanced_message
             })
             
-            # Call OpenRouter API with GPT-5/o1 thinking mode
+            # NUKE mode gets more tokens for comprehensive analysis
+            max_tokens = 16384 if is_nuke else 8192
+            
+            # === PRIMARY: Use Gemini 2.5 Pro via Multi-Model Orchestrator ===
+            if self.multi_model:
+                try:
+                    # Combine system prompts
+                    system_prompt = self.system_context
+                    if is_nuke:
+                        system_prompt = f"{self.system_context}\n\n{self.nuke_context}"
+                    
+                    gemini_result = self.multi_model.analyze(
+                        user_message=enhanced_message,
+                        context=context,
+                        system_prompt=system_prompt,
+                        is_nuke_mode=is_nuke
+                    )
+                    
+                    if gemini_result.get("success"):
+                        assistant_message = gemini_result.get("content", "")
+                        
+                        # Add NUKE mode header if applicable
+                        if is_nuke:
+                            assistant_message = f"☢️ **NUKE MODE ANALYSIS** ☢️\n\n{assistant_message}"
+                        
+                        # Update conversation history
+                        self.conversation_history.append({"role": "user", "content": user_message})
+                        self.conversation_history.append({"role": "assistant", "content": assistant_message})
+                        
+                        response["success"] = True
+                        response["message"] = assistant_message
+                        response["data"] = {
+                            "symbol_detected": symbol,
+                            "model_used": gemini_result.get("model_used", "gemini-2.5-pro"),
+                            "tokens_used": gemini_result.get("usage", {}),
+                            "nuke_mode": is_nuke,
+                            "perplexity_used": gemini_result.get("perplexity_research") is not None,
+                            "firecrawl_used": self.firecrawl is not None
+                        }
+                        return response
+                        
+                except Exception as gemini_error:
+                    import sys as _sys
+                    print(f"Warning: Gemini failed, falling back to OpenRouter: {gemini_error}", file=_sys.stderr)
+            
+            # === FALLBACK: Use OpenRouter API ===
             headers = {
                 "Authorization": f"Bearer {self.OPENROUTER_API_KEY}",
                 "Content-Type": "application/json",
                 "HTTP-Referer": "https://sadie-ai.com",
                 "X-Title": "SadieAI Financial Assistant"
             }
-            
-            # NUKE mode gets more tokens for comprehensive analysis
-            max_tokens = 16384 if is_nuke else 4096
             
             payload = {
                 "model": self.MODELS[0],  # Use o1 (GPT-5 thinking mode)
