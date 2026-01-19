@@ -27,8 +27,8 @@ class GeminiProvider:
     def __init__(self, api_key: Optional[str] = None):
         self.api_key = api_key or os.environ.get('GEMINI_API_KEY', '')
         self.base_url = "https://generativelanguage.googleapis.com/v1beta"
-        self.model = "gemini-2.5-pro-preview-06-05"  # Latest Gemini 2.5 Pro
-        self.fallback_model = "gemini-2.5-flash-preview-05-20"  # Fast fallback
+        self.model = "gemini-2.5-pro"  # Latest Gemini 2.5 Pro
+        self.fallback_model = "gemini-2.5-flash"  # Fast fallback
         
     def generate(
         self,
@@ -140,10 +140,12 @@ class GeminiProvider:
                             
                             return result
                 else:
-                    print(f"Gemini {model} error: {response.status_code} - {response.text[:200]}")
+                    import sys as _sys
+                    print(f"Gemini {model} error: {response.status_code} - {response.text[:200]}", file=_sys.stderr)
                     
             except Exception as e:
-                print(f"Gemini {model} exception: {e}")
+                import sys as _sys
+                print(f"Gemini {model} exception: {e}", file=_sys.stderr)
                 continue
         
         result["error"] = "All Gemini models failed"
@@ -420,7 +422,8 @@ class MultiModelOrchestrator:
                         return result
                         
             except Exception as e:
-                print(f"OpenRouter fallback {model} failed: {e}")
+                import sys as _sys
+                print(f"OpenRouter fallback {model} failed: {e}", file=_sys.stderr)
                 continue
         
         return result

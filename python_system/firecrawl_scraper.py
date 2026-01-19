@@ -52,10 +52,12 @@ class FirecrawlScraper:
             if response.status_code == 200:
                 return response.json()
             else:
-                print(f"Firecrawl error: {response.status_code} - {response.text}")
+                import sys as _sys
+                print(f"Firecrawl error: {response.status_code} - {response.text}", file=_sys.stderr)
                 return None
         except Exception as e:
-            print(f"Firecrawl request failed: {e}")
+            import sys as _sys
+            print(f"Firecrawl request failed: {e}", file=_sys.stderr)
             return None
     
     def scrape_options_chain(self, symbol: str) -> Dict[str, Any]:
