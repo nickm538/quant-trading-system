@@ -177,6 +177,13 @@ class EnhancedFundamentalsAnalyzer:
                 ev_to_ebitda, fcf_yield, sector
             )
             
+            # NEW: Enhanced data fetching
+            earnings_data = self._fetch_earnings_data(symbol)
+            dividend_data = self._fetch_dividend_data(symbol, info)
+            insider_data = self._fetch_insider_transactions(symbol)
+            analyst_data = self._fetch_analyst_ratings(symbol)
+            financial_trends = self._fetch_financial_trends(symbol)
+            
             return {
                 'success': True,
                 'symbol': symbol.upper(),
@@ -270,6 +277,13 @@ class EnhancedFundamentalsAnalyzer:
                 'quality_score': quality_score,
                 'liquidity_analysis': liquidity_analysis,
                 'value_assessment': value_assessment,
+                
+                # NEW: Enhanced Data Sections
+                'earnings': earnings_data,
+                'dividends': dividend_data,
+                'insider_activity': insider_data,
+                'analyst_ratings': analyst_data,
+                'financial_trends': financial_trends,
                 
                 # Overall Fundamental Rating
                 'overall_rating': self._calculate_overall_rating(
@@ -734,6 +748,307 @@ class EnhancedFundamentalsAnalyzer:
             return f'{sign}${abs_num/1e3:.2f}K'
         else:
             return f'{sign}${abs_num:.2f}'
+
+
+    def _fetch_earnings_data(self, symbol: str) -> Dict:
+        """
+        Fetch earnings history, estimates, and surprises.
+        Uses Finnhub and FMP APIs.
+        """
+        earnings_data = {
+            'quarterly_earnings': [],
+            'annual_earnings': [],
+            'eps_estimates': None,
+            'earnings_surprises': [],
+            'next_earnings_date': None
+        }
+        
+        try:
+            # Finnhub earnings calendar
+            url = f'https://finnhub.io/api/v1/calendar/earnings?symbol={symbol}&token={self.finnhub_key}'
+            response = requests.get(url, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                if data.get('earningsCalendar'):
+                    for item in data['earningsCalendar'][:4]:
+                        earnings_data['quarterly_earnings'].append({
+                            'date': item.get('date'),
+                            'eps_actual': item.get('epsActual'),
+                            'eps_estimate': item.get('epsEstimate'),
+                            'revenue_actual': item.get('revenueActual'),
+                            'revenue_estimate': item.get('revenueEstimate'),
+                            'surprise_pct': item.get('surprisePercent')
+                        })
+            
+            # FMP earnings surprises
+            url = f'https://financialmodelingprep.com/api/v3/earnings-surprises/{symbol}?apikey={self.fmp_key}'
+            response = requests.get(url, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                if data:
+                    for item in data[:8]:
+                        earnings_data['earnings_surprises'].append({
+                            'date': item.get('date'),
+                            'actual_eps': item.get('actualEarningResult'),
+                            'estimated_eps': item.get('estimatedEarning'),
+                            'surprise': round(item.get('actualEarningResult', 0) - item.get('estimatedEarning', 0), 4) if item.get('actualEarningResult') and item.get('estimatedEarning') else None
+                        })
+            
+            # FMP analyst estimates
+            url = f'https://financialmodelingprep.com/api/v3/analyst-estimates/{symbol}?apikey={self.fmp_key}'
+            response = requests.get(url, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                if data:
+                    latest = data[0]
+                    earnings_data['eps_estimates'] = {
+                        'date': latest.get('date'),
+                        'estimated_eps_avg': latest.get('estimatedEpsAvg'),
+                        'estimated_eps_high': latest.get('estimatedEpsHigh'),
+                        'estimated_eps_low': latest.get('estimatedEpsLow'),
+                        'estimated_revenue_avg': latest.get('estimatedRevenueAvg'),
+                        'number_of_analysts': latest.get('numberAnalystsEstimatedEps')
+                    }
+        except Exception:
+            pass
+        
+        return earnings_data
+    
+    def _fetch_dividend_data(self, symbol: str, info: Dict) -> Dict:
+        """
+        Fetch comprehensive dividend data.
+        """
+        dividend_data = {
+            'dividend_yield_pct': None,
+            'annual_dividend': None,
+            'payout_ratio_pct': None,
+            'ex_dividend_date': None,
+            'dividend_date': None,
+            'dividend_growth_5yr': None,
+            'consecutive_years': None,
+            'dividend_history': []
+        }
+        
+        try:
+            # From yfinance info
+            dividend_data['dividend_yield_pct'] = round((info.get('dividendYield', 0) or 0) * 100, 2)
+            dividend_data['annual_dividend'] = info.get('dividendRate')
+            dividend_data['payout_ratio_pct'] = round((info.get('payoutRatio', 0) or 0) * 100, 2)
+            dividend_data['ex_dividend_date'] = info.get('exDividendDate')
+            
+            # FMP dividend history
+            url = f'https://financialmodelingprep.com/api/v3/historical-price-full/stock_dividend/{symbol}?apikey={self.fmp_key}'
+            response = requests.get(url, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                if data.get('historical'):
+                    history = data['historical'][:20]  # Last 20 dividends
+                    dividend_data['dividend_history'] = [
+                        {
+                            'date': item.get('date'),
+                            'dividend': item.get('dividend'),
+                            'adj_dividend': item.get('adjDividend')
+                        } for item in history
+                    ]
+                    
+                    # Calculate 5-year growth
+                    if len(history) >= 8:
+                        recent = sum(h.get('dividend', 0) for h in history[:4])
+                        older = sum(h.get('dividend', 0) for h in history[16:20]) if len(history) >= 20 else sum(h.get('dividend', 0) for h in history[-4:])
+                        if older > 0:
+                            dividend_data['dividend_growth_5yr'] = round((recent / older - 1) * 100, 2)
+        except Exception:
+            pass
+        
+        return dividend_data
+    
+    def _fetch_insider_transactions(self, symbol: str) -> Dict:
+        """
+        Fetch recent insider transactions.
+        """
+        insider_data = {
+            'recent_transactions': [],
+            'net_insider_activity': 'NEUTRAL',
+            'total_buys_90d': 0,
+            'total_sells_90d': 0,
+            'buy_value_90d': 0,
+            'sell_value_90d': 0
+        }
+        
+        try:
+            # Finnhub insider transactions
+            url = f'https://finnhub.io/api/v1/stock/insider-transactions?symbol={symbol}&token={self.finnhub_key}'
+            response = requests.get(url, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                if data.get('data'):
+                    ninety_days_ago = (datetime.now() - timedelta(days=90)).strftime('%Y-%m-%d')
+                    
+                    for txn in data['data'][:20]:
+                        txn_date = txn.get('transactionDate', '')
+                        txn_type = txn.get('transactionCode', '')
+                        shares = txn.get('share', 0) or 0
+                        price = txn.get('transactionPrice', 0) or 0
+                        value = shares * price
+                        
+                        insider_data['recent_transactions'].append({
+                            'date': txn_date,
+                            'name': txn.get('name'),
+                            'position': txn.get('filingDate'),
+                            'type': 'BUY' if txn_type in ['P', 'A'] else 'SELL' if txn_type in ['S', 'F'] else txn_type,
+                            'shares': shares,
+                            'price': price,
+                            'value': value
+                        })
+                        
+                        if txn_date >= ninety_days_ago:
+                            if txn_type in ['P', 'A']:
+                                insider_data['total_buys_90d'] += 1
+                                insider_data['buy_value_90d'] += value
+                            elif txn_type in ['S', 'F']:
+                                insider_data['total_sells_90d'] += 1
+                                insider_data['sell_value_90d'] += value
+                    
+                    # Determine net activity
+                    if insider_data['buy_value_90d'] > insider_data['sell_value_90d'] * 1.5:
+                        insider_data['net_insider_activity'] = 'BULLISH'
+                    elif insider_data['sell_value_90d'] > insider_data['buy_value_90d'] * 1.5:
+                        insider_data['net_insider_activity'] = 'BEARISH'
+        except Exception:
+            pass
+        
+        return insider_data
+    
+    def _fetch_analyst_ratings(self, symbol: str) -> Dict:
+        """
+        Fetch analyst ratings and price targets.
+        """
+        analyst_data = {
+            'consensus_rating': None,
+            'target_price': None,
+            'target_high': None,
+            'target_low': None,
+            'number_of_analysts': 0,
+            'strong_buy': 0,
+            'buy': 0,
+            'hold': 0,
+            'sell': 0,
+            'strong_sell': 0,
+            'recommendation_trend': []
+        }
+        
+        try:
+            # Finnhub recommendation trends
+            url = f'https://finnhub.io/api/v1/stock/recommendation?symbol={symbol}&token={self.finnhub_key}'
+            response = requests.get(url, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                if data:
+                    latest = data[0]
+                    analyst_data['strong_buy'] = latest.get('strongBuy', 0)
+                    analyst_data['buy'] = latest.get('buy', 0)
+                    analyst_data['hold'] = latest.get('hold', 0)
+                    analyst_data['sell'] = latest.get('sell', 0)
+                    analyst_data['strong_sell'] = latest.get('strongSell', 0)
+                    
+                    total = sum([analyst_data['strong_buy'], analyst_data['buy'], analyst_data['hold'], analyst_data['sell'], analyst_data['strong_sell']])
+                    analyst_data['number_of_analysts'] = total
+                    
+                    # Calculate weighted consensus
+                    if total > 0:
+                        score = (analyst_data['strong_buy'] * 5 + analyst_data['buy'] * 4 + analyst_data['hold'] * 3 + analyst_data['sell'] * 2 + analyst_data['strong_sell'] * 1) / total
+                        if score >= 4.5:
+                            analyst_data['consensus_rating'] = 'STRONG_BUY'
+                        elif score >= 3.5:
+                            analyst_data['consensus_rating'] = 'BUY'
+                        elif score >= 2.5:
+                            analyst_data['consensus_rating'] = 'HOLD'
+                        elif score >= 1.5:
+                            analyst_data['consensus_rating'] = 'SELL'
+                        else:
+                            analyst_data['consensus_rating'] = 'STRONG_SELL'
+                    
+                    # Trend data
+                    for item in data[:6]:
+                        analyst_data['recommendation_trend'].append({
+                            'period': item.get('period'),
+                            'strong_buy': item.get('strongBuy', 0),
+                            'buy': item.get('buy', 0),
+                            'hold': item.get('hold', 0),
+                            'sell': item.get('sell', 0),
+                            'strong_sell': item.get('strongSell', 0)
+                        })
+            
+            # Finnhub price target
+            url = f'https://finnhub.io/api/v1/stock/price-target?symbol={symbol}&token={self.finnhub_key}'
+            response = requests.get(url, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                analyst_data['target_price'] = data.get('targetMean')
+                analyst_data['target_high'] = data.get('targetHigh')
+                analyst_data['target_low'] = data.get('targetLow')
+        except Exception:
+            pass
+        
+        return analyst_data
+    
+    def _fetch_financial_trends(self, symbol: str) -> Dict:
+        """
+        Fetch historical financial trends (5-year CAGR for revenue/earnings).
+        """
+        trends = {
+            'revenue_5yr_cagr': None,
+            'earnings_5yr_cagr': None,
+            'fcf_5yr_cagr': None,
+            'revenue_trend': [],
+            'earnings_trend': [],
+            'margin_trend': []
+        }
+        
+        try:
+            # FMP income statement
+            url = f'https://financialmodelingprep.com/api/v3/income-statement/{symbol}?limit=6&apikey={self.fmp_key}'
+            response = requests.get(url, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                if data and len(data) >= 2:
+                    for item in data[:6]:
+                        trends['revenue_trend'].append({
+                            'year': item.get('calendarYear'),
+                            'revenue': item.get('revenue'),
+                            'net_income': item.get('netIncome'),
+                            'eps': item.get('eps'),
+                            'gross_margin': round(item.get('grossProfit', 0) / item.get('revenue', 1) * 100, 2) if item.get('revenue') else None,
+                            'operating_margin': round(item.get('operatingIncome', 0) / item.get('revenue', 1) * 100, 2) if item.get('revenue') else None,
+                            'net_margin': round(item.get('netIncome', 0) / item.get('revenue', 1) * 100, 2) if item.get('revenue') else None
+                        })
+                    
+                    # Calculate 5-year CAGR
+                    if len(data) >= 5:
+                        recent_rev = data[0].get('revenue', 0)
+                        old_rev = data[4].get('revenue', 0)
+                        if old_rev > 0 and recent_rev > 0:
+                            trends['revenue_5yr_cagr'] = round((pow(recent_rev / old_rev, 0.2) - 1) * 100, 2)
+                        
+                        recent_earn = data[0].get('netIncome', 0)
+                        old_earn = data[4].get('netIncome', 0)
+                        if old_earn > 0 and recent_earn > 0:
+                            trends['earnings_5yr_cagr'] = round((pow(recent_earn / old_earn, 0.2) - 1) * 100, 2)
+            
+            # FMP cash flow statement for FCF trend
+            url = f'https://financialmodelingprep.com/api/v3/cash-flow-statement/{symbol}?limit=6&apikey={self.fmp_key}'
+            response = requests.get(url, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                if data and len(data) >= 5:
+                    recent_fcf = data[0].get('freeCashFlow', 0)
+                    old_fcf = data[4].get('freeCashFlow', 0)
+                    if old_fcf > 0 and recent_fcf > 0:
+                        trends['fcf_5yr_cagr'] = round((pow(recent_fcf / old_fcf, 0.2) - 1) * 100, 2)
+        except Exception:
+            pass
+        
+        return trends
 
 
 # Main execution for testing

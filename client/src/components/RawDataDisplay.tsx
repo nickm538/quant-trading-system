@@ -346,6 +346,90 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
                     </div>
                   </div>
                 )}
+                
+                {/* NEW: Analyst Ratings */}
+                {analysis.enhanced_fundamentals.analyst_ratings && (
+                  <div className="mt-4">
+                    <h5 className="font-semibold mb-2">📊 Analyst Ratings</h5>
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                      <DataItem label="Consensus" value={analysis.enhanced_fundamentals.analyst_ratings.consensus_rating || 'N/A'} />
+                      <DataItem label="Strong Buy" value={analysis.enhanced_fundamentals.analyst_ratings.strong_buy || 0} />
+                      <DataItem label="Buy" value={analysis.enhanced_fundamentals.analyst_ratings.buy || 0} />
+                      <DataItem label="Hold" value={analysis.enhanced_fundamentals.analyst_ratings.hold || 0} />
+                      <DataItem label="Sell" value={analysis.enhanced_fundamentals.analyst_ratings.sell || 0} />
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2">
+                      <DataItem label="Target Price" value={analysis.enhanced_fundamentals.analyst_ratings.target_price ? `$${safeFixed(analysis.enhanced_fundamentals.analyst_ratings.target_price)}` : 'N/A'} />
+                      <DataItem label="Target High" value={analysis.enhanced_fundamentals.analyst_ratings.target_high ? `$${safeFixed(analysis.enhanced_fundamentals.analyst_ratings.target_high)}` : 'N/A'} />
+                      <DataItem label="Target Low" value={analysis.enhanced_fundamentals.analyst_ratings.target_low ? `$${safeFixed(analysis.enhanced_fundamentals.analyst_ratings.target_low)}` : 'N/A'} />
+                      <DataItem label="# Analysts" value={analysis.enhanced_fundamentals.analyst_ratings.number_of_analysts || 0} />
+                    </div>
+                  </div>
+                )}
+                
+                {/* NEW: Insider Activity */}
+                {analysis.enhanced_fundamentals.insider_activity && (
+                  <div className="mt-4">
+                    <h5 className="font-semibold mb-2">🏢 Insider Activity (90 Days)</h5>
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                      <DataItem label="Net Activity" value={analysis.enhanced_fundamentals.insider_activity.net_insider_activity || 'NEUTRAL'} />
+                      <DataItem label="Total Buys" value={analysis.enhanced_fundamentals.insider_activity.total_buys_90d || 0} />
+                      <DataItem label="Total Sells" value={analysis.enhanced_fundamentals.insider_activity.total_sells_90d || 0} />
+                      <DataItem label="Buy Value" value={analysis.enhanced_fundamentals.insider_activity.buy_value_90d ? `$${safeFixed(analysis.enhanced_fundamentals.insider_activity.buy_value_90d / 1e6)}M` : '$0'} />
+                      <DataItem label="Sell Value" value={analysis.enhanced_fundamentals.insider_activity.sell_value_90d ? `$${safeFixed(analysis.enhanced_fundamentals.insider_activity.sell_value_90d / 1e6)}M` : '$0'} />
+                    </div>
+                    {analysis.enhanced_fundamentals.insider_activity.recent_transactions?.length > 0 && (
+                      <div className="mt-2 text-xs">
+                        <p className="text-muted-foreground">Recent: {analysis.enhanced_fundamentals.insider_activity.recent_transactions.slice(0, 3).map((t: any) => `${t.name?.split(' ')[0] || 'Insider'} ${t.type} ${t.shares?.toLocaleString() || 0} shares`).join('; ')}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                {/* NEW: Dividends */}
+                {analysis.enhanced_fundamentals.dividends && (
+                  <div className="mt-4">
+                    <h5 className="font-semibold mb-2">💰 Dividend Information</h5>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                      <DataItem label="Dividend Yield" value={`${safeFixed(analysis.enhanced_fundamentals.dividends.dividend_yield_pct)}%`} />
+                      <DataItem label="Annual Dividend" value={analysis.enhanced_fundamentals.dividends.annual_dividend ? `$${safeFixed(analysis.enhanced_fundamentals.dividends.annual_dividend)}` : 'N/A'} />
+                      <DataItem label="Payout Ratio" value={`${safeFixed(analysis.enhanced_fundamentals.dividends.payout_ratio_pct)}%`} />
+                      <DataItem label="5Y Div Growth" value={analysis.enhanced_fundamentals.dividends.dividend_growth_5yr ? `${safeFixed(analysis.enhanced_fundamentals.dividends.dividend_growth_5yr)}%` : 'N/A'} />
+                    </div>
+                  </div>
+                )}
+                
+                {/* NEW: Earnings */}
+                {analysis.enhanced_fundamentals.earnings && (
+                  <div className="mt-4">
+                    <h5 className="font-semibold mb-2">📈 Earnings Data</h5>
+                    {analysis.enhanced_fundamentals.earnings.eps_estimates && (
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                        <DataItem label="Est. EPS Avg" value={analysis.enhanced_fundamentals.earnings.eps_estimates.estimated_eps_avg ? `$${safeFixed(analysis.enhanced_fundamentals.earnings.eps_estimates.estimated_eps_avg)}` : 'N/A'} />
+                        <DataItem label="Est. EPS High" value={analysis.enhanced_fundamentals.earnings.eps_estimates.estimated_eps_high ? `$${safeFixed(analysis.enhanced_fundamentals.earnings.eps_estimates.estimated_eps_high)}` : 'N/A'} />
+                        <DataItem label="Est. EPS Low" value={analysis.enhanced_fundamentals.earnings.eps_estimates.estimated_eps_low ? `$${safeFixed(analysis.enhanced_fundamentals.earnings.eps_estimates.estimated_eps_low)}` : 'N/A'} />
+                        <DataItem label="# Analysts" value={analysis.enhanced_fundamentals.earnings.eps_estimates.number_of_analysts || 'N/A'} />
+                      </div>
+                    )}
+                    {analysis.enhanced_fundamentals.earnings.earnings_surprises?.length > 0 && (
+                      <div className="mt-2 text-xs">
+                        <p className="text-muted-foreground">Recent Surprises: {analysis.enhanced_fundamentals.earnings.earnings_surprises.slice(0, 4).map((s: any) => `${s.date}: ${s.surprise > 0 ? '+' : ''}${safeFixed(s.surprise, 3)}`).join(', ')}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                {/* NEW: Financial Trends */}
+                {analysis.enhanced_fundamentals.financial_trends && (
+                  <div className="mt-4">
+                    <h5 className="font-semibold mb-2">📊 5-Year Financial Trends</h5>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                      <DataItem label="Revenue CAGR" value={analysis.enhanced_fundamentals.financial_trends.revenue_5yr_cagr ? `${safeFixed(analysis.enhanced_fundamentals.financial_trends.revenue_5yr_cagr)}%` : 'N/A'} />
+                      <DataItem label="Earnings CAGR" value={analysis.enhanced_fundamentals.financial_trends.earnings_5yr_cagr ? `${safeFixed(analysis.enhanced_fundamentals.financial_trends.earnings_5yr_cagr)}%` : 'N/A'} />
+                      <DataItem label="FCF CAGR" value={analysis.enhanced_fundamentals.financial_trends.fcf_5yr_cagr ? `${safeFixed(analysis.enhanced_fundamentals.financial_trends.fcf_5yr_cagr)}%` : 'N/A'} />
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="text-center text-muted-foreground py-8">
