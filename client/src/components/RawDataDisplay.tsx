@@ -120,6 +120,9 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
               <p className="text-sm text-amber-800 dark:text-amber-200">
                 Expert-level pattern recognition including Doji, Hammer, Engulfing, Morning/Evening Star, Ichimoku Cloud, and more.
               </p>
+              <p className="text-xs text-amber-700 dark:text-amber-300 mt-2">
+                ⚠️ <strong>Note:</strong> This page shows two types of analysis: <strong>Algorithmic Detection</strong> (mathematical formulas on OHLC data) and <strong>Vision AI Analysis</strong> (AI visually analyzing chart images). They may show different patterns because they analyze different timeframes and use different methods. When signals conflict, consider both perspectives and use additional confirmation.
+              </p>
             </div>
             
             {analysis.candlestick_patterns ? (
@@ -133,7 +136,12 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
                 
                 {(analysis.candlestick_patterns.patterns?.length > 0 || analysis.candlestick_patterns.patterns_detected?.length > 0) && (
                   <div className="mt-4">
-                    <h5 className="font-semibold mb-2">Detected Patterns</h5>
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-blue-600 dark:text-blue-400">📊</span>
+                      <h5 className="font-semibold">Algorithmic Pattern Detection</h5>
+                      <span className="text-xs bg-blue-100 dark:bg-blue-900 px-2 py-0.5 rounded text-blue-700 dark:text-blue-300">OHLC Data Analysis</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mb-3">Patterns detected using mathematical formulas on recent price data (Open, High, Low, Close). Analyzes the last 100 trading days.</p>
                     <div className="space-y-2">
                       {(analysis.candlestick_patterns.patterns || analysis.candlestick_patterns.patterns_detected || []).map((pattern: any, idx: number) => (
                         <div key={idx} className={`p-3 rounded-lg border ${pattern.type?.includes('BULLISH') ? 'bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800' : pattern.type?.includes('BEARISH') ? 'bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800' : 'bg-muted/20 border-border'}`}>
@@ -221,16 +229,53 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
                   </div>
                 )}
                 
+                {/* Signal Conflict Detection */}
+                {analysis.candlestick_patterns.vision_ai_analysis && (() => {
+                  const algoBias = analysis.candlestick_patterns.overall_bias?.toUpperCase();
+                  const aiBias = analysis.candlestick_patterns.vision_ai_analysis.overall_bias?.toUpperCase();
+                  const hasConflict = algoBias && aiBias && 
+                    ((algoBias.includes('BULL') && aiBias.includes('BEAR')) || 
+                     (algoBias.includes('BEAR') && aiBias.includes('BULL')));
+                  
+                  if (hasConflict) {
+                    return (
+                      <div className="mt-4 p-4 bg-yellow-50 dark:bg-yellow-950 rounded-lg border-2 border-yellow-400 dark:border-yellow-600">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-2xl">⚠️</span>
+                          <h5 className="font-bold text-yellow-800 dark:text-yellow-200">Signal Conflict Detected!</h5>
+                        </div>
+                        <p className="text-sm text-yellow-700 dark:text-yellow-300 mb-2">
+                          <strong>Algorithmic Analysis</strong> shows <span className={algoBias?.includes('BULL') ? 'text-green-600 font-bold' : 'text-red-600 font-bold'}>{algoBias}</span> while{' '}
+                          <strong>Vision AI</strong> shows <span className={aiBias?.includes('BULL') ? 'text-green-600 font-bold' : 'text-red-600 font-bold'}>{aiBias}</span>
+                        </p>
+                        <p className="text-xs text-yellow-600 dark:text-yellow-400">
+                          <strong>What this means:</strong> The two analysis methods disagree. This often happens when:
+                        </p>
+                        <ul className="text-xs text-yellow-600 dark:text-yellow-400 mt-1 ml-4 list-disc">
+                          <li>Different timeframes are being analyzed (algorithmic uses recent OHLC data, Vision AI sees the Finviz daily chart)</li>
+                          <li>A trend reversal may be forming (one method catches it before the other)</li>
+                          <li>The stock is in a consolidation/choppy phase with mixed signals</li>
+                        </ul>
+                        <p className="text-xs text-yellow-700 dark:text-yellow-300 mt-2 font-medium">
+                          💡 <strong>Recommendation:</strong> Use additional confirmation (volume, support/resistance, other indicators) before making trading decisions.
+                        </p>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
+                
                 {/* Vision AI Chart Analysis */}
                 {analysis.candlestick_patterns.vision_ai_analysis && (
                   <div className="mt-6 p-4 bg-purple-50 dark:bg-purple-950 rounded-lg border border-purple-200 dark:border-purple-800">
-                    <div className="flex items-center gap-2 mb-3">
+                    <div className="flex items-center gap-2 mb-2">
                       <span className="text-purple-600 dark:text-purple-400">🤖</span>
                       <h5 className="font-semibold text-purple-900 dark:text-purple-100">Vision AI Chart Analysis</h5>
                       <span className="text-xs bg-purple-100 dark:bg-purple-900 px-2 py-0.5 rounded text-purple-700 dark:text-purple-300">
                         {analysis.candlestick_patterns.vision_ai_analysis.chart_source} + {analysis.candlestick_patterns.vision_ai_analysis.ai_model}
                       </span>
                     </div>
+                    <p className="text-xs text-purple-700 dark:text-purple-300 mb-3">AI visually analyzes the Finviz chart image like a human trader would. May detect different patterns than algorithmic analysis due to different timeframes and visual interpretation.</p>
                     
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                       <DataItem label="AI Bias" value={analysis.candlestick_patterns.vision_ai_analysis.overall_bias || 'N/A'} />
