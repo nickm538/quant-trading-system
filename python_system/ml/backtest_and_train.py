@@ -186,17 +186,27 @@ def prepare_features_and_target(df: pd.DataFrame, horizon_days: int = 1) -> Tupl
     
     return X, y, feature_cols
 
-def train_xgboost_model(X_train, y_train, X_val, y_val):
-    """Train XGBoost model"""
-    model = xgb.XGBRegressor(
-        n_estimators=100,
-        max_depth=5,
-        learning_rate=0.1,
-        subsample=0.8,
-        colsample_bytree=0.8,
-        random_state=42,
-        n_jobs=-1
-    )
+def train_xgboost_model(X_train, y_train, X_val, y_val, hyperparams: Dict = None):
+    """Train XGBoost model with optional optimized hyperparameters"""
+    # Default hyperparameters
+    default_hp = {
+        'n_estimators': 100,
+        'max_depth': 5,
+        'learning_rate': 0.1,
+        'subsample': 0.8,
+        'colsample_bytree': 0.8,
+        'random_state': 42,
+        'n_jobs': -1
+    }
+    
+    # Override with provided hyperparameters
+    if hyperparams:
+        for key in ['n_estimators', 'max_depth', 'learning_rate', 'subsample', 
+                    'colsample_bytree', 'min_child_weight', 'reg_alpha', 'reg_lambda']:
+            if key in hyperparams:
+                default_hp[key] = hyperparams[key]
+    
+    model = xgb.XGBRegressor(**default_hp)
     
     model.fit(
         X_train, y_train,
@@ -206,18 +216,28 @@ def train_xgboost_model(X_train, y_train, X_val, y_val):
     
     return model
 
-def train_lightgbm_model(X_train, y_train, X_val, y_val):
-    """Train LightGBM model"""
-    model = lgb.LGBMRegressor(
-        n_estimators=100,
-        max_depth=5,
-        learning_rate=0.1,
-        subsample=0.8,
-        colsample_bytree=0.8,
-        random_state=42,
-        n_jobs=-1,
-        verbose=-1
-    )
+def train_lightgbm_model(X_train, y_train, X_val, y_val, hyperparams: Dict = None):
+    """Train LightGBM model with optional optimized hyperparameters"""
+    # Default hyperparameters
+    default_hp = {
+        'n_estimators': 100,
+        'max_depth': 5,
+        'learning_rate': 0.1,
+        'subsample': 0.8,
+        'colsample_bytree': 0.8,
+        'random_state': 42,
+        'n_jobs': -1,
+        'verbose': -1
+    }
+    
+    # Override with provided hyperparameters
+    if hyperparams:
+        for key in ['n_estimators', 'max_depth', 'learning_rate', 'subsample', 
+                    'colsample_bytree', 'min_child_samples', 'reg_alpha', 'reg_lambda']:
+            if key in hyperparams:
+                default_hp[key] = hyperparams[key]
+    
+    model = lgb.LGBMRegressor(**default_hp)
     
     model.fit(
         X_train, y_train,
@@ -444,11 +464,36 @@ def save_backtest_results_to_db(conn, model_id: int, symbol: str, metrics: Dict,
     conn.commit()
     cursor.close()
 
-def process_stock(symbol: str, conn) -> Dict:
-    """Process single stock: load data, train models, backtest, save results"""
+def process_stock(symbol: str, conn, use_improved_hp: bool = True) -> Dict:
+    """Process single stock: load data, train models, backtest, save results
+    
+    Args:
+        symbol: Stock symbol
+        conn: Database connection
+        use_improved_hp: Whether to use hyperparameters from continuous improvement
+    """
     print(f"\n{'='*80}")
     print(f"Processing {symbol}")
     print(f"{'='*80}")
+    
+    # Get improved hyperparameters if available
+    xgb_hp = None
+    lgb_hp = None
+    market_regime = 'unknown'
+    
+    if use_improved_hp:
+        try:
+            from ml.continuous_improvement import get_improved_training_config
+            config = get_improved_training_config(conn, symbol, 'xgboost')
+            xgb_hp = config.get('hyperparameters', {})
+            market_regime = config.get('market_regime', 'unknown')
+            print(f"  Using improved hyperparameters (regime: {market_regime})")
+            
+            config_lgb = get_improved_training_config(conn, symbol, 'lightgbm')
+            lgb_hp = config_lgb.get('hyperparameters', {})
+        except Exception as e:
+            print(f"  Could not load improved hyperparameters: {e}")
+            print(f"  Using default hyperparameters")
     
     # Load data
     print(f"[1/6] Downloading stock data from yfinance...")
@@ -477,21 +522,22 @@ def process_stock(symbol: str, conn) -> Dict:
     
     results = {}
     
-    # Train XGBoost
+    # Train XGBoost with improved hyperparameters
     print(f"[3/6] Training XGBoost model...")
-    xgb_model = train_xgboost_model(X_train_final, y_train_final, X_val, y_val)
+    xgb_model = train_xgboost_model(X_train_final, y_train_final, X_val, y_val, xgb_hp)
     xgb_predictions = xgb_model.predict(X_test)
     xgb_metrics = calculate_backtest_metrics(xgb_predictions, y_test.values, y_test.values)
-    print(f"  ✓ XGBoost - Accuracy: {xgb_metrics['direction_accuracy']*100:.2f}%, Sharpe: {xgb_metrics['sharpe_ratio']:.2f}")
+    print(f"  XGBoost - Accuracy: {xgb_metrics['direction_accuracy']*100:.2f}%, Sharpe: {xgb_metrics['sharpe_ratio']:.2f}")
     
-    # Save XGBoost to DB
-    xgb_hyperparams = {
+    # Save XGBoost to DB (use actual hyperparameters)
+    xgb_hyperparams = xgb_hp if xgb_hp else {
         'n_estimators': 100,
         'max_depth': 5,
         'learning_rate': 0.1,
         'subsample': 0.8,
         'colsample_bytree': 0.8
     }
+    xgb_hyperparams['market_regime'] = market_regime  # Track regime for learning
     xgb_feature_importance = dict(zip(feature_names[:len(xgb_model.feature_importances_)], xgb_model.feature_importances_.tolist()))
     xgb_model_id = save_model_to_db(conn, symbol, 'xgboost', xgb_model, xgb_metrics, xgb_hyperparams, xgb_feature_importance)
     save_backtest_results_to_db(
@@ -500,21 +546,22 @@ def process_stock(symbol: str, conn) -> Dict:
     )
     results['xgboost'] = xgb_metrics
     
-    # Train LightGBM
+    # Train LightGBM with improved hyperparameters
     print(f"[4/6] Training LightGBM model...")
-    lgb_model = train_lightgbm_model(X_train_final, y_train_final, X_val, y_val)
+    lgb_model = train_lightgbm_model(X_train_final, y_train_final, X_val, y_val, lgb_hp)
     lgb_predictions = lgb_model.predict(X_test)
     lgb_metrics = calculate_backtest_metrics(lgb_predictions, y_test.values, y_test.values)
-    print(f"  ✓ LightGBM - Accuracy: {lgb_metrics['direction_accuracy']*100:.2f}%, Sharpe: {lgb_metrics['sharpe_ratio']:.2f}")
+    print(f"  LightGBM - Accuracy: {lgb_metrics['direction_accuracy']*100:.2f}%, Sharpe: {lgb_metrics['sharpe_ratio']:.2f}")
     
-    # Save LightGBM to DB
-    lgb_hyperparams = {
+    # Save LightGBM to DB (use actual hyperparameters)
+    lgb_hyperparams = lgb_hp if lgb_hp else {
         'n_estimators': 100,
         'max_depth': 5,
         'learning_rate': 0.1,
         'subsample': 0.8,
         'colsample_bytree': 0.8
     }
+    lgb_hyperparams['market_regime'] = market_regime  # Track regime for learning
     lgb_feature_importance = dict(zip(feature_names[:len(lgb_model.feature_importances_)], lgb_model.feature_importances_.tolist()))
     lgb_model_id = save_model_to_db(conn, symbol, 'lightgbm', lgb_model, lgb_metrics, lgb_hyperparams, lgb_feature_importance)
     save_backtest_results_to_db(

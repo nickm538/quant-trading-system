@@ -66,8 +66,19 @@ def get_db_connection():
 def get_best_models_for_stock(conn, symbol: str, top_n: int = 3) -> List[Dict]:
     """
     Retrieve the best performing models for a stock from database
-    Returns top N models sorted by test accuracy
+    Uses composite scoring (accuracy + Sharpe + win rate + recent performance)
     """
+    # Try to use advanced model selector first
+    try:
+        from ml.model_selector import get_top_models_for_stock
+        top_models = get_top_models_for_stock(conn, symbol, top_n)
+        if top_models:
+            print(f"Using composite-scored models for {symbol}")
+            return top_models
+    except Exception as e:
+        print(f"Model selector unavailable, falling back to basic selection: {e}")
+    
+    # Fallback to original method
     print(f"\n🔍 Retrieving models for {symbol}...", file=sys.stderr)
     cursor = conn.cursor(dictionary=True)
     
@@ -160,7 +171,7 @@ def deserialize_model(model_data_b64: str):
 def generate_ensemble_prediction(models: List[Dict], features: np.ndarray) -> Dict:
     """
     Generate ensemble prediction using multiple models
-    Uses weighted average based on model accuracy
+    Uses weighted average based on composite score (accuracy + Sharpe + win rate)
     """
     predictions = []
     weights = []
@@ -177,9 +188,13 @@ def generate_ensemble_prediction(models: List[Dict], features: np.ndarray) -> Di
                 pred = model.predict(features)
                 predictions.append(pred[0])
                 
-                # Weight by test accuracy
-                accuracy = model_info['test_accuracy'] / 10000.0  # Convert from stored format
-                weights.append(accuracy)
+                # Weight by composite score if available, otherwise test accuracy
+                if 'composite_score' in model_info:
+                    weight = model_info['composite_score']
+                else:
+                    accuracy = model_info['test_accuracy'] / 10000.0  # Convert from stored format
+                    weight = accuracy
+                weights.append(max(0.1, weight))  # Minimum weight to avoid zeros
         except Exception as e:
             print(f"Error making prediction with model {model_info['id']}: {e}")
             continue
