@@ -68,6 +68,11 @@ from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, List
 import yfinance as yf
 
+# Advanced Analysis Modules
+from advanced_technicals import AdvancedTechnicals
+from candlestick_patterns import CandlestickPatternDetector
+from enhanced_fundamentals import EnhancedFundamentalsAnalyzer
+
 # Import our financial engines
 try:
     from perfect_production_analyzer import PerfectProductionAnalyzer
@@ -1014,7 +1019,10 @@ One comprehensive paragraph that synthesizes EVERYTHING above - BOTH MACRO AND M
             "production_analysis": None,
             "options_analysis": None,
             "fundamentals_analysis": None,
-            "ttm_squeeze": None
+            "ttm_squeeze": None,
+            "advanced_technicals": None,
+            "candlestick_patterns": None,
+            "enhanced_fundamentals": None
         }
         
         # Run production analyzer
@@ -1048,6 +1056,27 @@ One comprehensive paragraph that synthesizes EVERYTHING above - BOTH MACRO AND M
                 results["ttm_squeeze"] = ttm
             except Exception as e:
                 results["ttm_squeeze"] = {"error": str(e)}
+        
+        # Run Advanced Technicals (R2, Pivot, Fibonacci)
+        try:
+            adv_tech = AdvancedTechnicals()
+            results["advanced_technicals"] = adv_tech.analyze(symbol)
+        except Exception as e:
+            results["advanced_technicals"] = {"error": str(e)}
+        
+        # Run Candlestick Pattern Detection
+        try:
+            candle_detector = CandlestickPatternDetector()
+            results["candlestick_patterns"] = candle_detector.analyze(symbol)
+        except Exception as e:
+            results["candlestick_patterns"] = {"error": str(e)}
+        
+        # Run Enhanced Fundamentals (Cash Flow, GARP, FCF)
+        try:
+            enh_fund = EnhancedFundamentalsAnalyzer()
+            results["enhanced_fundamentals"] = enh_fund.analyze(symbol)
+        except Exception as e:
+            results["enhanced_fundamentals"] = {"error": str(e)}
         
         return results
     
@@ -1972,6 +2001,177 @@ One comprehensive paragraph that synthesizes EVERYTHING above - BOTH MACRO AND M
             except Exception as e:
                 import sys as _sys
                 print(f"Warning: Firecrawl scraping failed: {e}", file=_sys.stderr)
+        
+        # === ADVANCED TECHNICALS (R2 Score, Pivot Points, Fibonacci) ===
+        if symbol:
+            try:
+                adv_tech = AdvancedTechnicals()
+                adv_result = adv_tech.analyze(symbol)
+                
+                if adv_result.get('status') == 'success':
+                    context_parts.append(f"\n=== ADVANCED TECHNICALS (R2, PIVOT, FIBONACCI) ===")
+                    
+                    # R2 Score
+                    r2 = adv_result.get('r2_analysis', {})
+                    if r2:
+                        context_parts.append(f"\n--- R2 Score Analysis ---")
+                        context_parts.append(f"R2 Score: {r2.get('r2_score', 'N/A'):.4f}")
+                        context_parts.append(f"Predictability: {r2.get('predictability', 'N/A')}")
+                        context_parts.append(f"Trend Direction: {r2.get('trend_direction', 'N/A')}")
+                        context_parts.append(f"Trend Slope: {r2.get('slope', 'N/A'):.4f}")
+                    
+                    # Pivot Points
+                    pivots = adv_result.get('pivot_points', {})
+                    if pivots:
+                        std = pivots.get('standard', {})
+                        if std:
+                            context_parts.append(f"\n--- Pivot Points (Standard) ---")
+                            context_parts.append(f"Pivot: ${std.get('pivot', 0):.2f}")
+                            context_parts.append(f"R1: ${std.get('r1', 0):.2f} | R2: ${std.get('r2', 0):.2f} | R3: ${std.get('r3', 0):.2f}")
+                            context_parts.append(f"S1: ${std.get('s1', 0):.2f} | S2: ${std.get('s2', 0):.2f} | S3: ${std.get('s3', 0):.2f}")
+                        context_parts.append(f"Recommended Method: {pivots.get('method_recommendation', 'N/A')}")
+                    
+                    # Fibonacci Levels
+                    fib = adv_result.get('fibonacci', {})
+                    if fib:
+                        context_parts.append(f"\n--- Fibonacci Retracement ---")
+                        context_parts.append(f"Trend: {fib.get('trend', 'N/A')}")
+                        context_parts.append(f"Swing High: ${fib.get('swing_high', 0):.2f} | Swing Low: ${fib.get('swing_low', 0):.2f}")
+                        levels = fib.get('retracement', {})
+                        if levels:
+                            context_parts.append(f"0.0%: ${levels.get('0.000', 0):.2f} | 23.6%: ${levels.get('0.236', 0):.2f}")
+                            context_parts.append(f"38.2%: ${levels.get('0.382', 0):.2f} | 50.0%: ${levels.get('0.500', 0):.2f}")
+                            context_parts.append(f"61.8%: ${levels.get('0.618', 0):.2f} | 78.6%: ${levels.get('0.786', 0):.2f}")
+                            context_parts.append(f"100%: ${levels.get('1.000', 0):.2f}")
+                        context_parts.append(f"Current Position: {fib.get('current_position', 'N/A')}")
+                        key_level = fib.get('key_level', {})
+                        if key_level:
+                            context_parts.append(f"Key Level: {key_level.get('level', 'N/A')} at ${key_level.get('price', 0):.2f} ({key_level.get('distance_pct', 0):.1f}% away)")
+                    
+                    # Support/Resistance
+                    sr = adv_result.get('support_resistance', {})
+                    if sr:
+                        context_parts.append(f"\n--- Key Support/Resistance ---")
+                        supports = sr.get('supports', [])
+                        resistances = sr.get('resistances', [])
+                        if supports:
+                            context_parts.append(f"Supports: {', '.join([f'${s:.2f}' for s in supports[:3]])}")
+                        if resistances:
+                            context_parts.append(f"Resistances: {', '.join([f'${r:.2f}' for r in resistances[:3]])}")
+                    
+            except Exception as e:
+                import sys as _sys
+                print(f"Warning: Advanced technicals failed: {e}", file=_sys.stderr)
+        
+        # === CANDLESTICK PATTERN DETECTION ===
+        if symbol:
+            try:
+                candle_detector = CandlestickPatternDetector()
+                candle_result = candle_detector.analyze(symbol)
+                
+                if candle_result.get('status') == 'success':
+                    patterns = candle_result.get('patterns_detected', [])
+                    if patterns:
+                        context_parts.append(f"\n=== CANDLESTICK PATTERN DETECTION ===")
+                        context_parts.append(f"Patterns Found: {len(patterns)}")
+                        context_parts.append(f"Overall Bias: {candle_result.get('overall_bias', 'NEUTRAL')}")
+                        context_parts.append(f"Confidence: {candle_result.get('confidence', 0):.1f}%")
+                        
+                        for pattern in patterns[:5]:  # Top 5 patterns
+                            context_parts.append(f"\n--- {pattern.get('name', 'Unknown')} ---")
+                            context_parts.append(f"Type: {pattern.get('type', 'N/A')}")
+                            context_parts.append(f"Strength: {pattern.get('strength', 'N/A')}")
+                            context_parts.append(f"Reliability: {pattern.get('reliability', 0):.0f}%")
+                            if pattern.get('description'):
+                                context_parts.append(f"Meaning: {pattern.get('description')}")
+                            if pattern.get('action'):
+                                context_parts.append(f"Action: {pattern.get('action')}")
+                        
+                        # Ichimoku Cloud (if detected)
+                        ichimoku = candle_result.get('ichimoku', {})
+                        if ichimoku:
+                            context_parts.append(f"\n--- Ichimoku Cloud Analysis ---")
+                            context_parts.append(f"Trend: {ichimoku.get('trend', 'N/A')}")
+                            context_parts.append(f"Price vs Cloud: {ichimoku.get('price_position', 'N/A')}")
+                            context_parts.append(f"TK Cross: {ichimoku.get('tk_cross', 'N/A')}")
+                            context_parts.append(f"Cloud Color: {ichimoku.get('cloud_color', 'N/A')}")
+                            context_parts.append(f"Signal: {ichimoku.get('signal', 'N/A')}")
+                    else:
+                        context_parts.append(f"\n=== CANDLESTICK PATTERN DETECTION ===")
+                        context_parts.append("No significant candlestick patterns detected in recent price action.")
+                        
+            except Exception as e:
+                import sys as _sys
+                print(f"Warning: Candlestick pattern detection failed: {e}", file=_sys.stderr)
+        
+        # === ENHANCED FUNDAMENTALS (Cash Flow, GARP, FCF, EBITDA/EV) ===
+        if symbol:
+            try:
+                enh_fund = EnhancedFundamentalsAnalyzer()
+                enh_result = enh_fund.analyze(symbol)
+                
+                if enh_result.get('status') == 'success':
+                    context_parts.append(f"\n=== ENHANCED CASH FLOW FUNDAMENTALS ===")
+                    
+                    # Valuation Metrics
+                    val = enh_result.get('valuation', {})
+                    if val:
+                        context_parts.append(f"\n--- Valuation Metrics ---")
+                        context_parts.append(f"P/E Ratio: {val.get('pe_ratio', 'N/A')}")
+                        context_parts.append(f"Forward P/E: {val.get('forward_pe', 'N/A')}")
+                        context_parts.append(f"PEG Ratio: {val.get('peg_ratio', 'N/A')}")
+                        context_parts.append(f"EV/EBITDA: {val.get('ev_to_ebitda', 'N/A')}")
+                        context_parts.append(f"EV/Revenue: {val.get('ev_to_revenue', 'N/A')}")
+                        context_parts.append(f"Price/Book: {val.get('price_to_book', 'N/A')}")
+                        context_parts.append(f"Price/Sales: {val.get('price_to_sales', 'N/A')}")
+                    
+                    # Cash Flow Analysis
+                    cf = enh_result.get('cash_flow', {})
+                    if cf:
+                        context_parts.append(f"\n--- Cash Flow Analysis ---")
+                        context_parts.append(f"Operating Cash Flow: ${cf.get('operating_cash_flow', 'N/A'):,.0f}" if cf.get('operating_cash_flow') else "Operating Cash Flow: N/A")
+                        context_parts.append(f"Free Cash Flow: ${cf.get('free_cash_flow', 'N/A'):,.0f}" if cf.get('free_cash_flow') else "Free Cash Flow: N/A")
+                        context_parts.append(f"FCF Yield: {cf.get('fcf_yield', 'N/A'):.2f}%" if cf.get('fcf_yield') else "FCF Yield: N/A")
+                        context_parts.append(f"FCF Margin: {cf.get('fcf_margin', 'N/A'):.2f}%" if cf.get('fcf_margin') else "FCF Margin: N/A")
+                        context_parts.append(f"Cash Conversion: {cf.get('cash_conversion', 'N/A'):.2f}" if cf.get('cash_conversion') else "Cash Conversion: N/A")
+                    
+                    # GARP Analysis
+                    garp = enh_result.get('garp_analysis', {})
+                    if garp:
+                        context_parts.append(f"\n--- GARP Analysis (Growth at Reasonable Price) ---")
+                        context_parts.append(f"GARP Score: {garp.get('garp_score', 'N/A')}/100")
+                        context_parts.append(f"GARP Signal: {garp.get('signal', 'N/A')}")
+                        context_parts.append(f"Growth Rate: {garp.get('growth_rate', 'N/A'):.1f}%" if garp.get('growth_rate') else "Growth Rate: N/A")
+                        context_parts.append(f"PEG Assessment: {garp.get('peg_assessment', 'N/A')}")
+                    
+                    # Liquidity & Float
+                    liq = enh_result.get('liquidity', {})
+                    if liq:
+                        context_parts.append(f"\n--- Liquidity & Float ---")
+                        context_parts.append(f"Free Float: {liq.get('free_float_pct', 'N/A'):.1f}%" if liq.get('free_float_pct') else "Free Float: N/A")
+                        context_parts.append(f"Float Shares: {liq.get('float_shares', 'N/A'):,.0f}" if liq.get('float_shares') else "Float Shares: N/A")
+                        context_parts.append(f"Shares Outstanding: {liq.get('shares_outstanding', 'N/A'):,.0f}" if liq.get('shares_outstanding') else "Shares Outstanding: N/A")
+                        context_parts.append(f"Avg Volume: {liq.get('avg_volume', 'N/A'):,.0f}" if liq.get('avg_volume') else "Avg Volume: N/A")
+                        context_parts.append(f"Liquidity Score: {liq.get('liquidity_score', 'N/A')}/100")
+                    
+                    # Financial Health
+                    health = enh_result.get('financial_health', {})
+                    if health:
+                        context_parts.append(f"\n--- Financial Health ---")
+                        context_parts.append(f"Current Ratio: {health.get('current_ratio', 'N/A')}")
+                        context_parts.append(f"Quick Ratio: {health.get('quick_ratio', 'N/A')}")
+                        context_parts.append(f"Debt/Equity: {health.get('debt_to_equity', 'N/A')}")
+                        context_parts.append(f"Interest Coverage: {health.get('interest_coverage', 'N/A')}")
+                        context_parts.append(f"Altman Z-Score: {health.get('altman_z', 'N/A')}")
+                    
+                    # Overall Assessment
+                    context_parts.append(f"\n--- Overall Fundamental Assessment ---")
+                    context_parts.append(f"Fundamental Score: {enh_result.get('fundamental_score', 'N/A')}/100")
+                    context_parts.append(f"Value Signal: {enh_result.get('value_signal', 'N/A')}")
+                    
+            except Exception as e:
+                import sys as _sys
+                print(f"Warning: Enhanced fundamentals failed: {e}", file=_sys.stderr)
         
         return "\n".join(context_parts)
     
