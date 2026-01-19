@@ -5,6 +5,14 @@ interface RawDataDisplayProps {
   analysis: any;
 }
 
+// Safe number formatting helper - handles null, undefined, strings, and non-numbers
+const safeFixed = (value: any, decimals: number = 2): string => {
+  if (value === null || value === undefined) return 'N/A';
+  const num = typeof value === 'string' ? parseFloat(value) : value;
+  if (typeof num !== 'number' || isNaN(num)) return 'N/A';
+  return num.toFixed(decimals);
+};
+
 export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
   const technical = analysis.technical_analysis || {};
   const stochastic = analysis.stochastic_analysis || {};
@@ -33,14 +41,14 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
 
           <TabsContent value="technical" className="space-y-4">
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              <DataItem label="Technical Score" value={`${technical.technical_score?.toFixed(2) || 'N/A'}/100`} />
-              <DataItem label="Momentum Score" value={`${technical.momentum_score?.toFixed(2) || 'N/A'}/100`} />
-              <DataItem label="Trend Score" value={`${technical.trend_score?.toFixed(2) || 'N/A'}/100`} />
-              <DataItem label="Volatility Score" value={`${technical.volatility_score?.toFixed(2) || 'N/A'}/100`} />
-              <DataItem label="RSI (14)" value={technical.rsi?.toFixed(2) || 'N/A'} />
-              <DataItem label="MACD" value={technical.macd?.toFixed(4) || 'N/A'} />
-              <DataItem label="ADX" value={technical.adx?.toFixed(2) || 'N/A'} />
-              <DataItem label="Current Volatility" value={`${(technical.current_volatility * 100)?.toFixed(2) || 'N/A'}%`} />
+              <DataItem label="Technical Score" value={`${safeFixed(technical.technical_score)}/100`} />
+              <DataItem label="Momentum Score" value={`${safeFixed(technical.momentum_score)}/100`} />
+              <DataItem label="Trend Score" value={`${safeFixed(technical.trend_score)}/100`} />
+              <DataItem label="Volatility Score" value={`${safeFixed(technical.volatility_score)}/100`} />
+              <DataItem label="RSI (14)" value={safeFixed(technical.rsi)} />
+              <DataItem label="MACD" value={safeFixed(technical.macd, 4)} />
+              <DataItem label="ADX" value={safeFixed(technical.adx)} />
+              <DataItem label="Current Volatility" value={`${safeFixed(technical.current_volatility * 100)}%`} />
             </div>
             
             <div className="mt-4 p-4 bg-muted/20 rounded-lg">
@@ -68,21 +76,21 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <DataItem label="Trend Direction" value={analysis.advanced_technicals.r2_analysis?.trend_direction || analysis.advanced_technicals.trend_direction || 'N/A'} />
                   <DataItem label="Trend Strength" value={analysis.advanced_technicals.r2_analysis?.trend_strength || 'N/A'} />
-                  <DataItem label="Current Price" value={`$${analysis.advanced_technicals.current_price?.toFixed(2) || 'N/A'}`} />
-                  <DataItem label="Nearest Support" value={`$${analysis.advanced_technicals.key_levels?.nearest_support?.toFixed(2) || 'N/A'}`} />
+                  <DataItem label="Current Price" value={`$${safeFixed(analysis.advanced_technicals.current_price)}`} />
+                  <DataItem label="Nearest Support" value={`$${safeFixed(analysis.advanced_technicals.key_levels?.nearest_support)}`} />
                 </div>
                 
                 {analysis.advanced_technicals.pivot_points && (
                   <div className="mt-4">
                     <h5 className="font-semibold mb-2">Standard Pivot Points</h5>
                     <div className="grid grid-cols-3 md:grid-cols-7 gap-2">
-                      <DataItem label="R3" value={`$${analysis.advanced_technicals.pivot_points.standard?.r3?.toFixed(2) || 'N/A'}`} />
-                      <DataItem label="R2" value={`$${analysis.advanced_technicals.pivot_points.standard?.r2?.toFixed(2) || 'N/A'}`} />
-                      <DataItem label="R1" value={`$${analysis.advanced_technicals.pivot_points.standard?.r1?.toFixed(2) || 'N/A'}`} />
-                      <DataItem label="Pivot" value={`$${analysis.advanced_technicals.pivot_points.standard?.pivot?.toFixed(2) || 'N/A'}`} />
-                      <DataItem label="S1" value={`$${analysis.advanced_technicals.pivot_points.standard?.s1?.toFixed(2) || 'N/A'}`} />
-                      <DataItem label="S2" value={`$${analysis.advanced_technicals.pivot_points.standard?.s2?.toFixed(2) || 'N/A'}`} />
-                      <DataItem label="S3" value={`$${analysis.advanced_technicals.pivot_points.standard?.s3?.toFixed(2) || 'N/A'}`} />
+                      <DataItem label="R3" value={`$${safeFixed(analysis.advanced_technicals.pivot_points.standard?.r3)}`} />
+                      <DataItem label="R2" value={`$${safeFixed(analysis.advanced_technicals.pivot_points.standard?.r2)}`} />
+                      <DataItem label="R1" value={`$${safeFixed(analysis.advanced_technicals.pivot_points.standard?.r1)}`} />
+                      <DataItem label="Pivot" value={`$${safeFixed(analysis.advanced_technicals.pivot_points.standard?.pivot)}`} />
+                      <DataItem label="S1" value={`$${safeFixed(analysis.advanced_technicals.pivot_points.standard?.s1)}`} />
+                      <DataItem label="S2" value={`$${safeFixed(analysis.advanced_technicals.pivot_points.standard?.s2)}`} />
+                      <DataItem label="S3" value={`$${safeFixed(analysis.advanced_technicals.pivot_points.standard?.s3)}`} />
                     </div>
                   </div>
                 )}
@@ -92,7 +100,7 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
                     <h5 className="font-semibold mb-2">Fibonacci Levels</h5>
                     <div className="grid grid-cols-4 md:grid-cols-7 gap-2">
                       {Object.entries(analysis.advanced_technicals.fibonacci.retracement || {}).map(([level, price]: [string, any]) => (
-                        <DataItem key={level} label={`${level}`} value={`$${price?.toFixed(2) || 'N/A'}`} />
+                        <DataItem key={level} label={`${level}`} value={`$${safeFixed(price)}`} />
                       ))}
                     </div>
                   </div>
@@ -118,7 +126,7 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
               <div className="space-y-4">
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <DataItem label="Overall Bias" value={analysis.candlestick_patterns.overall_bias || 'N/A'} />
-                  <DataItem label="Confidence" value={`${(analysis.candlestick_patterns.confidence * 100)?.toFixed(1) || 'N/A'}%`} />
+                  <DataItem label="Confidence" value={`${safeFixed(analysis.candlestick_patterns.confidence * 100, 1)}%`} />
                   <DataItem label="Patterns Found" value={analysis.candlestick_patterns.patterns_detected?.length || 0} />
                   <DataItem label="Pattern Strength" value={analysis.candlestick_patterns.pattern_strength || 'N/A'} />
                 </div>
@@ -285,20 +293,20 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
             {analysis.enhanced_fundamentals ? (
               <div className="space-y-4">
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <DataItem label="P/E Ratio" value={analysis.enhanced_fundamentals.valuation?.pe_ratio?.toFixed(2) || 'N/A'} />
-                  <DataItem label="Forward P/E" value={analysis.enhanced_fundamentals.valuation?.forward_pe?.toFixed(2) || 'N/A'} />
-                  <DataItem label="PEG Ratio" value={analysis.enhanced_fundamentals.valuation?.peg_ratio?.toFixed(2) || 'N/A'} />
-                  <DataItem label="EV/EBITDA" value={analysis.enhanced_fundamentals.valuation?.ev_ebitda?.toFixed(2) || 'N/A'} />
+                  <DataItem label="P/E Ratio" value={safeFixed(analysis.enhanced_fundamentals.valuation?.pe_ratio)} />
+                  <DataItem label="Forward P/E" value={safeFixed(analysis.enhanced_fundamentals.valuation?.forward_pe)} />
+                  <DataItem label="PEG Ratio" value={safeFixed(analysis.enhanced_fundamentals.valuation?.peg_ratio)} />
+                  <DataItem label="EV/EBITDA" value={safeFixed(analysis.enhanced_fundamentals.valuation?.ev_ebitda)} />
                 </div>
                 
                 {analysis.enhanced_fundamentals.cash_flow && (
                   <div className="mt-4">
                     <h5 className="font-semibold mb-2">Cash Flow Metrics</h5>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                      <DataItem label="Free Cash Flow" value={`$${(analysis.enhanced_fundamentals.cash_flow.free_cash_flow / 1e9)?.toFixed(2) || 'N/A'}B`} />
-                      <DataItem label="FCF Yield" value={`${(analysis.enhanced_fundamentals.cash_flow.fcf_yield * 100)?.toFixed(2) || 'N/A'}%`} />
-                      <DataItem label="FCF Margin" value={`${(analysis.enhanced_fundamentals.cash_flow.fcf_margin * 100)?.toFixed(2) || 'N/A'}%`} />
-                      <DataItem label="Op Cash Flow" value={`$${(analysis.enhanced_fundamentals.cash_flow.operating_cash_flow / 1e9)?.toFixed(2) || 'N/A'}B`} />
+                      <DataItem label="Free Cash Flow" value={`$${safeFixed(analysis.enhanced_fundamentals.cash_flow.free_cash_flow / 1e9)}B`} />
+                      <DataItem label="FCF Yield" value={`${safeFixed(analysis.enhanced_fundamentals.cash_flow.fcf_yield * 100)}%`} />
+                      <DataItem label="FCF Margin" value={`${safeFixed(analysis.enhanced_fundamentals.cash_flow.fcf_margin * 100)}%`} />
+                      <DataItem label="Op Cash Flow" value={`$${safeFixed(analysis.enhanced_fundamentals.cash_flow.operating_cash_flow / 1e9)}B`} />
                     </div>
                   </div>
                 )}
@@ -307,10 +315,10 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
                   <div className="mt-4">
                     <h5 className="font-semibold mb-2">GARP Analysis (Growth at Reasonable Price)</h5>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                      <DataItem label="GARP Score" value={`${analysis.enhanced_fundamentals.garp_analysis.garp_score?.toFixed(1) || 'N/A'}/100`} />
+                      <DataItem label="GARP Score" value={`${safeFixed(analysis.enhanced_fundamentals.garp_analysis.garp_score, 1)}/100`} />
                       <DataItem label="GARP Signal" value={analysis.enhanced_fundamentals.garp_analysis.garp_signal || 'N/A'} />
-                      <DataItem label="Growth Rate" value={`${(analysis.enhanced_fundamentals.garp_analysis.earnings_growth * 100)?.toFixed(1) || 'N/A'}%`} />
-                      <DataItem label="Value Score" value={`${analysis.enhanced_fundamentals.garp_analysis.value_score?.toFixed(1) || 'N/A'}/100`} />
+                      <DataItem label="Growth Rate" value={`${safeFixed(analysis.enhanced_fundamentals.garp_analysis.earnings_growth * 100, 1)}%`} />
+                      <DataItem label="Value Score" value={`${safeFixed(analysis.enhanced_fundamentals.garp_analysis.value_score, 1)}/100`} />
                     </div>
                   </div>
                 )}
@@ -319,10 +327,10 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
                   <div className="mt-4">
                     <h5 className="font-semibold mb-2">Liquidity & Float</h5>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                      <DataItem label="Free Float %" value={`${(analysis.enhanced_fundamentals.liquidity.free_float_pct * 100)?.toFixed(1) || 'N/A'}%`} />
-                      <DataItem label="Liquidity Score" value={`${analysis.enhanced_fundamentals.liquidity.liquidity_score?.toFixed(1) || 'N/A'}/100`} />
-                      <DataItem label="Avg Volume" value={`${(analysis.enhanced_fundamentals.liquidity.avg_volume / 1e6)?.toFixed(2) || 'N/A'}M`} />
-                      <DataItem label="Current Ratio" value={analysis.enhanced_fundamentals.liquidity.current_ratio?.toFixed(2) || 'N/A'} />
+                      <DataItem label="Free Float %" value={`${safeFixed(analysis.enhanced_fundamentals.liquidity.free_float_pct * 100, 1)}%`} />
+                      <DataItem label="Liquidity Score" value={`${safeFixed(analysis.enhanced_fundamentals.liquidity.liquidity_score, 1)}/100`} />
+                      <DataItem label="Avg Volume" value={`${safeFixed(analysis.enhanced_fundamentals.liquidity.avg_volume / 1e6)}M`} />
+                      <DataItem label="Current Ratio" value={safeFixed(analysis.enhanced_fundamentals.liquidity.current_ratio)} />
                     </div>
                   </div>
                 )}
@@ -331,10 +339,10 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
                   <div className="mt-4">
                     <h5 className="font-semibold mb-2">Financial Health</h5>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                      <DataItem label="Altman Z-Score" value={analysis.enhanced_fundamentals.financial_health.altman_z_score?.toFixed(2) || 'N/A'} />
+                      <DataItem label="Altman Z-Score" value={safeFixed(analysis.enhanced_fundamentals.financial_health.altman_z_score)} />
                       <DataItem label="Z-Score Rating" value={analysis.enhanced_fundamentals.financial_health.z_score_rating || 'N/A'} />
-                      <DataItem label="Debt/Equity" value={analysis.enhanced_fundamentals.financial_health.debt_to_equity?.toFixed(2) || 'N/A'} />
-                      <DataItem label="Interest Coverage" value={analysis.enhanced_fundamentals.financial_health.interest_coverage?.toFixed(2) || 'N/A'} />
+                      <DataItem label="Debt/Equity" value={safeFixed(analysis.enhanced_fundamentals.financial_health.debt_to_equity)} />
+                      <DataItem label="Interest Coverage" value={safeFixed(analysis.enhanced_fundamentals.financial_health.interest_coverage)} />
                     </div>
                   </div>
                 )}
@@ -367,22 +375,22 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
               </div>
               
               <div className="space-y-1">
-                <DataItem label="Fat-Tail DF" value={garch.fat_tail_df?.toFixed(2) || 'N/A'} />
+                <DataItem label="Fat-Tail DF" value={safeFixed(garch.fat_tail_df)} />
                 <p className="text-xs text-muted-foreground">Lower = fatter tails (more extreme events). Typical: 3-10</p>
               </div>
               
               <div className="space-y-1">
-                <DataItem label="AIC" value={garch.aic?.toFixed(2) || 'N/A'} />
+                <DataItem label="AIC" value={safeFixed(garch.aic)} />
                 <p className="text-xs text-muted-foreground">Model quality: Lower is better. Compare across stocks</p>
               </div>
               
               <div className="space-y-1">
-                <DataItem label="BIC" value={garch.bic?.toFixed(2) || 'N/A'} />
+                <DataItem label="BIC" value={safeFixed(garch.bic)} />
                 <p className="text-xs text-muted-foreground">Similar to AIC but penalizes complexity more</p>
               </div>
               
               <div className="space-y-1">
-                <DataItem label="Current Vol" value={`${(garch.current_volatility * 100)?.toFixed(2) || 'N/A'}%`} />
+                <DataItem label="Current Vol" value={`${safeFixed(garch.current_volatility * 100)}%`} />
                 <p className="text-xs text-muted-foreground">Annualized volatility forecast for next period</p>
               </div>
             </div>
@@ -399,7 +407,7 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
                 - ε²ₜ₋₁ = Previous squared residual<br/>
                 <br/>
                 Fitted using Maximum Likelihood Estimation (MLE)<br/>
-                Student-t distribution captures fat tails (df={garch.fat_tail_df?.toFixed(2) || 'N/A'})
+                Student-t distribution captures fat tails (df={safeFixed(garch.fat_tail_df)})
               </code>
             </div>
             
@@ -435,37 +443,37 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
               </div>
               
               <div className="space-y-1">
-                <DataItem label="Expected Price" value={`$${stochastic.expected_price?.toFixed(2) || 'N/A'}`} />
+                <DataItem label="Expected Price" value={`$${safeFixed(stochastic.expected_price)}`} />
                 <p className="text-xs text-muted-foreground">Average price across all 20,000 simulations</p>
               </div>
               
               <div className="space-y-1">
-                <DataItem label="Expected Return" value={`${(stochastic.expected_return * 100)?.toFixed(2) || 'N/A'}%`} />
+                <DataItem label="Expected Return" value={`${safeFixed(stochastic.expected_return * 100)}%`} />
                 <p className="text-xs text-muted-foreground">Average return over 30 days (annualized)</p>
               </div>
               
               <div className="space-y-1">
-                <DataItem label="VaR (95%)" value={`${(stochastic.var_95 * 100)?.toFixed(2) || 'N/A'}%`} />
+                <DataItem label="VaR (95%)" value={`${safeFixed(stochastic.var_95 * 100)}%`} />
                 <p className="text-xs text-muted-foreground">Worst-case loss in 95% of scenarios (5% chance worse)</p>
               </div>
               
               <div className="space-y-1">
-                <DataItem label="CVaR (95%)" value={`${(stochastic.cvar_95 * 100)?.toFixed(2) || 'N/A'}%`} />
+                <DataItem label="CVaR (95%)" value={`${safeFixed(stochastic.cvar_95 * 100)}%`} />
                 <p className="text-xs text-muted-foreground">Average loss when VaR is exceeded (tail risk)</p>
               </div>
               
               <div className="space-y-1">
-                <DataItem label="Max Drawdown" value={`${(stochastic.max_drawdown * 100)?.toFixed(2) || 'N/A'}%`} />
+                <DataItem label="Max Drawdown" value={`${safeFixed(stochastic.max_drawdown * 100)}%`} />
                 <p className="text-xs text-muted-foreground">Largest peak-to-trough decline across simulations</p>
               </div>
               
               <div className="space-y-1">
-                <DataItem label="95% CI Lower" value={`$${stochastic.confidence_interval_lower?.toFixed(2) || 'N/A'}`} />
+                <DataItem label="95% CI Lower" value={`$${safeFixed(stochastic.confidence_interval_lower)}`} />
                 <p className="text-xs text-muted-foreground">Lower bound: 95% chance price stays above this</p>
               </div>
               
               <div className="space-y-1">
-                <DataItem label="95% CI Upper" value={`$${stochastic.confidence_interval_upper?.toFixed(2) || 'N/A'}`} />
+                <DataItem label="95% CI Upper" value={`$${safeFixed(stochastic.confidence_interval_upper)}`} />
                 <p className="text-xs text-muted-foreground">Upper bound: 95% chance price stays below this</p>
               </div>
             </div>
@@ -502,14 +510,14 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
 
           <TabsContent value="position" className="space-y-4">
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              <DataItem label="Bankroll" value={`$${(analysis.bankroll || 1000).toFixed(2)}`} />
-              <DataItem label="Position Size" value={`${((positionSizing.position_size_pct || 0) * 100)?.toFixed(2)}%`} />
-              <DataItem label="Shares" value={positionSizing.shares?.toFixed(0) || 'N/A'} />
-              <DataItem label="Position Value" value={`$${positionSizing.position_value?.toFixed(2) || 'N/A'}`} />
-              <DataItem label="Dollar Risk" value={`$${positionSizing.dollar_risk?.toFixed(2) || 'N/A'}`} />
-              <DataItem label="Dollar Reward" value={`$${positionSizing.dollar_reward?.toFixed(2) || 'N/A'}`} />
-              <DataItem label="Risk/Reward" value={`1:${positionSizing.risk_reward_ratio?.toFixed(2) || 'N/A'}`} />
-              <DataItem label="Risk % of Bankroll" value={`${(positionSizing.risk_pct_of_bankroll * 100)?.toFixed(2) || 'N/A'}%`} />
+              <DataItem label="Bankroll" value={`$${safeFixed(analysis.bankroll || 1000)}`} />
+              <DataItem label="Position Size" value={`${safeFixed((positionSizing.position_size_pct || 0) * 100)}%`} />
+              <DataItem label="Shares" value={safeFixed(positionSizing.shares, 0)} />
+              <DataItem label="Position Value" value={`$${safeFixed(positionSizing.position_value)}`} />
+              <DataItem label="Dollar Risk" value={`$${safeFixed(positionSizing.dollar_risk)}`} />
+              <DataItem label="Dollar Reward" value={`$${safeFixed(positionSizing.dollar_reward)}`} />
+              <DataItem label="Risk/Reward" value={`1:${safeFixed(positionSizing.risk_reward_ratio)}`} />
+              <DataItem label="Risk % of Bankroll" value={`${safeFixed((positionSizing.risk_pct_of_bankroll || 0) * 100)}%`} />
             </div>
             
             <div className="mt-4 p-4 bg-muted/20 rounded-lg">
