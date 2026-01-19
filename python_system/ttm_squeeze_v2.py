@@ -99,18 +99,18 @@ class TTMSqueeze:
             data = response.json()
             
             if data.get('status') == 'error':
-                print(f"❌ TwelveData API Error: {data.get('message')}")
+                import sys; print(f"TwelveData API Error: {data.get('message')}", file=sys.stderr)
                 return None
             
             values = data.get('values', [])
             if not values:
-                print(f"❌ No price data returned for {symbol}")
+                import sys; print(f"No price data returned for {symbol}", file=sys.stderr)
                 return None
             
             return values
             
         except Exception as e:
-            print(f"❌ Error fetching price data: {e}")
+            import sys; print(f"Error fetching price data: {e}", file=sys.stderr)
             return None
     
     def _calculate_sma(self, prices: List[float], period: int) -> List[float]:
@@ -471,7 +471,7 @@ if __name__ == "__main__":
     if result['status'] == 'success':
         print(f"Symbol: {result['symbol']}")
         print(f"Price: ${result['current_price']:.2f}")
-        print(f"Squeeze: {'🔴 ON' if result['squeeze_on'] else '🟢 OFF'} ({result['squeeze_count']} bars)")
+        print(f"Squeeze: {'ON' if result['squeeze_on'] else 'OFF'} ({result['squeeze_count']} bars)")
         print(f"Momentum: {result['momentum']} ({result['momentum_color']})")
         print(f"Signal: {result['signal']} ({result['signal_strength']})")
         print(f"\nBollinger Bands: {result['bb_lower']:.2f} | {result['bb_middle']:.2f} | {result['bb_upper']:.2f}")
