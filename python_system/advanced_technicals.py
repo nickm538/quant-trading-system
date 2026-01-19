@@ -221,8 +221,10 @@ class AdvancedTechnicals:
         
         return {
             'r2_score': primary_r2,
+            'r2_scores': r2_scores,  # Alias for frontend compatibility
             'r2_scores_by_timeframe': r2_scores,
             'slopes_by_timeframe': slopes,
+            'slope': round(primary_slope, 4),  # Primary slope for frontend
             'trend_direction': trend_direction,
             'trend_strength': trend_strength,
             'interpretation': interpretation,

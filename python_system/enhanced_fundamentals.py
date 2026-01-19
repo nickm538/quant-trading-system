@@ -71,6 +71,8 @@ class EnhancedFundamentalsAnalyzer:
             yf_data = self._fetch_yfinance_data(symbol)
             fmp_data = self._fetch_fmp_data(symbol)
             finnhub_data = self._fetch_finnhub_data(symbol)
+            fmp_key_metrics = self._fetch_fmp_key_metrics(symbol)
+            fmp_ratios = self._fetch_fmp_ratios_ttm(symbol)
             
             if not yf_data:
                 return {
@@ -88,12 +90,12 @@ class EnhancedFundamentalsAnalyzer:
             sector = info.get('sector', 'Unknown')
             industry = info.get('industry', 'Unknown')
             
-            # Valuation metrics
-            pe_ratio = info.get('trailingPE') or info.get('forwardPE')
+            # Valuation metrics with FMP fallbacks
+            pe_ratio = info.get('trailingPE') or info.get('forwardPE') or (fmp_ratios.get('priceToEarningsRatioTTM') if fmp_ratios else None)
             forward_pe = info.get('forwardPE')
-            peg_ratio = info.get('pegRatio')
-            price_to_book = info.get('priceToBook')
-            price_to_sales = info.get('priceToSalesTrailing12Months')
+            peg_ratio = info.get('pegRatio') or (fmp_ratios.get('priceToEarningsGrowthRatioTTM') if fmp_ratios else None)
+            price_to_book = info.get('priceToBook') or (fmp_ratios.get('priceToBookRatioTTM') if fmp_ratios else None)
+            price_to_sales = info.get('priceToSalesTrailing12Months') or (fmp_ratios.get('priceToSalesRatioTTM') if fmp_ratios else None)
             
             # Growth metrics
             earnings_growth = info.get('earningsGrowth', 0) or 0
@@ -131,13 +133,23 @@ class EnhancedFundamentalsAnalyzer:
             # Free Float percentage
             free_float_pct = (float_shares / shares_outstanding * 100) if shares_outstanding > 0 else 0
             
-            # FCF Yield
+            # FCF Yield with FMP fallback
             fcf_yield = (free_cash_flow / market_cap * 100) if market_cap > 0 else 0
+            if fcf_yield == 0 and fmp_key_metrics:
+                fcf_yield = (fmp_key_metrics.get('freeCashFlowYield', 0) or 0) * 100  # Convert to percentage
             
-            # EBITDA and EV/EBITDA
+            # FCF Margin (FCF / Revenue)
+            total_revenue = info.get('totalRevenue', 0) or 0
+            fcf_margin = (free_cash_flow / total_revenue * 100) if total_revenue > 0 else 0
+            
+            # EBITDA and EV/EBITDA with FMP fallbacks
             ebitda = info.get('ebitda', 0) or 0
-            enterprise_value = info.get('enterpriseValue', 0) or 0
+            enterprise_value = info.get('enterpriseValue', 0) or (fmp_key_metrics.get('enterpriseValue') if fmp_key_metrics else 0)
+            
+            # Calculate EV/EBITDA with FMP fallback
             ev_to_ebitda = (enterprise_value / ebitda) if ebitda > 0 else 0
+            if ev_to_ebitda == 0 and fmp_key_metrics:
+                ev_to_ebitda = fmp_key_metrics.get('evToEBITDA', 0) or 0
             
             # EV/FCF
             ev_to_fcf = (enterprise_value / free_cash_flow) if free_cash_flow > 0 else 0
@@ -216,7 +228,8 @@ class EnhancedFundamentalsAnalyzer:
                 'cash_flow': {
                     'free_cash_flow': free_cash_flow,
                     'fcf_formatted': self._format_large_number(free_cash_flow),
-                    'fcf_yield_pct': round(fcf_yield, 2),
+                    'fcf_yield_pct': round(fcf_yield, 2) if fcf_yield else None,
+                    'fcf_margin_pct': round(fcf_margin, 2) if fcf_margin else None,
                     'operating_cash_flow': operating_cash_flow,
                     'ocf_formatted': self._format_large_number(operating_cash_flow),
                     'fcf_to_ocf_ratio': round(free_cash_flow / operating_cash_flow, 2) if operating_cash_flow else None,
@@ -335,6 +348,30 @@ class EnhancedFundamentalsAnalyzer:
             response = requests.get(url, timeout=10)
             if response.status_code == 200:
                 return response.json()
+        except Exception:
+            pass
+        return None
+    
+    def _fetch_fmp_key_metrics(self, symbol: str) -> Optional[Dict]:
+        """Fetch key metrics from FMP stable API."""
+        try:
+            url = f'https://financialmodelingprep.com/stable/key-metrics?symbol={symbol}&limit=1&apikey={self.fmp_key}'
+            response = requests.get(url, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                return data[0] if data else None
+        except Exception:
+            pass
+        return None
+    
+    def _fetch_fmp_ratios_ttm(self, symbol: str) -> Optional[Dict]:
+        """Fetch TTM ratios from FMP stable API."""
+        try:
+            url = f'https://financialmodelingprep.com/stable/ratios-ttm?symbol={symbol}&apikey={self.fmp_key}'
+            response = requests.get(url, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                return data[0] if data else None
         except Exception:
             pass
         return None
@@ -979,14 +1016,27 @@ class EnhancedFundamentalsAnalyzer:
                             'strong_sell': item.get('strongSell', 0)
                         })
             
-            # Finnhub price target
+            # Finnhub price target (may require premium)
             url = f'https://finnhub.io/api/v1/stock/price-target?symbol={symbol}&token={self.finnhub_key}'
             response = requests.get(url, timeout=10)
             if response.status_code == 200:
                 data = response.json()
-                analyst_data['target_price'] = data.get('targetMean')
-                analyst_data['target_high'] = data.get('targetHigh')
-                analyst_data['target_low'] = data.get('targetLow')
+                if data.get('targetMean'):
+                    analyst_data['target_price'] = data.get('targetMean')
+                    analyst_data['target_high'] = data.get('targetHigh')
+                    analyst_data['target_low'] = data.get('targetLow')
+            
+            # FMP price target consensus as fallback
+            if not analyst_data['target_price']:
+                url = f'https://financialmodelingprep.com/stable/price-target-consensus?symbol={symbol}&apikey={self.fmp_key}'
+                response = requests.get(url, timeout=10)
+                if response.status_code == 200:
+                    data = response.json()
+                    if data and len(data) > 0:
+                        analyst_data['target_price'] = data[0].get('targetConsensus')
+                        analyst_data['target_high'] = data[0].get('targetHigh')
+                        analyst_data['target_low'] = data[0].get('targetLow')
+                        analyst_data['target_median'] = data[0].get('targetMedian')
         except Exception:
             pass
         

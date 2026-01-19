@@ -218,9 +218,10 @@ export function OptionsFlowScanner() {
                     <div>
                       <h4 className="font-bold text-green-500 mb-2">Unusual Calls</h4>
                       {result.unusual_calls.map((call: any, idx: number) => (
-                        <div key={idx} className="text-sm flex justify-between border-b py-1">
-                          <span>${call.strike} strike</span>
-                          <span>Vol/OI: {call.vol_oi_ratio}x</span>
+                        <div key={idx} className="text-sm flex justify-between items-center border-b py-1 gap-2">
+                          <span className="font-medium">${call.strike} strike</span>
+                          <span className="text-muted-foreground">Exp: {call.expiration || call.exp || 'N/A'}</span>
+                          <span className="text-green-600">Vol/OI: {call.vol_oi_ratio}x</span>
                         </div>
                       ))}
                     </div>
@@ -229,9 +230,10 @@ export function OptionsFlowScanner() {
                     <div>
                       <h4 className="font-bold text-red-500 mb-2">Unusual Puts</h4>
                       {result.unusual_puts.map((put: any, idx: number) => (
-                        <div key={idx} className="text-sm flex justify-between border-b py-1">
-                          <span>${put.strike} strike</span>
-                          <span>Vol/OI: {put.vol_oi_ratio}x</span>
+                        <div key={idx} className="text-sm flex justify-between items-center border-b py-1 gap-2">
+                          <span className="font-medium">${put.strike} strike</span>
+                          <span className="text-muted-foreground">Exp: {put.expiration || put.exp || 'N/A'}</span>
+                          <span className="text-red-600">Vol/OI: {put.vol_oi_ratio}x</span>
                         </div>
                       ))}
                     </div>

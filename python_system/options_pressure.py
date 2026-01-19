@@ -66,8 +66,13 @@ class OptionsPressure:
             for exp in expirations[:3]:  # First 3 expirations
                 try:
                     chain = stock.option_chain(exp)
-                    all_calls.append(chain.calls)
-                    all_puts.append(chain.puts)
+                    # Add expiration date to each row
+                    calls_with_exp = chain.calls.copy()
+                    calls_with_exp['expiration'] = exp
+                    puts_with_exp = chain.puts.copy()
+                    puts_with_exp['expiration'] = exp
+                    all_calls.append(calls_with_exp)
+                    all_puts.append(puts_with_exp)
                 except Exception:
                     continue
             
@@ -250,6 +255,7 @@ class OptionsPressure:
             if vol_oi_ratio >= threshold and volume >= 100:
                 unusual.append({
                     'strike': row.get('strike', 0),
+                    'expiration': row.get('expiration', 'N/A'),
                     'volume': int(volume),
                     'open_interest': int(oi),
                     'vol_oi_ratio': round(vol_oi_ratio, 2),
