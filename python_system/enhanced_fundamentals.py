@@ -39,6 +39,7 @@ class EnhancedFundamentalsAnalyzer:
     def __init__(self):
         self.finnhub_key = os.environ.get('KEY') or os.environ.get('FINNHUB_API_KEY') or 'd55b3ohr01qljfdeghm0d55b3ohr01qljfdeghm1'
         self.fmp_key = os.environ.get('FMP_API_KEY') or 'LTecnRjOFtd8bFOTCRLpcncjxrqaZlqq'
+        self.alphavantage_key = os.environ.get('ALPHAVANTAGE_API_KEY') or 'GYALAFBEMJUE8GYO'
         
         # Sector P/E benchmarks (updated periodically)
         self.sector_pe_benchmarks = {
@@ -73,6 +74,7 @@ class EnhancedFundamentalsAnalyzer:
             finnhub_data = self._fetch_finnhub_data(symbol)
             fmp_key_metrics = self._fetch_fmp_key_metrics(symbol)
             fmp_ratios = self._fetch_fmp_ratios_ttm(symbol)
+            av_data = self._fetch_alphavantage_overview(symbol)
             
             if not yf_data:
                 return {
@@ -90,28 +92,60 @@ class EnhancedFundamentalsAnalyzer:
             sector = info.get('sector', 'Unknown')
             industry = info.get('industry', 'Unknown')
             
-            # Valuation metrics with FMP fallbacks
+            # Valuation metrics with FMP and AlphaVantage fallbacks
             pe_ratio = info.get('trailingPE') or info.get('forwardPE') or (fmp_ratios.get('priceToEarningsRatioTTM') if fmp_ratios else None)
-            forward_pe = info.get('forwardPE')
-            peg_ratio = info.get('pegRatio') or (fmp_ratios.get('priceToEarningsGrowthRatioTTM') if fmp_ratios else None)
-            price_to_book = info.get('priceToBook') or (fmp_ratios.get('priceToBookRatioTTM') if fmp_ratios else None)
-            price_to_sales = info.get('priceToSalesTrailing12Months') or (fmp_ratios.get('priceToSalesRatioTTM') if fmp_ratios else None)
+            if pe_ratio is None and av_data:
+                pe_ratio = self._safe_float(av_data.get('PERatio'))
             
-            # Growth metrics
+            forward_pe = info.get('forwardPE')
+            if forward_pe is None and av_data:
+                forward_pe = self._safe_float(av_data.get('ForwardPE'))
+            
+            peg_ratio = info.get('pegRatio') or (fmp_ratios.get('priceToEarningsGrowthRatioTTM') if fmp_ratios else None)
+            if peg_ratio is None and av_data:
+                peg_ratio = self._safe_float(av_data.get('PEGRatio'))
+            
+            price_to_book = info.get('priceToBook') or (fmp_ratios.get('priceToBookRatioTTM') if fmp_ratios else None)
+            if price_to_book is None and av_data:
+                price_to_book = self._safe_float(av_data.get('PriceToBookRatio'))
+            
+            price_to_sales = info.get('priceToSalesTrailing12Months') or (fmp_ratios.get('priceToSalesRatioTTM') if fmp_ratios else None)
+            if price_to_sales is None and av_data:
+                price_to_sales = self._safe_float(av_data.get('PriceToSalesRatioTTM'))
+            
+            # Growth metrics with AlphaVantage fallbacks
             earnings_growth = info.get('earningsGrowth', 0) or 0
             revenue_growth = info.get('revenueGrowth', 0) or 0
             earnings_quarterly_growth = info.get('earningsQuarterlyGrowth', 0) or 0
+            
+            # AlphaVantage provides quarterly YOY growth
+            if earnings_quarterly_growth == 0 and av_data:
+                earnings_quarterly_growth = self._safe_float(av_data.get('QuarterlyEarningsGrowthYOY')) or 0
+            if revenue_growth == 0 and av_data:
+                revenue_growth = self._safe_float(av_data.get('QuarterlyRevenueGrowthYOY')) or 0
             
             # Cash flow metrics
             free_cash_flow = info.get('freeCashflow', 0) or 0
             operating_cash_flow = info.get('operatingCashflow', 0) or 0
             
-            # Profitability
+            # Profitability with AlphaVantage fallbacks
             profit_margin = info.get('profitMargins', 0) or 0
+            if profit_margin == 0 and av_data:
+                profit_margin = self._safe_float(av_data.get('ProfitMargin')) or 0
+            
             operating_margin = info.get('operatingMargins', 0) or 0
+            if operating_margin == 0 and av_data:
+                operating_margin = self._safe_float(av_data.get('OperatingMarginTTM')) or 0
+            
             gross_margin = info.get('grossMargins', 0) or 0
+            
             roe = info.get('returnOnEquity', 0) or 0
+            if roe == 0 and av_data:
+                roe = self._safe_float(av_data.get('ReturnOnEquityTTM')) or 0
+            
             roa = info.get('returnOnAssets', 0) or 0
+            if roa == 0 and av_data:
+                roa = self._safe_float(av_data.get('ReturnOnAssetsTTM')) or 0
             
             # Balance sheet
             total_debt = info.get('totalDebt', 0) or 0
@@ -142,14 +176,19 @@ class EnhancedFundamentalsAnalyzer:
             total_revenue = info.get('totalRevenue', 0) or 0
             fcf_margin = (free_cash_flow / total_revenue * 100) if total_revenue > 0 else 0
             
-            # EBITDA and EV/EBITDA with FMP fallbacks
+            # EBITDA and EV/EBITDA with FMP and AlphaVantage fallbacks
             ebitda = info.get('ebitda', 0) or 0
+            if ebitda == 0 and av_data:
+                ebitda = self._safe_float(av_data.get('EBITDA')) or 0
+            
             enterprise_value = info.get('enterpriseValue', 0) or (fmp_key_metrics.get('enterpriseValue') if fmp_key_metrics else 0)
             
-            # Calculate EV/EBITDA with FMP fallback
+            # Calculate EV/EBITDA with FMP and AlphaVantage fallbacks
             ev_to_ebitda = (enterprise_value / ebitda) if ebitda > 0 else 0
             if ev_to_ebitda == 0 and fmp_key_metrics:
                 ev_to_ebitda = fmp_key_metrics.get('evToEBITDA', 0) or 0
+            if ev_to_ebitda == 0 and av_data:
+                ev_to_ebitda = self._safe_float(av_data.get('EVToEBITDA')) or 0
             
             # EV/FCF
             ev_to_fcf = (enterprise_value / free_cash_flow) if free_cash_flow > 0 else 0
@@ -376,6 +415,29 @@ class EnhancedFundamentalsAnalyzer:
             pass
         return None
     
+    def _fetch_alphavantage_overview(self, symbol: str) -> Optional[Dict]:
+        """Fetch company overview from AlphaVantage API."""
+        try:
+            url = f'https://www.alphavantage.co/query?function=OVERVIEW&symbol={symbol}&apikey={self.alphavantage_key}'
+            response = requests.get(url, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                # Check if we got valid data (not rate limit or error)
+                if 'Symbol' in data:
+                    return data
+        except Exception:
+            pass
+        return None
+    
+    def _safe_float(self, value) -> Optional[float]:
+        """Safely convert a value to float, handling None, 'None', and '-' values."""
+        if value is None or value == 'None' or value == '-' or value == '':
+            return None
+        try:
+            return float(value)
+        except (ValueError, TypeError):
+            return None
+    
     def _analyze_garp(self, pe: float, peg: float, earnings_growth: float, revenue_growth: float, sector: str) -> Dict:
         """
         Analyze stock for Growth At Reasonable Price (GARP) setup.
@@ -453,13 +515,32 @@ class EnhancedFundamentalsAnalyzer:
             verdict = 'NOT_GARP'
             interpretation = 'Does not meet GARP criteria'
         
+        # Calculate value score based on P/E vs sector and PEG
+        value_score = 0
+        if pe and pe < sector_pe:
+            value_score += 50 * (1 - pe / sector_pe)  # Higher score for lower P/E vs sector
+        if peg and peg < 2:
+            value_score += 50 * (1 - peg / 2)  # Higher score for lower PEG
+        value_score = min(100, max(0, value_score))  # Clamp to 0-100
+        
+        # Use the higher of earnings or revenue growth as the primary growth rate
+        growth_rate_pct = None
+        if earnings_growth and revenue_growth:
+            growth_rate_pct = max(earnings_growth * 100, revenue_growth * 100)
+        elif earnings_growth:
+            growth_rate_pct = earnings_growth * 100
+        elif revenue_growth:
+            growth_rate_pct = revenue_growth * 100
+        
         return {
             'score': garp_score,
             'max_score': 100,
             'verdict': verdict,
             'interpretation': interpretation,
             'signals': signals,
-            'peg_ratio': round(peg, 2) if peg else None
+            'peg_ratio': round(peg, 2) if peg else None,
+            'growth_rate_used': round(growth_rate_pct, 2) if growth_rate_pct else None,
+            'value_score': round(value_score, 1)
         }
     
     def _compare_to_sector(self, pe: float, sector: str, profit_margin: float, roe: float) -> Dict:
@@ -894,6 +975,29 @@ class EnhancedFundamentalsAnalyzer:
                         older = sum(h.get('dividend', 0) for h in history[16:20]) if len(history) >= 20 else sum(h.get('dividend', 0) for h in history[-4:])
                         if older > 0:
                             dividend_data['dividend_growth_5yr'] = round((recent / older - 1) * 100, 2)
+            
+            # AlphaVantage dividend fallback if FMP didn't return data
+            if not dividend_data['dividend_history']:
+                url = f'https://www.alphavantage.co/query?function=DIVIDENDS&symbol={symbol}&apikey={self.alphavantage_key}'
+                response = requests.get(url, timeout=10)
+                if response.status_code == 200:
+                    data = response.json()
+                    if data.get('data'):
+                        history = data['data'][:20]  # Last 20 dividends
+                        dividend_data['dividend_history'] = [
+                            {
+                                'date': item.get('ex_dividend_date'),
+                                'dividend': float(item.get('amount', 0)),
+                                'payment_date': item.get('payment_date')
+                            } for item in history
+                        ]
+                        
+                        # Calculate 5-year growth from AlphaVantage data
+                        if len(history) >= 20:
+                            recent = sum(float(h.get('amount', 0)) for h in history[:4])
+                            older = sum(float(h.get('amount', 0)) for h in history[16:20])
+                            if older > 0:
+                                dividend_data['dividend_growth_5yr'] = round((recent / older - 1) * 100, 2)
         except Exception:
             pass
         
@@ -1037,6 +1141,24 @@ class EnhancedFundamentalsAnalyzer:
                         analyst_data['target_high'] = data[0].get('targetHigh')
                         analyst_data['target_low'] = data[0].get('targetLow')
                         analyst_data['target_median'] = data[0].get('targetMedian')
+            
+            # AlphaVantage as final fallback for price target
+            if not analyst_data['target_price']:
+                url = f'https://www.alphavantage.co/query?function=OVERVIEW&symbol={symbol}&apikey={self.alphavantage_key}'
+                response = requests.get(url, timeout=10)
+                if response.status_code == 200:
+                    data = response.json()
+                    if data.get('AnalystTargetPrice'):
+                        analyst_data['target_price'] = self._safe_float(data.get('AnalystTargetPrice'))
+                        # AlphaVantage also has analyst ratings
+                        if not analyst_data['strong_buy']:
+                            analyst_data['strong_buy'] = int(data.get('AnalystRatingStrongBuy', 0) or 0)
+                            analyst_data['buy'] = int(data.get('AnalystRatingBuy', 0) or 0)
+                            analyst_data['hold'] = int(data.get('AnalystRatingHold', 0) or 0)
+                            analyst_data['sell'] = int(data.get('AnalystRatingSell', 0) or 0)
+                            analyst_data['strong_sell'] = int(data.get('AnalystRatingStrongSell', 0) or 0)
+                            total = sum([analyst_data['strong_buy'], analyst_data['buy'], analyst_data['hold'], analyst_data['sell'], analyst_data['strong_sell']])
+                            analyst_data['number_of_analysts'] = total
         except Exception:
             pass
         
@@ -1197,6 +1319,30 @@ class EnhancedFundamentalsAnalyzer:
             except Exception:
                 pass
             
+            # AlphaVantage fallback for FCF CAGR if yfinance didn't provide it
+            if trends['fcf_5yr_cagr'] is None:
+                try:
+                    url = f'https://www.alphavantage.co/query?function=CASH_FLOW&symbol={symbol}&apikey={self.alphavantage_key}'
+                    response = requests.get(url, timeout=15)
+                    if response.status_code == 200:
+                        data = response.json()
+                        annual_reports = data.get('annualReports', [])
+                        if len(annual_reports) >= 5:
+                            # Calculate FCF = Operating Cash Flow - Capital Expenditures
+                            fcf_values = []
+                            for report in annual_reports[:6]:  # Get 6 years for 5yr CAGR
+                                ocf = float(report.get('operatingCashflow', 0) or 0)
+                                capex = abs(float(report.get('capitalExpenditures', 0) or 0))
+                                fcf = ocf - capex
+                                fcf_values.append(fcf)
+                            
+                            if len(fcf_values) >= 4 and fcf_values[0] > 0 and fcf_values[3] > 0:
+                                trends['fcf_3yr_cagr'] = self._calculate_cagr(fcf_values[3], fcf_values[0], 3)
+                            if len(fcf_values) >= 5 and fcf_values[0] > 0 and fcf_values[4] > 0:
+                                trends['fcf_5yr_cagr'] = self._calculate_cagr(fcf_values[4], fcf_values[0], 4)
+                except Exception:
+                    pass
+            
             # Get historical stock price for price CAGR
             try:
                 hist = ticker.history(period='10y')
@@ -1238,6 +1384,35 @@ class EnhancedFundamentalsAnalyzer:
                             trends['dividend_5yr_cagr'] = self._calculate_cagr(old_div, recent_div, 5)
             except Exception:
                 pass
+            
+            # AlphaVantage fallback for dividend CAGR if yfinance didn't provide it
+            if trends['dividend_5yr_cagr'] is None:
+                try:
+                    url = f'https://www.alphavantage.co/query?function=DIVIDENDS&symbol={symbol}&apikey={self.alphavantage_key}'
+                    response = requests.get(url, timeout=15)
+                    if response.status_code == 200:
+                        data = response.json()
+                        div_data = data.get('data', [])
+                        if len(div_data) >= 20:  # Need at least 5 years of quarterly dividends
+                            # Group by year and sum
+                            from collections import defaultdict
+                            yearly_divs = defaultdict(float)
+                            for div in div_data:
+                                date_str = div.get('ex_dividend_date', '')
+                                if date_str:
+                                    year = date_str[:4]
+                                    amount = float(div.get('amount', 0) or 0)
+                                    yearly_divs[year] += amount
+                            
+                            # Sort years and calculate CAGR
+                            sorted_years = sorted(yearly_divs.keys(), reverse=True)
+                            if len(sorted_years) >= 6:
+                                recent_div = yearly_divs[sorted_years[0]]
+                                old_div = yearly_divs[sorted_years[5]]
+                                if old_div > 0 and recent_div > 0:
+                                    trends['dividend_5yr_cagr'] = self._calculate_cagr(old_div, recent_div, 5)
+                except Exception:
+                    pass
             
             # Create CAGR summary
             cagr_values = []
