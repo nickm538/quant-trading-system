@@ -313,7 +313,7 @@ export function QuantMLAnalysis({ mlPrediction, r2Analysis, loading }: QuantMLAn
             
             <div className="text-xs text-muted-foreground">
               <strong>What R² Means:</strong> R² (coefficient of determination) measures how well price follows a linear trend. 
-              High R² (>70%) = price is trending predictably. Low R² (<30%) = price is choppy/random. 
+              High R² (&gt;70%) = price is trending predictably. Low R² (&lt;30%) = price is choppy/random. 
               Use high R² stocks for trend-following strategies and low R² for mean-reversion.
             </div>
           </div>
