@@ -1183,7 +1183,7 @@ export default function Home() {
                   {/* ML Prediction Results */}
                   <QuantMLAnalysis 
                     mlPrediction={mlPrediction} 
-                    r2Analysis={analysisResult?.advanced_technicals?.r2_analysis || analysisResult?.advanced_technicals}
+                    r2Analysis={analysis?.advanced_technicals?.r2_analysis || analysis?.advanced_technicals}
                     loading={mlPredictionMutation.isPending}
                   />
                 </div>
