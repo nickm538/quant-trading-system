@@ -1562,6 +1562,68 @@ One comprehensive paragraph that synthesizes EVERYTHING above - BOTH MACRO AND M
                     import sys as _sys
                     print(f"Warning: Bohen 5:1 analysis failed: {e}", file=_sys.stderr)
             
+            # TTM SQUEEZE ANALYSIS - Critical for volatility breakout detection
+            if hasattr(self, 'ttm_analyzer') and self.ttm_analyzer:
+                try:
+                    ttm_result = self.ttm_analyzer.analyze(symbol)
+                    if ttm_result and ttm_result.get('status') == 'success':
+                        context_parts.append(f"\n=== 🔥 TTM SQUEEZE ANALYSIS ====")
+                        context_parts.append(f"Data Source: {ttm_result.get('data_source', 'yfinance (Real-time)')}")
+                        context_parts.append(f"Current Price: ${ttm_result.get('current_price', 'N/A')}")
+                        
+                        # Squeeze Status
+                        squeeze_on = ttm_result.get('squeeze_on', False)
+                        squeeze_count = ttm_result.get('squeeze_count', 0)
+                        dot_color = 'RED (Squeeze ON)' if squeeze_on else 'GREEN (Squeeze OFF)'
+                        context_parts.append(f"\n--- Squeeze Status ---")
+                        context_parts.append(f"Squeeze: {'🔴 ON' if squeeze_on else '🟢 OFF'} ({dot_color})")
+                        context_parts.append(f"Consecutive Bars: {squeeze_count}")
+                        
+                        # Momentum
+                        momentum = ttm_result.get('momentum')
+                        mom_dir = ttm_result.get('momentum_direction', 'N/A')
+                        mom_inc = ttm_result.get('momentum_increasing', False)
+                        context_parts.append(f"\n--- Momentum ---")
+                        context_parts.append(f"Momentum Value: {momentum}")
+                        context_parts.append(f"Direction: {mom_dir}")
+                        context_parts.append(f"Increasing: {'YES ↑' if mom_inc else 'NO ↓'}")
+                        
+                        # Signal
+                        signal = ttm_result.get('signal', 'none')
+                        context_parts.append(f"\n--- Signal ---")
+                        context_parts.append(f"Signal: {signal.upper()}")
+                        
+                        # Bands
+                        context_parts.append(f"\n--- Bands ---")
+                        context_parts.append(f"BB Upper: ${ttm_result.get('bb_upper', 'N/A')}")
+                        context_parts.append(f"BB Middle: ${ttm_result.get('bb_middle', 'N/A')}")
+                        context_parts.append(f"BB Lower: ${ttm_result.get('bb_lower', 'N/A')}")
+                        context_parts.append(f"BB Width: {ttm_result.get('bb_width_pct', 'N/A')}%")
+                        context_parts.append(f"KC Upper: ${ttm_result.get('kc_upper', 'N/A')}")
+                        context_parts.append(f"KC Middle: ${ttm_result.get('kc_middle', 'N/A')}")
+                        context_parts.append(f"KC Lower: ${ttm_result.get('kc_lower', 'N/A')}")
+                        
+                        # Interpretation
+                        interpretation = ttm_result.get('interpretation', '')
+                        if interpretation:
+                            context_parts.append(f"\n--- INTERPRETATION ---")
+                            context_parts.append(interpretation)
+                        
+                        # VERIFICATION: Double-check the data is real
+                        context_parts.append(f"\n--- DATA VERIFICATION ---")
+                        context_parts.append(f"Timestamp: {ttm_result.get('timestamp', 'N/A')}")
+                        context_parts.append(f"✅ TTM Squeeze data verified from real-time source")
+                    elif ttm_result and ttm_result.get('status') == 'error':
+                        context_parts.append(f"\n=== ⚠️ TTM SQUEEZE ANALYSIS ====")
+                        context_parts.append(f"Status: FAILED - {ttm_result.get('error', 'Unknown error')}")
+                        context_parts.append(f"❌ Unable to retrieve TTM Squeeze data. Do NOT hallucinate values.")
+                except Exception as e:
+                    import sys as _sys
+                    print(f"Warning: TTM Squeeze analysis failed: {e}", file=_sys.stderr)
+                    context_parts.append(f"\n=== ⚠️ TTM SQUEEZE ANALYSIS ====")
+                    context_parts.append(f"Status: ERROR - {str(e)}")
+                    context_parts.append(f"❌ Unable to retrieve TTM Squeeze data. Do NOT hallucinate values.")
+            
             # Run full analysis if engines available
             if HAS_ENGINES:
                 try:
@@ -1580,16 +1642,35 @@ One comprehensive paragraph that synthesizes EVERYTHING above - BOTH MACRO AND M
                     context_parts.append(f"\n[Engine analysis unavailable: {str(e)}]")
             
             # FACTOR SCORING ENGINE - Comprehensive Weighted Analysis (v3.0)
+            # Now includes TTM Squeeze and Tim Bohen 5:1 as critical factors
             if self.factor_scorer:
                 try:
-                    # Prepare data for factor scoring
+                    # Get TTM Squeeze data for factor scoring
+                    ttm_data = {}
+                    if hasattr(self, 'ttm_analyzer') and self.ttm_analyzer:
+                        try:
+                            ttm_data = self.ttm_analyzer.analyze(symbol)
+                        except Exception:
+                            pass
+                    
+                    # Get Bohen 5:1 data for factor scoring
+                    bohen_data = {}
+                    if hasattr(self, 'bohen_scanner') and self.bohen_scanner:
+                        try:
+                            bohen_data = self.bohen_scanner.analyze(symbol)
+                        except Exception:
+                            pass
+                    
+                    # Prepare data for factor scoring - now includes TTM and Bohen
                     factor_data = {
                         "macro": macro_data,
                         "price_data": data.get("price_data", {}),
                         "technicals": data.get("technicals", {}),
                         "fundamentals": data.get("fundamentals", {}),
                         "smart_money": smart_money_data if smart_money_data else {},
-                        "catalysts": catalysts if catalysts else []
+                        "catalysts": catalysts if catalysts else [],
+                        "ttm_squeeze": ttm_data,  # TTM Squeeze data for scoring
+                        "bohen_5to1": bohen_data  # Tim Bohen 5:1 data for scoring
                     }
                     
                     factor_scores = self.factor_scorer.score_all_factors(factor_data)

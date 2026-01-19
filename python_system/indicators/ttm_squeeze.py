@@ -467,6 +467,146 @@ class TTMSqueeze:
         
         return colors
     
+    def analyze(self, symbol: str, period: str = '3mo') -> Dict:
+        """
+        Analyze a symbol for TTM Squeeze signals.
+        
+        This is a convenience wrapper that:
+        1. Fetches real-time price data from yfinance
+        2. Calculates the TTM Squeeze indicator
+        3. Returns a comprehensive analysis dictionary
+        
+        Args:
+            symbol: Stock ticker symbol (e.g., 'AAPL')
+            period: Data period to fetch (default: '3mo')
+        
+        Returns:
+            Dictionary with squeeze analysis, signals, and interpretation
+        
+        CRITICAL: This uses REAL-TIME data only. No placeholders or fake data.
+        """
+        import yfinance as yf
+        from datetime import datetime
+        
+        try:
+            # Fetch real-time data from yfinance
+            ticker = yf.Ticker(symbol)
+            data = ticker.history(period=period)
+            
+            if data.empty:
+                return {
+                    'status': 'error',
+                    'error': f'No data available for {symbol}',
+                    'symbol': symbol,
+                    'timestamp': datetime.now().isoformat()
+                }
+            
+            # Standardize column names to lowercase
+            data.columns = [c.lower() for c in data.columns]
+            
+            # Calculate TTM Squeeze
+            result = self.calculate(data)
+            
+            # Get latest values
+            latest_squeeze = result['squeeze_state'].iloc[-1] if len(result['squeeze_state']) > 0 else False
+            latest_momentum = result['momentum'].iloc[-1] if len(result['momentum']) > 0 else 0.0
+            latest_signal = result['signal'].iloc[-1] if len(result['signal']) > 0 else 'none'
+            latest_dot = result['dots'].iloc[-1] if len(result['dots']) > 0 else 'gray'
+            
+            # Count consecutive squeeze bars
+            squeeze_count = 0
+            for i in range(len(result['squeeze_state']) - 1, -1, -1):
+                if result['squeeze_state'].iloc[i]:
+                    squeeze_count += 1
+                else:
+                    break
+            
+            # Determine momentum direction
+            momentum_direction = 'BULLISH' if latest_momentum > 0 else 'BEARISH'
+            momentum_increasing = False
+            if len(result['momentum']) > 1:
+                prev_momentum = result['momentum'].iloc[-2]
+                momentum_increasing = abs(latest_momentum) > abs(prev_momentum)
+            
+            # Generate interpretation
+            interpretation = self._generate_interpretation(
+                latest_squeeze, latest_signal, latest_momentum, 
+                squeeze_count, momentum_increasing
+            )
+            
+            # Calculate BB width percentage
+            bb_width_pct = None
+            if result['bb_upper'].iloc[-1] and result['bb_lower'].iloc[-1] and result['bb_mid'].iloc[-1]:
+                bb_width_pct = round(
+                    (result['bb_upper'].iloc[-1] - result['bb_lower'].iloc[-1]) / 
+                    result['bb_mid'].iloc[-1] * 100, 2
+                )
+            
+            return {
+                'status': 'success',
+                'symbol': symbol,
+                'timestamp': datetime.now().isoformat(),
+                'data_source': 'yfinance (Real-time)',
+                
+                # Current state
+                'squeeze_on': bool(latest_squeeze),
+                'squeeze_count': squeeze_count,
+                'dot_color': latest_dot,  # 'red' = squeeze ON, 'green' = squeeze OFF
+                
+                # Momentum
+                'momentum': round(float(latest_momentum), 4) if not np.isnan(latest_momentum) else None,
+                'momentum_direction': momentum_direction,
+                'momentum_increasing': momentum_increasing,
+                
+                # Signal
+                'signal': latest_signal,  # 'long', 'short', 'active', 'none'
+                'score_contrib': result['score_contrib'],
+                
+                # Bands (current values)
+                'bb_upper': round(float(result['bb_upper'].iloc[-1]), 2) if not np.isnan(result['bb_upper'].iloc[-1]) else None,
+                'bb_middle': round(float(result['bb_mid'].iloc[-1]), 2) if not np.isnan(result['bb_mid'].iloc[-1]) else None,
+                'bb_lower': round(float(result['bb_lower'].iloc[-1]), 2) if not np.isnan(result['bb_lower'].iloc[-1]) else None,
+                'bb_width_pct': bb_width_pct,
+                
+                'kc_upper': round(float(result['kc_upper'].iloc[-1]), 2) if not np.isnan(result['kc_upper'].iloc[-1]) else None,
+                'kc_middle': round(float(result['kc_mid'].iloc[-1]), 2) if not np.isnan(result['kc_mid'].iloc[-1]) else None,
+                'kc_lower': round(float(result['kc_lower'].iloc[-1]), 2) if not np.isnan(result['kc_lower'].iloc[-1]) else None,
+                
+                # Interpretation
+                'interpretation': interpretation,
+                
+                # Current price
+                'current_price': round(float(data['close'].iloc[-1]), 2)
+            }
+            
+        except Exception as e:
+            return {
+                'status': 'error',
+                'error': str(e),
+                'symbol': symbol,
+                'timestamp': datetime.now().isoformat()
+            }
+    
+    def _generate_interpretation(self, squeeze_on: bool, signal: str, momentum: float, 
+                                  count: int, increasing: bool) -> str:
+        """
+        Generate human-readable interpretation of TTM Squeeze state.
+        """
+        direction = 'bullish' if momentum > 0 else 'bearish'
+        
+        if signal == 'long':
+            return f"🔥 SQUEEZE FIRED LONG! Breakout in progress with bullish momentum. High probability long entry!"
+        elif signal == 'short':
+            return f"🔥 SQUEEZE FIRED SHORT! Breakdown in progress with bearish momentum. High probability short entry!"
+        elif squeeze_on and count >= 6 and increasing:
+            return f"💎 PERFECT SETUP - Squeeze ON for {count} bars with {direction} momentum BUILDING. Explosive move imminent!"
+        elif squeeze_on and count >= 6:
+            return f"🔴 Extended Squeeze - ON for {count} bars. Volatility extremely compressed. Watch for momentum shift."
+        elif squeeze_on:
+            return f"🔴 Squeeze ON ({count} bars) - Volatility compressed, {direction} momentum. Energy building for breakout."
+        else:
+            return f"🟢 Squeeze OFF - Normal volatility. Current momentum: {direction}. No immediate setup."
+    
     def get_multi_timeframe_score(
         self,
         daily_data: pd.DataFrame,

@@ -30,25 +30,28 @@ class FactorScoringEngine:
     """
     
     # Factor weights (must sum to 1.0)
+    # Updated to include TTM Squeeze and Tim Bohen 5:1 as critical technical factors
     WEIGHTS = {
-        # MACRO FACTORS (40% total)
-        "monetary_policy": 0.12,
-        "economic_cycle": 0.10,
-        "market_regime": 0.08,
+        # MACRO FACTORS (35% total - reduced to make room for pattern factors)
+        "monetary_policy": 0.10,
+        "economic_cycle": 0.08,
+        "market_regime": 0.07,
         "sector_rotation": 0.05,
         "global_macro": 0.05,
         # MICRO FACTORS (40% total)
-        "price_action": 0.12,
+        "price_action": 0.10,
         "fundamentals": 0.10,
-        "technicals": 0.08,
-        "catalysts": 0.05,
+        "technicals": 0.06,
+        "catalysts": 0.04,
         "smart_money": 0.05,
-        # NON-TRADITIONAL FACTORS (20% total)
-        "sentiment": 0.06,
-        "positioning": 0.05,
-        "seasonality": 0.04,
-        "liquidity": 0.03,
-        "correlation": 0.02
+        "ttm_squeeze": 0.05,  # TTM Squeeze - critical volatility breakout indicator
+        # NON-TRADITIONAL FACTORS (25% total - increased for pattern recognition)
+        "sentiment": 0.05,
+        "positioning": 0.04,
+        "seasonality": 0.03,
+        "liquidity": 0.02,
+        "correlation": 0.02,
+        "bohen_5to1": 0.09  # Tim Bohen 5:1 Risk/Reward - critical trade setup factor
     }
     
     def __init__(self):
@@ -406,6 +409,59 @@ class FactorScoringEngine:
         scores["smart_money"] = max(0, min(100, sm_score))
         self.explanations["smart_money"] = "; ".join(sm_explanation) if sm_explanation else "No clear smart money signal"
         
+        # 6. TTM Squeeze (5% weight) - Critical volatility breakout indicator
+        ttm_score = 50
+        ttm_explanation = []
+        
+        ttm_data = data.get("ttm_squeeze", {})
+        if ttm_data and ttm_data.get("status") == "success":
+            squeeze_on = ttm_data.get("squeeze_on", False)
+            squeeze_count = ttm_data.get("squeeze_count", 0)
+            momentum = ttm_data.get("momentum", 0)
+            momentum_dir = ttm_data.get("momentum_direction", "NEUTRAL")
+            momentum_increasing = ttm_data.get("momentum_increasing", False)
+            signal = ttm_data.get("signal", "none")
+            
+            # Squeeze fired signals are the strongest
+            if signal == "long":
+                ttm_score = 90  # Very bullish - squeeze fired long
+                ttm_explanation.append("🔥 SQUEEZE FIRED LONG - High probability bullish breakout")
+            elif signal == "short":
+                ttm_score = 10  # Very bearish - squeeze fired short
+                ttm_explanation.append("🔥 SQUEEZE FIRED SHORT - High probability bearish breakdown")
+            elif squeeze_on:
+                # Squeeze is building - direction depends on momentum
+                if squeeze_count >= 6:
+                    # Extended squeeze = explosive move imminent
+                    if momentum_dir == "BULLISH" and momentum_increasing:
+                        ttm_score = 75
+                        ttm_explanation.append(f"💎 Perfect Setup: Squeeze ON {squeeze_count} bars, bullish momentum building")
+                    elif momentum_dir == "BEARISH" and momentum_increasing:
+                        ttm_score = 25
+                        ttm_explanation.append(f"Squeeze ON {squeeze_count} bars, bearish momentum building")
+                    else:
+                        ttm_score = 55 if momentum_dir == "BULLISH" else 45
+                        ttm_explanation.append(f"Squeeze ON {squeeze_count} bars, {momentum_dir.lower()} momentum")
+                else:
+                    # Early squeeze
+                    ttm_score = 55 if momentum_dir == "BULLISH" else 45
+                    ttm_explanation.append(f"Squeeze ON ({squeeze_count} bars) - volatility compressed")
+            else:
+                # Squeeze off - normal volatility
+                if momentum_dir == "BULLISH":
+                    ttm_score = 55
+                    ttm_explanation.append("Squeeze OFF, bullish momentum")
+                elif momentum_dir == "BEARISH":
+                    ttm_score = 45
+                    ttm_explanation.append("Squeeze OFF, bearish momentum")
+                else:
+                    ttm_explanation.append("No squeeze, neutral momentum")
+        else:
+            ttm_explanation.append("TTM Squeeze data unavailable")
+        
+        scores["ttm_squeeze"] = max(0, min(100, ttm_score))
+        self.explanations["ttm_squeeze"] = "; ".join(ttm_explanation) if ttm_explanation else "Neutral TTM Squeeze"
+        
         return scores
     
     def _score_nontraditional_factors(self, data: Dict[str, Any]) -> Dict[str, float]:
@@ -507,6 +563,70 @@ class FactorScoringEngine:
         
         scores["correlation"] = corr_score
         self.explanations["correlation"] = "; ".join(corr_explanation) if corr_explanation else "Normal correlation"
+        
+        # 6. Tim Bohen 5:1 Risk/Reward (9% weight) - Critical trade setup factor
+        bohen_score = 50
+        bohen_explanation = []
+        
+        bohen_data = data.get("bohen_5to1", {})
+        if bohen_data and not bohen_data.get("error"):
+            best_setup = bohen_data.get("best_setup", {})
+            trend = bohen_data.get("trend", {})
+            volume_signal = bohen_data.get("volume_signal", "NORMAL")
+            
+            # Check if we have a valid 5:1 setup
+            if best_setup and best_setup.get("meets_5to1"):
+                rr_ratio = best_setup.get("rr_ratio", 0)
+                direction = best_setup.get("direction", "NEUTRAL")
+                
+                if rr_ratio >= 5:
+                    # Perfect 5:1 or better setup
+                    if direction == "LONG":
+                        bohen_score = 85
+                        bohen_explanation.append(f"🎯 PERFECT LONG SETUP: {rr_ratio}:1 R/R ratio!")
+                    elif direction == "SHORT":
+                        bohen_score = 15
+                        bohen_explanation.append(f"🎯 PERFECT SHORT SETUP: {rr_ratio}:1 R/R ratio!")
+                    
+                    # Add entry/stop/target details
+                    entry = best_setup.get("entry", "N/A")
+                    stop = best_setup.get("stop_loss", "N/A")
+                    target = best_setup.get("target", "N/A")
+                    bohen_explanation.append(f"Entry: ${entry}, Stop: ${stop}, Target: ${target}")
+                elif rr_ratio >= 3:
+                    # Good but not perfect setup
+                    if direction == "LONG":
+                        bohen_score = 65
+                        bohen_explanation.append(f"Good long setup: {rr_ratio}:1 R/R ratio")
+                    elif direction == "SHORT":
+                        bohen_score = 35
+                        bohen_explanation.append(f"Good short setup: {rr_ratio}:1 R/R ratio")
+            else:
+                # No 5:1 setup found - use trend for scoring
+                trend_direction = trend.get("direction", "NEUTRAL")
+                trend_score = trend.get("score", 50)
+                
+                if trend_direction == "BULLISH":
+                    bohen_score = min(60, 50 + trend_score / 10)
+                    bohen_explanation.append(f"No 5:1 setup, but bullish trend (score: {trend_score})")
+                elif trend_direction == "BEARISH":
+                    bohen_score = max(40, 50 - trend_score / 10)
+                    bohen_explanation.append(f"No 5:1 setup, bearish trend (score: {trend_score})")
+                else:
+                    bohen_explanation.append("No 5:1 setup found, neutral trend")
+            
+            # Volume confirmation
+            if volume_signal == "STRONG":
+                bohen_score = min(100, bohen_score + 5)
+                bohen_explanation.append("Volume confirms setup")
+            elif volume_signal == "WEAK":
+                bohen_score = max(0, bohen_score - 5)
+                bohen_explanation.append("Weak volume - less conviction")
+        else:
+            bohen_explanation.append("Bohen 5:1 analysis unavailable")
+        
+        scores["bohen_5to1"] = max(0, min(100, bohen_score))
+        self.explanations["bohen_5to1"] = "; ".join(bohen_explanation) if bohen_explanation else "No Bohen 5:1 setup"
         
         return scores
     
