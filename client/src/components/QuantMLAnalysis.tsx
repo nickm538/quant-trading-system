@@ -4,6 +4,14 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { TrendingUp, TrendingDown, Brain, Target, AlertTriangle, Lightbulb, BarChart3, Zap } from "lucide-react";
 
+// Safe toFixed helper that handles undefined/null values
+const safeFixed = (value: number | undefined | null, decimals: number = 2): string => {
+  if (value === undefined || value === null || isNaN(value)) {
+    return 'N/A';
+  }
+  return value.toFixed(decimals);
+};
+
 interface MLPrediction {
   success: boolean;
   symbol: string;
@@ -91,19 +99,27 @@ export function QuantMLAnalysis({ mlPrediction, r2Analysis, loading }: QuantMLAn
   }
 
   const { 
-    predicted_change_pct, 
-    confidence, 
-    recommendation, 
-    reasoning,
+    predicted_change_pct = 0, 
+    confidence = 0, 
+    recommendation = 'HOLD', 
+    reasoning = '',
     model_performance,
-    horizon_days,
-    current_price,
-    predicted_price
+    horizon_days = 5,
+    current_price = 0,
+    predicted_price = 0
   } = mlPrediction;
 
-  const isPositive = predicted_change_pct > 0;
-  const isHighConfidence = confidence > 70;
-  const isStrongSignal = Math.abs(predicted_change_pct) > 3;
+  // Safe defaults for model_performance
+  const safeModelPerformance = {
+    avg_accuracy: model_performance?.avg_accuracy ?? 0,
+    avg_sharpe_ratio: model_performance?.avg_sharpe_ratio ?? 0,
+    avg_win_rate: model_performance?.avg_win_rate ?? 0,
+    num_models_used: model_performance?.num_models_used ?? 0
+  };
+
+  const isPositive = (predicted_change_pct ?? 0) > 0;
+  const isHighConfidence = (confidence ?? 0) > 70;
+  const isStrongSignal = Math.abs(predicted_change_pct ?? 0) > 3;
 
   return (
     <Card className="w-full">
@@ -112,11 +128,11 @@ export function QuantMLAnalysis({ mlPrediction, r2Analysis, loading }: QuantMLAn
           <Brain className="h-5 w-5 text-purple-500" />
           Quant/ML Analysis
           <Badge variant={isHighConfidence ? "default" : "secondary"}>
-            {confidence.toFixed(1)}% Confidence
+            {safeFixed(confidence, 1)}% Confidence
           </Badge>
         </CardTitle>
         <CardDescription>
-          Advanced machine learning insights powered by {model_performance.num_models_used} ensemble models
+          Advanced machine learning insights powered by {safeModelPerformance.num_models_used} ensemble models
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -132,27 +148,27 @@ export function QuantMLAnalysis({ mlPrediction, r2Analysis, loading }: QuantMLAn
                   <TrendingDown className="h-6 w-6 text-red-500" />
                 )}
                 <h3 className="text-2xl font-bold">
-                  {isPositive ? '+' : ''}{predicted_change_pct.toFixed(2)}%
+                  {isPositive ? '+' : ''}{safeFixed(predicted_change_pct, 2)}%
                 </h3>
                 <span className="text-sm text-muted-foreground">
                   in {horizon_days} days
                 </span>
               </div>
               <p className="text-sm text-muted-foreground">
-                ${current_price.toFixed(2)} → ${predicted_price.toFixed(2)}
+                ${safeFixed(current_price, 2)} → ${safeFixed(predicted_price, 2)}
               </p>
             </div>
             <Badge 
               variant={
-                recommendation.includes('STRONG BUY') ? 'default' :
-                recommendation.includes('BUY') ? 'default' :
-                recommendation.includes('STRONG SELL') ? 'destructive' :
-                recommendation.includes('SELL') ? 'destructive' :
+                recommendation?.includes('STRONG BUY') ? 'default' :
+                recommendation?.includes('BUY') ? 'default' :
+                recommendation?.includes('STRONG SELL') ? 'destructive' :
+                recommendation?.includes('SELL') ? 'destructive' :
                 'secondary'
               }
               className="text-lg px-4 py-2"
             >
-              {recommendation}
+              {recommendation || 'HOLD'}
             </Badge>
           </div>
         </div>
@@ -169,7 +185,7 @@ export function QuantMLAnalysis({ mlPrediction, r2Analysis, loading }: QuantMLAn
               <Alert className="border-yellow-500 bg-yellow-50 dark:bg-yellow-950/20">
                 <Zap className="h-4 w-4 text-yellow-600" />
                 <AlertDescription className="text-sm">
-                  <strong>Strong Signal Detected:</strong> Our models predict a {Math.abs(predicted_change_pct).toFixed(1)}% 
+                  <strong>Strong Signal Detected:</strong> Our models predict a {safeFixed(Math.abs(predicted_change_pct ?? 0), 1)}% 
                   {isPositive ? ' upward' : ' downward'} movement - significantly above normal market noise. 
                   This suggests {isPositive ? 'accumulation by smart money' : 'distribution before a decline'}.
                 </AlertDescription>
@@ -180,18 +196,18 @@ export function QuantMLAnalysis({ mlPrediction, r2Analysis, loading }: QuantMLAn
               <Alert className="border-blue-500 bg-blue-50 dark:bg-blue-950/20">
                 <Target className="h-4 w-4 text-blue-600" />
                 <AlertDescription className="text-sm">
-                  <strong>High Model Agreement:</strong> {model_performance.num_models_used} independent ML models 
-                  agree with {confidence.toFixed(1)}% consensus. This level of agreement typically precedes 
+                  <strong>High Model Agreement:</strong> {safeModelPerformance.num_models_used} independent ML models 
+                  agree with {safeFixed(confidence, 1)}% consensus. This level of agreement typically precedes 
                   actual price movements within {horizon_days} days.
                 </AlertDescription>
               </Alert>
             )}
 
-            {model_performance.avg_sharpe_ratio > 1.5 && (
+            {safeModelPerformance.avg_sharpe_ratio > 1.5 && (
               <Alert className="border-green-500 bg-green-50 dark:bg-green-950/20">
                 <BarChart3 className="h-4 w-4 text-green-600" />
                 <AlertDescription className="text-sm">
-                  <strong>Superior Risk-Adjusted Returns:</strong> Models show Sharpe Ratio of {model_performance.avg_sharpe_ratio.toFixed(2)}, 
+                  <strong>Superior Risk-Adjusted Returns:</strong> Models show Sharpe Ratio of {safeFixed(safeModelPerformance.avg_sharpe_ratio, 2)}, 
                   indicating excellent risk-adjusted performance. This suggests the predicted move has favorable risk/reward.
                 </AlertDescription>
               </Alert>
@@ -204,7 +220,7 @@ export function QuantMLAnalysis({ mlPrediction, r2Analysis, loading }: QuantMLAn
           <h4 className="font-semibold text-sm text-muted-foreground">How This System Works</h4>
           <div className="text-sm space-y-2 text-muted-foreground">
             <p>
-              <strong className="text-foreground">🤖 Ensemble Learning:</strong> We use {model_performance.num_models_used} different 
+              <strong className="text-foreground">🤖 Ensemble Learning:</strong> We use {safeModelPerformance.num_models_used} different 
               AI models (XGBoost, LightGBM, and Ensemble) that each analyze 50+ technical indicators. 
               By combining their predictions, we reduce individual model bias and increase accuracy.
             </p>
@@ -220,7 +236,7 @@ export function QuantMLAnalysis({ mlPrediction, r2Analysis, loading }: QuantMLAn
             </p>
             <p>
               <strong className="text-foreground">⚡ Early Warning System:</strong> When models detect high-confidence 
-              predictions (&gt;{confidence.toFixed(0)}%), it means they've identified a pattern that historically 
+              predictions (&gt;{safeFixed(confidence, 0)}%), it means they've identified a pattern that historically 
               precedes price movements. This gives you an edge to act before the market moves.
             </p>
           </div>
@@ -238,17 +254,17 @@ export function QuantMLAnalysis({ mlPrediction, r2Analysis, loading }: QuantMLAn
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="text-center">
                   <div className={`text-3xl font-bold ${
-                    r2Analysis.r2_score > 0.7 ? 'text-green-600' :
-                    r2Analysis.r2_score > 0.4 ? 'text-blue-600' :
-                    r2Analysis.r2_score > 0.2 ? 'text-yellow-600' : 'text-red-600'
+                    (r2Analysis.r2_score ?? 0) > 0.7 ? 'text-green-600' :
+                    (r2Analysis.r2_score ?? 0) > 0.4 ? 'text-blue-600' :
+                    (r2Analysis.r2_score ?? 0) > 0.2 ? 'text-yellow-600' : 'text-red-600'
                   }`}>
-                    {(r2Analysis.r2_score * 100).toFixed(1)}%
+                    {safeFixed((r2Analysis.r2_score ?? 0) * 100, 1)}%
                   </div>
                   <div className="text-xs text-muted-foreground mt-1">R² Score</div>
                   <div className="text-xs text-muted-foreground">
-                    {r2Analysis.r2_score > 0.7 ? 'Highly Predictable' :
-                     r2Analysis.r2_score > 0.4 ? 'Moderately Predictable' :
-                     r2Analysis.r2_score > 0.2 ? 'Weakly Predictable' : 'Random/Choppy'}
+                    {(r2Analysis.r2_score ?? 0) > 0.7 ? 'Highly Predictable' :
+                     (r2Analysis.r2_score ?? 0) > 0.4 ? 'Moderately Predictable' :
+                     (r2Analysis.r2_score ?? 0) > 0.2 ? 'Weakly Predictable' : 'Random/Choppy'}
                   </div>
                 </div>
                 
@@ -260,7 +276,6 @@ export function QuantMLAnalysis({ mlPrediction, r2Analysis, loading }: QuantMLAn
                     {r2Analysis.trend_direction === 'UPTREND' ? '📈' :
                      r2Analysis.trend_direction === 'DOWNTREND' ? '📉' : '➡️'}
                   </div>
-                  <div className="text-sm font-medium mt-1">{r2Analysis.trend_direction}</div>
                   <div className="text-xs text-muted-foreground">Trend Direction</div>
                 </div>
                 
@@ -269,16 +284,16 @@ export function QuantMLAnalysis({ mlPrediction, r2Analysis, loading }: QuantMLAn
                     r2Analysis.trend_strength === 'STRONG' ? 'text-green-600' :
                     r2Analysis.trend_strength === 'MODERATE' ? 'text-blue-600' : 'text-yellow-600'
                   }`}>
-                    {r2Analysis.trend_strength}
+                    {r2Analysis.trend_strength || 'N/A'}
                   </div>
                   <div className="text-xs text-muted-foreground mt-1">Trend Strength</div>
                 </div>
                 
                 <div className="text-center">
                   <div className={`text-2xl font-bold ${
-                    r2Analysis.slope > 0 ? 'text-green-600' : 'text-red-600'
+                    (r2Analysis.slope ?? 0) > 0 ? 'text-green-600' : 'text-red-600'
                   }`}>
-                    {r2Analysis.slope > 0 ? '+' : ''}{r2Analysis.slope.toFixed(4)}
+                    {(r2Analysis.slope ?? 0) > 0 ? '+' : ''}{safeFixed(r2Analysis.slope, 4)}
                   </div>
                   <div className="text-xs text-muted-foreground mt-1">Slope ($/day)</div>
                 </div>
@@ -292,10 +307,10 @@ export function QuantMLAnalysis({ mlPrediction, r2Analysis, loading }: QuantMLAn
                     {Object.entries(r2Analysis.r2_scores).map(([tf, score]) => (
                       <div key={tf} className="text-center p-2 bg-white dark:bg-gray-800 rounded">
                         <div className={`font-bold ${
-                          score > 0.7 ? 'text-green-600' :
-                          score > 0.4 ? 'text-blue-600' : 'text-yellow-600'
+                          (score ?? 0) > 0.7 ? 'text-green-600' :
+                          (score ?? 0) > 0.4 ? 'text-blue-600' : 'text-yellow-600'
                         }`}>
-                          {(score * 100).toFixed(1)}%
+                          {safeFixed((score ?? 0) * 100, 1)}%
                         </div>
                         <div className="text-xs text-muted-foreground">{tf}</div>
                       </div>
@@ -325,42 +340,42 @@ export function QuantMLAnalysis({ mlPrediction, r2Analysis, loading }: QuantMLAn
           <div className="grid grid-cols-3 gap-4">
             <div className="text-center p-3 rounded-lg bg-muted/50">
               <div className="text-2xl font-bold text-green-600">
-                {model_performance.avg_accuracy.toFixed(1)}%
+                {safeFixed(safeModelPerformance.avg_accuracy, 1)}%
               </div>
               <div className="text-xs text-muted-foreground mt-1">
                 Direction Accuracy
               </div>
               <div className="text-xs text-muted-foreground mt-1">
-                {model_performance.avg_accuracy > 55 ? 'Excellent' : 'Good'} (&gt;50% beats random)
+                {safeModelPerformance.avg_accuracy > 55 ? 'Excellent' : 'Good'} (&gt;50% beats random)
               </div>
             </div>
             
             <div className="text-center p-3 rounded-lg bg-muted/50">
-              <div className={`text-2xl font-bold ${model_performance.avg_sharpe_ratio > 1 ? 'text-green-600' : model_performance.avg_sharpe_ratio > 0 ? 'text-blue-600' : 'text-red-600'}`}>
-                {model_performance.avg_sharpe_ratio.toFixed(2)}
+              <div className={`text-2xl font-bold ${safeModelPerformance.avg_sharpe_ratio > 1 ? 'text-green-600' : safeModelPerformance.avg_sharpe_ratio > 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                {safeFixed(safeModelPerformance.avg_sharpe_ratio, 2)}
               </div>
               <div className="text-xs text-muted-foreground mt-1">
                 Real Sharpe Ratio
               </div>
               <div className="text-xs text-muted-foreground mt-1">
-                {model_performance.avg_sharpe_ratio > 2 ? '🏆 Excellent' : 
-                 model_performance.avg_sharpe_ratio > 1 ? '✅ Strong' : 
-                 model_performance.avg_sharpe_ratio > 0.5 ? '📊 Moderate' :
-                 model_performance.avg_sharpe_ratio > 0 ? '⚠️ Weak' : '❌ Negative'}
+                {safeModelPerformance.avg_sharpe_ratio > 2 ? '🏆 Excellent' : 
+                 safeModelPerformance.avg_sharpe_ratio > 1 ? '✅ Strong' : 
+                 safeModelPerformance.avg_sharpe_ratio > 0.5 ? '📊 Moderate' :
+                 safeModelPerformance.avg_sharpe_ratio > 0 ? '⚠️ Weak' : '❌ Negative'}
               </div>
             </div>
             
             <div className="text-center p-3 rounded-lg bg-muted/50">
-              <div className={`text-2xl font-bold ${model_performance.avg_win_rate > 55 ? 'text-green-600' : model_performance.avg_win_rate > 50 ? 'text-purple-600' : 'text-orange-600'}`}>
-                {model_performance.avg_win_rate.toFixed(1)}%
+              <div className={`text-2xl font-bold ${safeModelPerformance.avg_win_rate > 55 ? 'text-green-600' : safeModelPerformance.avg_win_rate > 50 ? 'text-purple-600' : 'text-orange-600'}`}>
+                {safeFixed(safeModelPerformance.avg_win_rate, 1)}%
               </div>
               <div className="text-xs text-muted-foreground mt-1">
                 Direction Accuracy
               </div>
               <div className="text-xs text-muted-foreground mt-1">
-                {model_performance.avg_win_rate > 60 ? '🎯 Excellent' :
-                 model_performance.avg_win_rate > 55 ? '✅ Strong' :
-                 model_performance.avg_win_rate > 50 ? '📊 Above Random' : '⚠️ Below 50%'}
+                {safeModelPerformance.avg_win_rate > 60 ? '🎯 Excellent' :
+                 safeModelPerformance.avg_win_rate > 55 ? '✅ Strong' :
+                 safeModelPerformance.avg_win_rate > 50 ? '📊 Above Random' : '⚠️ Below 50%'}
               </div>
             </div>
           </div>
@@ -371,7 +386,7 @@ export function QuantMLAnalysis({ mlPrediction, r2Analysis, loading }: QuantMLAn
           <h4 className="font-semibold text-sm text-muted-foreground">What The Data Is Telling Us</h4>
           <div className="text-sm space-y-2">
             <p className="leading-relaxed">
-              {reasoning}
+              {reasoning || 'No detailed reasoning available.'}
             </p>
             <p className="leading-relaxed text-muted-foreground">
               {isPositive ? (
@@ -388,7 +403,7 @@ export function QuantMLAnalysis({ mlPrediction, r2Analysis, loading }: QuantMLAn
                 </>
               )}
             </p>
-            {Math.abs(predicted_change_pct) < 1 && (
+            {Math.abs(predicted_change_pct ?? 0) < 1 && (
               <p className="leading-relaxed text-muted-foreground">
                 The predicted movement is <strong className="text-foreground">minimal</strong>, suggesting the stock 
                 is in a consolidation phase. This is often a period where smart money accumulates before the next 
