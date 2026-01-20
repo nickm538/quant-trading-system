@@ -87,17 +87,31 @@ def analyze_best_hyperparameters(conn, model_type: str = 'xgboost', min_samples:
         return get_default_hyperparameters(model_type)
     
     # Parse hyperparameters and create DataFrame
+    # Helper to convert Decimal to float
+    def to_float(val, default=0):
+        if val is None:
+            return default
+        try:
+            return float(val)
+        except (TypeError, ValueError):
+            return default
+    
     data = []
     for r in results:
         if r['hyperparameters']:
             try:
                 hp = json.loads(r['hyperparameters']) if isinstance(r['hyperparameters'], str) else r['hyperparameters']
-                hp['sharpe_ratio'] = r['sharpe_ratio'] or 0
-                hp['win_rate'] = r['win_rate'] or 0.5
-                hp['profit_factor'] = r['profit_factor'] or 1.0
-                hp['test_accuracy'] = r['test_accuracy'] or 0.5
+                # Convert all hyperparameter values to float to avoid Decimal issues
+                for key in hp:
+                    if isinstance(hp[key], (int, float)) or hasattr(hp[key], '__float__'):
+                        hp[key] = to_float(hp[key])
+                hp['sharpe_ratio'] = to_float(r['sharpe_ratio'], 0)
+                hp['win_rate'] = to_float(r['win_rate'], 0.5)
+                hp['profit_factor'] = to_float(r['profit_factor'], 1.0)
+                hp['test_accuracy'] = to_float(r['test_accuracy'], 0.5)
                 data.append(hp)
-            except:
+            except Exception as e:
+                logger.debug(f"Error parsing hyperparameters: {e}")
                 pass
     
     if not data:
@@ -337,24 +351,39 @@ def get_regime_adjusted_hyperparameters(base_hp: Dict, regime: str) -> Dict:
     Returns:
         Adjusted hyperparameters
     """
-    adjusted = base_hp.copy()
+    # Helper to safely convert to float (handles Decimal from database)
+    def safe_float(val, default=0):
+        if val is None:
+            return float(default)
+        try:
+            return float(val)
+        except (TypeError, ValueError):
+            return float(default)
+    
+    # Convert all base_hp values to float to avoid Decimal * float errors
+    adjusted = {}
+    for k, v in base_hp.items():
+        if isinstance(v, (int, float)) or hasattr(v, '__float__'):
+            adjusted[k] = safe_float(v)
+        else:
+            adjusted[k] = v
     
     if regime == 'volatile':
         # In volatile markets, use more conservative settings
-        adjusted['max_depth'] = min(base_hp.get('max_depth', 5), 4)
-        adjusted['learning_rate'] = base_hp.get('learning_rate', 0.1) * 0.8
-        adjusted['subsample'] = min(base_hp.get('subsample', 0.8), 0.7)
-        adjusted['n_estimators'] = int(base_hp.get('n_estimators', 100) * 1.2)
+        adjusted['max_depth'] = int(min(safe_float(base_hp.get('max_depth', 5)), 4))
+        adjusted['learning_rate'] = safe_float(base_hp.get('learning_rate', 0.1)) * 0.8
+        adjusted['subsample'] = min(safe_float(base_hp.get('subsample', 0.8)), 0.7)
+        adjusted['n_estimators'] = int(safe_float(base_hp.get('n_estimators', 100)) * 1.2)
         
     elif regime == 'bull':
         # In bull markets, can be slightly more aggressive
-        adjusted['max_depth'] = min(base_hp.get('max_depth', 5) + 1, 7)
-        adjusted['learning_rate'] = base_hp.get('learning_rate', 0.1) * 1.1
+        adjusted['max_depth'] = int(min(safe_float(base_hp.get('max_depth', 5)) + 1, 7))
+        adjusted['learning_rate'] = safe_float(base_hp.get('learning_rate', 0.1)) * 1.1
         
     elif regime == 'bear':
         # In bear markets, focus on risk management
-        adjusted['max_depth'] = min(base_hp.get('max_depth', 5), 4)
-        adjusted['reg_lambda'] = base_hp.get('reg_lambda', 1) * 1.5
+        adjusted['max_depth'] = int(min(safe_float(base_hp.get('max_depth', 5)), 4))
+        adjusted['reg_lambda'] = safe_float(base_hp.get('reg_lambda', 1)) * 1.5
         
     # sideways or unknown - use base parameters
     
