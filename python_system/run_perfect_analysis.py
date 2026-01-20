@@ -6,6 +6,17 @@ Uses AlphaVantage for fundamentals + Manus API Hub for prices
 
 import sys
 import json
+import logging
+import warnings
+
+# Configure ALL logging to go to stderr (not stdout) so JSON output stays clean
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(levelname)s:%(name)s:%(message)s',
+    stream=sys.stderr
+)
+# Suppress warnings from going to stdout
+warnings.filterwarnings('ignore')
 import time
 import numpy as np
 import talib
@@ -24,7 +35,7 @@ try:
     HAS_STOCKGRID = True
 except ImportError as e:
     HAS_STOCKGRID = False
-    print(f"Warning: StockGrid integration not available: {e}")
+    print(f"Warning: StockGrid integration not available: {e}", file=sys.stderr)
 try:
     from vision_chart_analyzer import VisionChartAnalyzer
     HAS_VISION = True
