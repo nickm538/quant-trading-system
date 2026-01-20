@@ -10,26 +10,19 @@ import logging
 import warnings
 import os
 
-# CRITICAL: Force ALL logging to stderr BEFORE any imports
-# This must happen first to prevent any module from configuring stdout logging
+# CRITICAL: Redirect stdout to stderr at the OS level
+# This ensures ALL output (print, logging, etc.) goes to stderr
+# We'll restore stdout only when outputting the final JSON
+_original_stdout = sys.stdout
+sys.stdout = sys.stderr
+
 os.environ['PYTHONUNBUFFERED'] = '1'
 
-# Remove ALL existing handlers from root logger
-root_logger = logging.getLogger()
-for handler in root_logger.handlers[:]:
-    root_logger.removeHandler(handler)
-
-# Configure root logger to use stderr only
-stderr_handler = logging.StreamHandler(sys.stderr)
-stderr_handler.setFormatter(logging.Formatter('%(levelname)s:%(name)s:%(message)s'))
-root_logger.addHandler(stderr_handler)
-root_logger.setLevel(logging.INFO)
-
-# Also suppress all warnings
+# Suppress all warnings
 warnings.filterwarnings('ignore')
 
-# Disable logging completely for cleaner output (optional - uncomment to disable all logs)
-# logging.disable(logging.CRITICAL)
+# Disable all logging to keep output clean
+logging.disable(logging.CRITICAL)
 import time
 import numpy as np
 import talib
@@ -555,10 +548,14 @@ def main():
         else:
             output['validation_status'] = 'PASSED'
         
+        # Restore original stdout for JSON output
+        sys.stdout = _original_stdout
         print(json.dumps(output, indent=2))
         
     except Exception as e:
         import traceback
+        # Restore original stdout for JSON output
+        sys.stdout = _original_stdout
         print(json.dumps({
             "error": str(e),
             "traceback": traceback.format_exc()
