@@ -180,13 +180,13 @@ class SadieAIEngine:
     PERPLEXITY_API_KEY = os.environ.get('PERPLEXITY_API_KEY', '')
     PERPLEXITY_URL = "https://api.perplexity.ai/chat/completions"
     
-    # Model selection - cost-effective with great quality
+    # Model selection - Gemini 2.5 Pro primary via OpenRouter
     MODELS = [
-        "openai/gpt-4o",  # GPT-4o (fast, reliable, cost-effective ~$2.50/1M tokens)
-        "openai/gpt-4-turbo",  # GPT-4 Turbo (good balance)
-        "anthropic/claude-3.5-sonnet",  # Claude 3.5 Sonnet (excellent alternative)
-        "openai/gpt-4",  # GPT-4 (reliable fallback)
-        "openai/gpt-4o-mini"  # GPT-4o Mini (ultra cheap fallback ~$0.15/1M tokens)
+        "google/gemini-2.5-pro-preview",  # Gemini 2.5 Pro (PRIMARY - best reasoning)
+        "anthropic/claude-sonnet-4",  # Claude Sonnet 4 (excellent fallback)
+        "openai/gpt-4o",  # GPT-4o (fast, reliable fallback)
+        "anthropic/claude-3.5-sonnet",  # Claude 3.5 Sonnet (backup)
+        "openai/gpt-4-turbo",  # GPT-4 Turbo (backup)
     ]
     
     # Perplexity models for real-time research
@@ -2381,10 +2381,10 @@ One comprehensive paragraph that synthesizes EVERYTHING above - BOTH MACRO AND M
             }
             
             payload = {
-                "model": self.MODELS[0],  # Use o1 (GPT-5 thinking mode)
+                "model": self.MODELS[0],  # Gemini 2.5 Pro via OpenRouter
                 "messages": messages,
                 "max_tokens": max_tokens,
-                "temperature": 1,  # o1 models require temperature=1
+                "temperature": 0.7,  # Gemini works best with 0.7 for analysis
             }
             
             # NUKE mode gets longer timeout for comprehensive analysis
