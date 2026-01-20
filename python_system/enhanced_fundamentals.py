@@ -1060,9 +1060,10 @@ class EnhancedFundamentalsAnalyzer:
         
         return insider_data
     
-    def _fetch_analyst_ratings(self, symbol: str) -> Dict:
+def _fetch_analyst_ratings(self, symbol: str) -> Dict:
         """
         Fetch analyst ratings and price targets.
+        Priority: yfinance (most reliable) -> Finnhub -> FMP -> AlphaVantage
         """
         analyst_data = {
             'consensus_rating': None,
@@ -1079,7 +1080,36 @@ class EnhancedFundamentalsAnalyzer:
         }
         
         try:
-            # Finnhub recommendation trends
+            # PRIMARY SOURCE: yfinance (most reliable for target prices)
+            try:
+                ticker = yf.Ticker(symbol)
+                info = ticker.info
+                
+                # Get target prices from yfinance
+                if info.get('targetMeanPrice'):
+                    analyst_data['target_price'] = info.get('targetMeanPrice')
+                if info.get('targetHighPrice'):
+                    analyst_data['target_high'] = info.get('targetHighPrice')
+                if info.get('targetLowPrice'):
+                    analyst_data['target_low'] = info.get('targetLowPrice')
+                if info.get('targetMedianPrice'):
+                    analyst_data['target_median'] = info.get('targetMedianPrice')
+                if info.get('numberOfAnalystOpinions'):
+                    analyst_data['number_of_analysts'] = info.get('numberOfAnalystOpinions')
+                
+                # Get recommendation from yfinance
+                if info.get('recommendationKey'):
+                    rec = info.get('recommendationKey', '').upper()
+                    if rec in ['STRONG_BUY', 'BUY', 'HOLD', 'SELL', 'STRONG_SELL']:
+                        analyst_data['consensus_rating'] = rec
+                    elif rec == 'UNDERPERFORM':
+                        analyst_data['consensus_rating'] = 'SELL'
+                    elif rec == 'OUTPERFORM':
+                        analyst_data['consensus_rating'] = 'BUY'
+            except Exception:
+                pass
+            
+            # Finnhub recommendation trends (for detailed breakdown)
             url = f'https://finnhub.io/api/v1/stock/recommendation?symbol={symbol}&token={self.finnhub_key}'
             response = requests.get(url, timeout=10)
             if response.status_code == 200:
@@ -1093,10 +1123,11 @@ class EnhancedFundamentalsAnalyzer:
                     analyst_data['strong_sell'] = latest.get('strongSell', 0)
                     
                     total = sum([analyst_data['strong_buy'], analyst_data['buy'], analyst_data['hold'], analyst_data['sell'], analyst_data['strong_sell']])
-                    analyst_data['number_of_analysts'] = total
+                    if total > analyst_data['number_of_analysts']:
+                        analyst_data['number_of_analysts'] = total
                     
-                    # Calculate weighted consensus
-                    if total > 0:
+                    # Calculate weighted consensus if not already set
+                    if not analyst_data['consensus_rating'] and total > 0:
                         score = (analyst_data['strong_buy'] * 5 + analyst_data['buy'] * 4 + analyst_data['hold'] * 3 + analyst_data['sell'] * 2 + analyst_data['strong_sell'] * 1) / total
                         if score >= 4.5:
                             analyst_data['consensus_rating'] = 'STRONG_BUY'
@@ -1120,15 +1151,16 @@ class EnhancedFundamentalsAnalyzer:
                             'strong_sell': item.get('strongSell', 0)
                         })
             
-            # Finnhub price target (may require premium)
-            url = f'https://finnhub.io/api/v1/stock/price-target?symbol={symbol}&token={self.finnhub_key}'
-            response = requests.get(url, timeout=10)
-            if response.status_code == 200:
-                data = response.json()
-                if data.get('targetMean'):
-                    analyst_data['target_price'] = data.get('targetMean')
-                    analyst_data['target_high'] = data.get('targetHigh')
-                    analyst_data['target_low'] = data.get('targetLow')
+            # Finnhub price target as fallback (may require premium)
+            if not analyst_data['target_price']:
+                url = f'https://finnhub.io/api/v1/stock/price-target?symbol={symbol}&token={self.finnhub_key}'
+                response = requests.get(url, timeout=10)
+                if response.status_code == 200:
+                    data = response.json()
+                    if data.get('targetMean'):
+                        analyst_data['target_price'] = data.get('targetMean')
+                        analyst_data['target_high'] = data.get('targetHigh')
+                        analyst_data['target_low'] = data.get('targetLow')
             
             # FMP price target consensus as fallback
             if not analyst_data['target_price']:
