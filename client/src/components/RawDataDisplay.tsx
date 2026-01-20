@@ -523,6 +523,25 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
                   </div>
                 )}
                 
+                {/* NEW: Share Structure & Free Float */}
+                {analysis.enhanced_fundamentals.share_structure && (
+                  <div className="mt-4">
+                    <h5 className="font-semibold mb-2">📊 Share Structure & Free Float</h5>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                      <DataItem label="Shares Outstanding" value={analysis.enhanced_fundamentals.share_structure.shares_outstanding_formatted || 'N/A'} />
+                      <DataItem label="Float Shares" value={analysis.enhanced_fundamentals.share_structure.float_shares_formatted || 'N/A'} />
+                      <DataItem label="Free Float %" value={analysis.enhanced_fundamentals.share_structure.free_float_pct ? `${safeFixed(analysis.enhanced_fundamentals.share_structure.free_float_pct)}%` : 'N/A'} />
+                      <DataItem label="Insider Ownership" value={analysis.enhanced_fundamentals.share_structure.insider_ownership_pct ? `${safeFixed(analysis.enhanced_fundamentals.share_structure.insider_ownership_pct)}%` : 'N/A'} />
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2">
+                      <DataItem label="Institutional %" value={analysis.enhanced_fundamentals.share_structure.institutional_ownership_pct ? `${safeFixed(analysis.enhanced_fundamentals.share_structure.institutional_ownership_pct)}%` : 'N/A'} />
+                      <DataItem label="Shares Short" value={analysis.enhanced_fundamentals.share_structure.shares_short_formatted || 'N/A'} />
+                      <DataItem label="Short % of Float" value={analysis.enhanced_fundamentals.share_structure.short_pct_of_float ? `${safeFixed(analysis.enhanced_fundamentals.share_structure.short_pct_of_float)}%` : 'N/A'} />
+                      <DataItem label="Short Ratio (Days)" value={analysis.enhanced_fundamentals.share_structure.short_ratio_days ? safeFixed(analysis.enhanced_fundamentals.share_structure.short_ratio_days) : 'N/A'} />
+                    </div>
+                  </div>
+                )}
+                
                 {/* CAGR Analysis Section */}
                 {analysis.enhanced_fundamentals.financial_trends && (
                   <div className="mt-4 space-y-4">
