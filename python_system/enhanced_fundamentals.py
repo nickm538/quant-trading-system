@@ -1060,7 +1060,7 @@ class EnhancedFundamentalsAnalyzer:
         
         return insider_data
     
-def _fetch_analyst_ratings(self, symbol: str) -> Dict:
+    def _fetch_analyst_ratings(self, symbol: str) -> Dict:
         """
         Fetch analyst ratings and price targets.
         Priority: yfinance (most reliable) -> Finnhub -> FMP -> AlphaVantage
