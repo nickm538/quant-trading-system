@@ -8,15 +8,28 @@ import sys
 import json
 import logging
 import warnings
+import os
 
-# Configure ALL logging to go to stderr (not stdout) so JSON output stays clean
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(levelname)s:%(name)s:%(message)s',
-    stream=sys.stderr
-)
-# Suppress warnings from going to stdout
+# CRITICAL: Force ALL logging to stderr BEFORE any imports
+# This must happen first to prevent any module from configuring stdout logging
+os.environ['PYTHONUNBUFFERED'] = '1'
+
+# Remove ALL existing handlers from root logger
+root_logger = logging.getLogger()
+for handler in root_logger.handlers[:]:
+    root_logger.removeHandler(handler)
+
+# Configure root logger to use stderr only
+stderr_handler = logging.StreamHandler(sys.stderr)
+stderr_handler.setFormatter(logging.Formatter('%(levelname)s:%(name)s:%(message)s'))
+root_logger.addHandler(stderr_handler)
+root_logger.setLevel(logging.INFO)
+
+# Also suppress all warnings
 warnings.filterwarnings('ignore')
+
+# Disable logging completely for cleaner output (optional - uncomment to disable all logs)
+# logging.disable(logging.CRITICAL)
 import time
 import numpy as np
 import talib
