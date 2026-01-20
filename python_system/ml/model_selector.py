@@ -203,16 +203,25 @@ def get_best_model_for_stock(conn, symbol: str) -> Optional[Dict]:
     
     # Calculate composite score for each model
     scored_models = []
+    # Helper to safely convert Decimal to float
+    def safe_float(val, default=0):
+        if val is None:
+            return float(default)
+        try:
+            return float(val)
+        except (TypeError, ValueError):
+            return float(default)
+    
     for model in models:
         # Get recent prediction accuracy
         recent_accuracy = get_recent_prediction_accuracy(conn, model['id'])
         
-        # Convert stored values to proper scale
-        test_accuracy = model['test_accuracy'] / 10000.0 if model['test_accuracy'] else 0.5
-        sharpe_ratio = model['sharpe_ratio'] / 10000.0 if model['sharpe_ratio'] else 0
-        win_rate = model['win_rate'] / 10000.0 if model['win_rate'] else 0.5
-        profit_factor = model['profit_factor'] / 10000.0 if model['profit_factor'] else 1.0
-        model_age_days = model['model_age_days'] or 0
+        # Convert stored values to proper scale (with Decimal safety)
+        test_accuracy = safe_float(model['test_accuracy'], 5000) / 10000.0
+        sharpe_ratio = safe_float(model['sharpe_ratio'], 0) / 10000.0
+        win_rate = safe_float(model['win_rate'], 5000) / 10000.0
+        profit_factor = safe_float(model['profit_factor'], 10000) / 10000.0
+        model_age_days = int(safe_float(model['model_age_days'], 0))
         
         # Calculate composite score
         composite_score = calculate_composite_score(
@@ -297,14 +306,25 @@ def get_top_models_for_stock(conn, symbol: str, top_n: int = 3) -> List[Dict]:
     
     # Calculate composite score for each model
     scored_models = []
+    
+    # Helper to safely convert Decimal to float
+    def safe_float(val, default=0):
+        if val is None:
+            return float(default)
+        try:
+            return float(val)
+        except (TypeError, ValueError):
+            return float(default)
+    
     for model in models:
         recent_accuracy = get_recent_prediction_accuracy(conn, model['id'])
         
-        test_accuracy = model['test_accuracy'] / 10000.0 if model['test_accuracy'] else 0.5
-        sharpe_ratio = model['sharpe_ratio'] / 10000.0 if model['sharpe_ratio'] else 0
-        win_rate = model['win_rate'] / 10000.0 if model['win_rate'] else 0.5
-        profit_factor = model['profit_factor'] / 10000.0 if model['profit_factor'] else 1.0
-        model_age_days = model['model_age_days'] or 0
+        # Convert with Decimal safety
+        test_accuracy = safe_float(model['test_accuracy'], 5000) / 10000.0
+        sharpe_ratio = safe_float(model['sharpe_ratio'], 0) / 10000.0
+        win_rate = safe_float(model['win_rate'], 5000) / 10000.0
+        profit_factor = safe_float(model['profit_factor'], 10000) / 10000.0
+        model_age_days = int(safe_float(model['model_age_days'], 0))
         
         composite_score = calculate_composite_score(
             test_accuracy=test_accuracy,
@@ -415,6 +435,15 @@ def get_learning_insights(conn, symbol: str = None) -> Dict:
     
     cursor.close()
     
+    # Helper to safely convert Decimal to float
+    def safe_float(val, default=0):
+        if val is None:
+            return float(default)
+        try:
+            return float(val)
+        except (TypeError, ValueError):
+            return float(default)
+    
     # Extract insights
     insights = {
         'best_model_types': [],
@@ -431,7 +460,7 @@ def get_learning_insights(conn, symbol: str = None) -> Dict:
             mt = config['model_type']
             if mt not in model_type_performance:
                 model_type_performance[mt] = []
-            model_type_performance[mt].append(config['avg_sharpe'] or 0)
+            model_type_performance[mt].append(safe_float(config['avg_sharpe'], 0))
         
         for mt, sharpes in model_type_performance.items():
             insights['best_model_types'].append({
@@ -450,27 +479,29 @@ def get_learning_insights(conn, symbol: str = None) -> Dict:
                 insights['best_hyperparameters'].append({
                     'model_type': config['model_type'],
                     'hyperparameters': hp,
-                    'avg_sharpe': config['avg_sharpe'],
-                    'avg_win_rate': config['avg_win_rate']
+                    'avg_sharpe': safe_float(config['avg_sharpe'], 0),
+                    'avg_win_rate': safe_float(config['avg_win_rate'], 0.5)
                 })
             except:
                 pass
     
     # Configurations to avoid
     for config in worst_configs:
-        if config['avg_sharpe'] and config['avg_sharpe'] < 0:
+        sharpe = safe_float(config['avg_sharpe'], 0)
+        if sharpe < 0:
             insights['avoid_configurations'].append({
                 'model_type': config['model_type'],
-                'reason': f"Negative Sharpe ratio ({config['avg_sharpe']:.2f})"
+                'reason': f"Negative Sharpe ratio ({sharpe:.2f})"
             })
     
     # High error symbols that need attention
     for error in error_patterns:
-        if error['avg_error'] and error['avg_error'] > 5:  # > 5% average error
+        avg_err = safe_float(error['avg_error'], 0)
+        if avg_err > 5:  # > 5% average error
             insights['high_error_symbols'].append({
                 'symbol': error['stock_symbol'],
-                'avg_error_pct': error['avg_error'],
-                'prediction_count': error['prediction_count']
+                'avg_error_pct': avg_err,
+                'prediction_count': int(safe_float(error['prediction_count'], 0))
             })
     
     # Generate recommendations
@@ -547,12 +578,25 @@ def get_optimal_hyperparameters(conn, symbol: str, model_type: str = 'xgboost') 
                 'colsample_bytree': 0.8
             }
     
+    # Helper to safely convert Decimal to float
+    def safe_float(val, default=0):
+        if val is None:
+            return float(default)
+        try:
+            return float(val)
+        except (TypeError, ValueError):
+            return float(default)
+    
     # Aggregate hyperparameters from top performers
     all_hyperparams = []
     for result in results:
         if result['hyperparameters']:
             try:
                 hp = json.loads(result['hyperparameters']) if isinstance(result['hyperparameters'], str) else result['hyperparameters']
+                # Convert all numeric values to float to avoid Decimal issues
+                for k, v in hp.items():
+                    if hasattr(v, '__float__'):
+                        hp[k] = safe_float(v)
                 all_hyperparams.append(hp)
             except:
                 pass
@@ -563,10 +607,10 @@ def get_optimal_hyperparameters(conn, symbol: str, model_type: str = 'xgboost') 
     # Average the hyperparameters
     optimal = {}
     for key in all_hyperparams[0].keys():
-        values = [hp.get(key) for hp in all_hyperparams if hp.get(key) is not None]
+        values = [safe_float(hp.get(key)) for hp in all_hyperparams if hp.get(key) is not None]
         if values:
             if isinstance(values[0], (int, float)):
-                optimal[key] = np.mean(values)
+                optimal[key] = float(np.mean(values))
                 if key in ['n_estimators', 'max_depth']:
                     optimal[key] = int(round(optimal[key]))
             else:

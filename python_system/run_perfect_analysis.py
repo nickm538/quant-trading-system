@@ -18,6 +18,7 @@ from advanced_options_analyzer import AdvancedOptionsAnalyzer
 from advanced_technicals import AdvancedTechnicals
 from candlestick_patterns import CandlestickPatternDetector
 from enhanced_fundamentals import EnhancedFundamentalsAnalyzer
+from market_intelligence import MarketIntelligence
 try:
     from vision_chart_analyzer import VisionChartAnalyzer
     HAS_VISION = True
@@ -428,7 +429,8 @@ def main():
             'bankroll': bankroll,
             'advanced_technicals': None,
             'candlestick_patterns': None,
-            'enhanced_fundamentals': None
+            'enhanced_fundamentals': None,
+            'market_context': None  # Market status, VIX, regime, sentiment
         }
         
         # Run Advanced Technicals (R2, Pivot, Fibonacci)
@@ -485,6 +487,13 @@ def main():
             output['enhanced_fundamentals'] = enhanced_fund.analyze(symbol)
         except Exception as e:
             output['enhanced_fundamentals'] = {'error': str(e)}
+        
+        # Run Market Intelligence (Market Status, VIX, Regime, Sentiment)
+        try:
+            market_intel = MarketIntelligence()
+            output['market_context'] = market_intel.get_full_market_intelligence()
+        except Exception as e:
+            output['market_context'] = {'error': str(e)}
         
         # PRODUCTION VALIDATION - Ensure all data is valid before returning
         validator = ProductionValidator()
