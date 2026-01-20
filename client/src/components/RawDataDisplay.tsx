@@ -28,7 +28,7 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="technical" className="w-full">
-          <TabsList className="grid w-full grid-cols-5 lg:grid-cols-9">
+          <TabsList className="grid w-full grid-cols-5 lg:grid-cols-11">
             <TabsTrigger value="technical">Technical</TabsTrigger>
             <TabsTrigger value="advanced">Pivot/Fib</TabsTrigger>
             <TabsTrigger value="candlestick">Candlesticks</TabsTrigger>
@@ -37,6 +37,8 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
             <TabsTrigger value="montecarlo">Monte Carlo</TabsTrigger>
             <TabsTrigger value="position">Position</TabsTrigger>
             <TabsTrigger value="market">Market</TabsTrigger>
+            <TabsTrigger value="darkpools">Dark Pools</TabsTrigger>
+            <TabsTrigger value="arima">ARIMA</TabsTrigger>
             <TabsTrigger value="all">All Data</TabsTrigger>
           </TabsList>
 
@@ -979,6 +981,196 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
             ) : (
               <div className="p-4 text-center text-muted-foreground">
                 Market context data not available
+              </div>
+            )}
+          </TabsContent>
+
+          {/* Dark Pools - Institutional flow from StockGrid.io */}
+          <TabsContent value="darkpools" className="space-y-4">
+            {analysis.stockgrid_analysis?.dark_pools ? (
+              <div className="space-y-6">
+                {/* Dark Pool Summary */}
+                <div className="p-4 bg-muted/20 rounded-lg border-l-4 border-purple-500">
+                  <h4 className="font-semibold text-purple-400 mb-3">🏦 Dark Pool Activity (FINRA TRF)</h4>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <DataItem 
+                      label="Net Short Volume" 
+                      value={analysis.stockgrid_analysis.dark_pools.net_short_volume ? 
+                        `${analysis.stockgrid_analysis.dark_pools.net_short_volume > 0 ? '+' : ''}${(analysis.stockgrid_analysis.dark_pools.net_short_volume / 1000000).toFixed(2)}M` : 'N/A'} 
+                    />
+                    <DataItem 
+                      label="Net Short $" 
+                      value={analysis.stockgrid_analysis.dark_pools.net_short_volume_dollar ? 
+                        `$${(analysis.stockgrid_analysis.dark_pools.net_short_volume_dollar / 1000000).toFixed(1)}M` : 'N/A'} 
+                    />
+                    <DataItem 
+                      label="20-Day Position" 
+                      value={analysis.stockgrid_analysis.dark_pools.position ? 
+                        `${(analysis.stockgrid_analysis.dark_pools.position / 1000000).toFixed(1)}M shares` : 'N/A'} 
+                    />
+                    <DataItem 
+                      label="Position $" 
+                      value={analysis.stockgrid_analysis.dark_pools.position_dollar ? 
+                        `$${(analysis.stockgrid_analysis.dark_pools.position_dollar / 1000000000).toFixed(2)}B` : 'N/A'} 
+                    />
+                  </div>
+                </div>
+
+                {/* Sentiment Interpretation */}
+                {analysis.stockgrid_analysis.dark_pools.sentiment && (
+                  <div className="p-4 bg-muted/20 rounded-lg">
+                    <h4 className="font-semibold text-primary mb-3">📊 Institutional Flow Signal</h4>
+                    <div className="flex items-center gap-4 mb-3">
+                      <span className={`px-4 py-2 rounded-full text-sm font-bold ${
+                        analysis.stockgrid_analysis.dark_pools.sentiment.sentiment?.includes('BULLISH') ? 'bg-green-500/20 text-green-400' :
+                        analysis.stockgrid_analysis.dark_pools.sentiment.sentiment?.includes('BEARISH') ? 'bg-red-500/20 text-red-400' :
+                        'bg-gray-500/20 text-gray-400'
+                      }`}>
+                        {analysis.stockgrid_analysis.dark_pools.sentiment.sentiment || 'N/A'}
+                      </span>
+                      <span className="text-sm text-muted-foreground">
+                        Score: {analysis.stockgrid_analysis.dark_pools.sentiment.score || 'N/A'}/100
+                      </span>
+                    </div>
+                    <p className="text-sm text-primary">{analysis.stockgrid_analysis.dark_pools.sentiment.signal}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Daily Trend: {analysis.stockgrid_analysis.dark_pools.sentiment.daily_trend || 'N/A'}
+                    </p>
+                  </div>
+                )}
+
+                {/* Explanation */}
+                <div className="p-4 bg-muted/10 rounded-lg border border-muted">
+                  <h4 className="font-semibold text-muted-foreground mb-2">ℹ️ How to Interpret Dark Pool Data</h4>
+                  <div className="text-xs text-muted-foreground space-y-2">
+                    <p><strong>Key Insight (SqueezeMetrics Research):</strong> Dark pool "short volume" mostly represents market makers selling shares to meet buyer demand. Counterintuitively:</p>
+                    <ul className="list-disc list-inside ml-2">
+                      <li><strong>Negative Position</strong> = More buying than shorting = <span className="text-green-400">BULLISH</span></li>
+                      <li><strong>Positive Position</strong> = More shorting than buying = <span className="text-red-400">BEARISH</span></li>
+                    </ul>
+                    <p className="mt-2"><strong>Thresholds:</strong></p>
+                    <ul className="list-disc list-inside ml-2">
+                      <li>Position $ &lt; -$1B: Strong institutional accumulation</li>
+                      <li>Position $ &gt; $1B: Strong institutional distribution</li>
+                    </ul>
+                    <p className="text-xs mt-2 italic">Data source: StockGrid.io (FINRA TRF). Updated daily at 6pm EST.</p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="p-4 text-center text-muted-foreground">
+                Dark pool data not available. {analysis.stockgrid_analysis?.dark_pools?.error || ''}
+              </div>
+            )}
+          </TabsContent>
+
+          {/* ARIMA Forecasting */}
+          <TabsContent value="arima" className="space-y-4">
+            {analysis.stockgrid_analysis?.arima?.status === 'success' ? (
+              <div className="space-y-6">
+                {/* ARIMA Summary */}
+                <div className="p-4 bg-muted/20 rounded-lg border-l-4 border-blue-500">
+                  <h4 className="font-semibold text-blue-400 mb-3">📈 ARIMA Time Series Forecast</h4>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <DataItem label="Model" value={analysis.stockgrid_analysis.arima.model || 'N/A'} />
+                    <DataItem label="Current Price" value={`$${safeFixed(analysis.stockgrid_analysis.arima.current_price)}`} />
+                    <DataItem 
+                      label="5-Day Forecast" 
+                      value={analysis.stockgrid_analysis.arima.forecast?.[4] ? 
+                        `$${safeFixed(analysis.stockgrid_analysis.arima.forecast[4].predicted)}` : 'N/A'} 
+                    />
+                    <DataItem 
+                      label="Expected Change" 
+                      value={analysis.stockgrid_analysis.arima.interpretation?.expected_change_pct ? 
+                        `${analysis.stockgrid_analysis.arima.interpretation.expected_change_pct > 0 ? '+' : ''}${safeFixed(analysis.stockgrid_analysis.arima.interpretation.expected_change_pct)}%` : 'N/A'} 
+                    />
+                  </div>
+                </div>
+
+                {/* Signal */}
+                {analysis.stockgrid_analysis.arima.interpretation && (
+                  <div className="p-4 bg-muted/20 rounded-lg">
+                    <h4 className="font-semibold text-primary mb-3">🎯 ARIMA Signal</h4>
+                    <div className="flex items-center gap-4 mb-3">
+                      <span className={`px-4 py-2 rounded-full text-sm font-bold ${
+                        analysis.stockgrid_analysis.arima.interpretation.signal?.includes('BUY') ? 'bg-green-500/20 text-green-400' :
+                        analysis.stockgrid_analysis.arima.interpretation.signal?.includes('SELL') ? 'bg-red-500/20 text-red-400' :
+                        'bg-gray-500/20 text-gray-400'
+                      }`}>
+                        {analysis.stockgrid_analysis.arima.interpretation.signal || 'N/A'}
+                      </span>
+                      <span className="text-sm text-muted-foreground">
+                        Confidence: {analysis.stockgrid_analysis.arima.interpretation.confidence || 'N/A'}
+                      </span>
+                    </div>
+                    <p className="text-sm">{analysis.stockgrid_analysis.arima.interpretation.summary}</p>
+                  </div>
+                )}
+
+                {/* Forecast Table */}
+                {analysis.stockgrid_analysis.arima.forecast?.length > 0 && (
+                  <div className="p-4 bg-muted/20 rounded-lg">
+                    <h4 className="font-semibold text-primary mb-3">📅 5-Day Price Forecast</h4>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-muted">
+                            <th className="text-left py-2">Date</th>
+                            <th className="text-right py-2">Predicted</th>
+                            <th className="text-right py-2">95% CI Low</th>
+                            <th className="text-right py-2">95% CI High</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {analysis.stockgrid_analysis.arima.forecast.map((f: any, i: number) => (
+                            <tr key={i} className="border-b border-muted/50">
+                              <td className="py-2">{f.date}</td>
+                              <td className="text-right">${safeFixed(f.predicted)}</td>
+                              <td className="text-right text-red-400">${safeFixed(f.lower_95)}</td>
+                              <td className="text-right text-green-400">${safeFixed(f.upper_95)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Model Statistics */}
+                {analysis.stockgrid_analysis.arima.model_stats && (
+                  <div className="p-4 bg-muted/20 rounded-lg">
+                    <h4 className="font-semibold text-primary mb-3">📊 Model Statistics</h4>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <DataItem label="AIC" value={safeFixed(analysis.stockgrid_analysis.arima.model_stats.aic)} />
+                      <DataItem label="BIC" value={safeFixed(analysis.stockgrid_analysis.arima.model_stats.bic)} />
+                      <DataItem label="Observations" value={analysis.stockgrid_analysis.arima.model_stats.observations || 'N/A'} />
+                      <DataItem label="Stationary" value={analysis.stockgrid_analysis.arima.model_stats.is_stationary ? 'Yes' : 'No'} />
+                    </div>
+                  </div>
+                )}
+
+                {/* Explanation */}
+                <div className="p-4 bg-muted/10 rounded-lg border border-muted">
+                  <h4 className="font-semibold text-muted-foreground mb-2">ℹ️ How to Interpret ARIMA Forecasts</h4>
+                  <div className="text-xs text-muted-foreground space-y-2">
+                    <p><strong>ARIMA (AutoRegressive Integrated Moving Average)</strong> is a statistical model for time series forecasting:</p>
+                    <ul className="list-disc list-inside ml-2">
+                      <li><strong>AR (p)</strong>: Uses past values to predict future values</li>
+                      <li><strong>I (d)</strong>: Differencing to make the series stationary</li>
+                      <li><strong>MA (q)</strong>: Uses past forecast errors</li>
+                    </ul>
+                    <p className="mt-2"><strong>Confidence Intervals:</strong></p>
+                    <ul className="list-disc list-inside ml-2">
+                      <li>Narrow CI = Higher confidence in prediction</li>
+                      <li>Wide CI = More uncertainty</li>
+                    </ul>
+                    <p className="mt-2 italic"><strong>Note:</strong> ARIMA works best for short-term forecasts (1-5 days) and should be combined with other analysis.</p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="p-4 text-center text-muted-foreground">
+                ARIMA forecast not available. {analysis.stockgrid_analysis?.arima?.error || ''}
               </div>
             )}
           </TabsContent>
