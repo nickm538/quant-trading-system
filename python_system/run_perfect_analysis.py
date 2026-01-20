@@ -19,7 +19,12 @@ from advanced_technicals import AdvancedTechnicals
 from candlestick_patterns import CandlestickPatternDetector
 from enhanced_fundamentals import EnhancedFundamentalsAnalyzer
 from market_intelligence import MarketIntelligence
-from stockgrid_integration import StockGridIntegration
+try:
+    from stockgrid_integration import StockGridIntegration
+    HAS_STOCKGRID = True
+except ImportError as e:
+    HAS_STOCKGRID = False
+    print(f"Warning: StockGrid integration not available: {e}")
 try:
     from vision_chart_analyzer import VisionChartAnalyzer
     HAS_VISION = True
@@ -498,11 +503,14 @@ def main():
             output['market_context'] = {'error': str(e)}
         
         # Run StockGrid Analysis (Dark Pools, ARIMA, Factor Analysis)
-        try:
-            stockgrid = StockGridIntegration()
-            output['stockgrid_analysis'] = stockgrid.get_full_stockgrid_analysis(symbol)
-        except Exception as e:
-            output['stockgrid_analysis'] = {'error': str(e)}
+        if HAS_STOCKGRID:
+            try:
+                stockgrid = StockGridIntegration()
+                output['stockgrid_analysis'] = stockgrid.get_full_stockgrid_analysis(symbol)
+            except Exception as e:
+                output['stockgrid_analysis'] = {'error': str(e)}
+        else:
+            output['stockgrid_analysis'] = {'error': 'StockGrid integration not available'}
         
         # PRODUCTION VALIDATION - Ensure all data is valid before returning
         validator = ProductionValidator()
