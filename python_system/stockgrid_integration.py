@@ -1,32 +1,31 @@
 """
-StockGrid.io Integration Module
-================================
-Provides access to institutional-grade dark pool data, ARIMA forecasting, 
-and factor analysis from StockGrid.io.
+Dark Pool & ARIMA Integration Module
+=====================================
+Provides access to institutional-grade dark pool data from FINRA,
+ARIMA forecasting, and factor analysis.
 
 Data Sources:
-- Dark Pools: FINRA TRF short volume data
+- Dark Pools: FINRA RegSHO short volume data (direct from FINRA CDN)
 - ARIMA: Time series forecasting using statsmodels
-- Factor Analysis: Signal-based trading factors
+- Factor Analysis: Calculated from price/volume data
 
 Author: Quant Trading System
 """
 
 import requests
-from bs4 import BeautifulSoup
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 import yfinance as yf
-import re
 from typing import Dict, List, Optional, Tuple
 import warnings
+from io import StringIO
 warnings.filterwarnings('ignore')
 
 # ARIMA imports
 try:
     from statsmodels.tsa.arima.model import ARIMA
-    from statsmodels.tsa.stattools import adfuller, acf, pacf
+    from statsmodels.tsa.stattools import adfuller
     ARIMA_AVAILABLE = True
 except ImportError:
     ARIMA_AVAILABLE = False
@@ -35,11 +34,12 @@ except ImportError:
 
 class StockGridIntegration:
     """
-    Integration with StockGrid.io for dark pool data, ARIMA forecasting,
+    Integration for dark pool data (FINRA), ARIMA forecasting,
     and factor analysis.
     """
     
-    BASE_URL = "https://www.stockgrid.io"
+    # FINRA RegSHO data URLs
+    FINRA_BASE_URL = "https://cdn.finra.org/equity/regsho/daily"
     
     def __init__(self):
         self.session = requests.Session()
@@ -59,15 +59,16 @@ class StockGridIntegration:
     
     def get_dark_pool_data(self, ticker: str) -> Dict:
         """
-        Fetch dark pool data for a specific ticker from StockGrid.
+        Fetch dark pool data for a specific ticker from FINRA RegSHO.
         
         Returns:
             Dict with dark pool metrics including:
-            - net_short_volume: Today's net short volume
-            - net_short_volume_dollar: Dollar value of net short volume
+            - short_volume: Today's short volume
+            - total_volume: Today's total volume
+            - short_ratio: Short volume / Total volume
+            - net_short_volume: Calculated net short (short - (total - short))
             - position: 20-day cumulative net short position
             - position_dollar: Dollar value of position
-            - short_volume_history: Historical short volume data
             - sentiment: Bullish/Bearish interpretation
         """
         cache_key = f"darkpool_{ticker}"
@@ -75,22 +76,63 @@ class StockGridIntegration:
             return self._cache[cache_key]
         
         try:
-            # Try Firecrawl MCP first (handles JavaScript rendering)
-            text = self._fetch_with_firecrawl(f"{self.BASE_URL}/darkpools/{ticker.upper()}")
+            # Fetch historical FINRA data (last 20 trading days)
+            history = self._fetch_finra_history(ticker.upper(), days=25)
             
-            if not text:
-                # Fallback to requests
-                url = f"{self.BASE_URL}/darkpools/{ticker.upper()}"
-                response = self.session.get(url, timeout=30)
-                
-                if response.status_code != 200:
-                    return self._empty_dark_pool_result(ticker, f"HTTP {response.status_code}")
-                
-                soup = BeautifulSoup(response.text, 'html.parser')
-                text = soup.get_text()
+            if not history:
+                return self._empty_dark_pool_result(ticker, "No FINRA data available")
             
-            # Extract dark pool metrics using regex
-            result = self._parse_dark_pool_data(ticker, text)
+            # Get current stock price for dollar calculations
+            try:
+                stock = yf.Ticker(ticker)
+                current_price = stock.info.get('regularMarketPrice') or stock.info.get('currentPrice', 0)
+            except:
+                current_price = 0
+            
+            # Calculate metrics
+            latest = history[0] if history else {}
+            
+            # Calculate net short volume (short volume - non-short volume)
+            # Net short = short_volume - (total_volume - short_volume) = 2*short_volume - total_volume
+            net_short_volume = 0
+            if latest.get('short_volume') and latest.get('total_volume'):
+                net_short_volume = (2 * latest['short_volume']) - latest['total_volume']
+            
+            # Calculate 20-day position
+            position = 0
+            for day in history[:20]:
+                if day.get('short_volume') and day.get('total_volume'):
+                    daily_net = (2 * day['short_volume']) - day['total_volume']
+                    position += daily_net
+            
+            # Calculate dollar values
+            net_short_dollar = net_short_volume * current_price if current_price else 0
+            position_dollar = position * current_price if current_price else 0
+            
+            result = {
+                'ticker': ticker.upper(),
+                'timestamp': datetime.now().isoformat(),
+                'source': 'FINRA RegSHO (Direct)',
+                'status': 'success',
+                'error': None,
+                'date': latest.get('date'),
+                'short_volume': latest.get('short_volume'),
+                'short_exempt_volume': latest.get('short_exempt_volume'),
+                'total_volume': latest.get('total_volume'),
+                'short_ratio': latest.get('short_ratio'),
+                'net_short_volume': net_short_volume,
+                'net_short_volume_dollar': net_short_dollar,
+                'position': position,
+                'position_dollar': position_dollar,
+                'current_price': current_price,
+                'short_volume_history': history[:15],
+            }
+            
+            # Calculate sentiment interpretation
+            result['sentiment'] = self._interpret_dark_pool_sentiment(result)
+            
+            # Add explanation
+            result['explanation'] = self._get_dark_pool_explanation(result)
             
             # Cache the result
             self._cache[cache_key] = result
@@ -101,112 +143,69 @@ class StockGridIntegration:
         except Exception as e:
             return self._empty_dark_pool_result(ticker, str(e))
     
-    def _fetch_with_firecrawl(self, url: str) -> Optional[str]:
-        """Fetch page content using Firecrawl MCP for JavaScript rendering."""
-        import subprocess
-        import json
+    def _fetch_finra_history(self, ticker: str, days: int = 25) -> List[Dict]:
+        """
+        Fetch historical FINRA RegSHO short volume data.
         
+        FINRA publishes daily files at:
+        https://cdn.finra.org/equity/regsho/daily/CNMSshvolYYYYMMDD.txt
+        """
+        history = []
+        current_date = datetime.now()
+        
+        # Try to fetch data for the last N trading days
+        attempts = 0
+        max_attempts = days + 10  # Account for weekends/holidays
+        
+        while len(history) < days and attempts < max_attempts:
+            date_str = current_date.strftime('%Y%m%d')
+            
+            # Skip weekends
+            if current_date.weekday() < 5:  # Monday = 0, Friday = 4
+                try:
+                    url = f"{self.FINRA_BASE_URL}/CNMSshvol{date_str}.txt"
+                    response = self.session.get(url, timeout=10)
+                    
+                    if response.status_code == 200:
+                        # Parse the pipe-delimited file
+                        data = self._parse_finra_file(response.text, ticker)
+                        if data:
+                            data['date'] = current_date.strftime('%Y-%m-%d')
+                            history.append(data)
+                except Exception as e:
+                    pass  # Skip failed days
+            
+            current_date -= timedelta(days=1)
+            attempts += 1
+        
+        return history
+    
+    def _parse_finra_file(self, content: str, ticker: str) -> Optional[Dict]:
+        """Parse FINRA RegSHO file and extract data for specific ticker."""
         try:
-            cmd = [
-                'manus-mcp-cli', 'tool', 'call', 'firecrawl_scrape',
-                '--server', 'firecrawl',
-                '--input', json.dumps({
-                    'url': url,
-                    'formats': ['markdown'],
-                    'waitFor': 5000
-                })
-            ]
-            
-            result = subprocess.run(
-                cmd, capture_output=True, text=True, timeout=60
-            )
-            
-            if result.returncode == 0:
-                # Parse the JSON output
-                output = result.stdout
-                # Find the JSON part
-                json_start = output.find('{')
-                if json_start >= 0:
-                    json_str = output[json_start:]
-                    data = json.loads(json_str)
-                    return data.get('markdown', '')
+            # File format: Date|Symbol|ShortVolume|ShortExemptVolume|TotalVolume|Market
+            for line in content.strip().split('\n'):
+                if line.startswith('Date|'):
+                    continue  # Skip header
+                
+                parts = line.split('|')
+                if len(parts) >= 5 and parts[1].upper() == ticker.upper():
+                    short_vol = int(parts[2])
+                    short_exempt = int(parts[3])
+                    total_vol = int(parts[4])
+                    
+                    return {
+                        'short_volume': short_vol,
+                        'short_exempt_volume': short_exempt,
+                        'total_volume': total_vol,
+                        'short_ratio': round(short_vol / total_vol, 4) if total_vol > 0 else 0,
+                        'market': parts[5] if len(parts) > 5 else 'N/A'
+                    }
             
             return None
             
         except Exception as e:
-            print(f"Firecrawl error: {e}")
             return None
-    
-    def _parse_dark_pool_data(self, ticker: str, text: str) -> Dict:
-        """Parse dark pool data from page text."""
-        result = {
-            'ticker': ticker.upper(),
-            'timestamp': datetime.now().isoformat(),
-            'source': 'StockGrid.io (FINRA TRF)',
-            'status': 'success',
-            'error': None
-        }
-        
-        # Extract Net Short Volume
-        net_short_match = re.search(r'Net Short Volume\s*([+-]?[\d,]+)', text)
-        if net_short_match:
-            result['net_short_volume'] = int(net_short_match.group(1).replace(',', ''))
-        else:
-            result['net_short_volume'] = None
-        
-        # Extract Net Short Volume $
-        net_short_dollar_match = re.search(r'Net Short Volume \$\s*([+-]?[\d,]+)', text)
-        if net_short_dollar_match:
-            result['net_short_volume_dollar'] = int(net_short_dollar_match.group(1).replace(',', ''))
-        else:
-            result['net_short_volume_dollar'] = None
-        
-        # Extract Position (20-day)
-        position_match = re.search(r'Position\s*([+-]?[\d,]+)', text)
-        if position_match:
-            result['position'] = int(position_match.group(1).replace(',', ''))
-        else:
-            result['position'] = None
-        
-        # Extract Position $
-        position_dollar_match = re.search(r'Position \$\s*([+-]?[\d,]+)', text)
-        if position_dollar_match:
-            result['position_dollar'] = int(position_dollar_match.group(1).replace(',', ''))
-        else:
-            result['position_dollar'] = None
-        
-        # Parse short volume history table
-        result['short_volume_history'] = self._parse_short_volume_table(ticker, text)
-        
-        # Calculate sentiment interpretation
-        result['sentiment'] = self._interpret_dark_pool_sentiment(result)
-        
-        # Add explanation
-        result['explanation'] = self._get_dark_pool_explanation(result)
-        
-        return result
-    
-    def _parse_short_volume_table(self, ticker: str, text: str) -> List[Dict]:
-        """Parse the short volume history table."""
-        history = []
-        
-        # Look for table rows with the ticker
-        pattern = rf'{ticker.upper()}\s+(\d{{4}}-\d{{2}}-\d{{2}})\s+([\d,]+)\s+([\d.]+)\s+([\d,]+)\s+([\d,]+)'
-        matches = re.findall(pattern, text)
-        
-        for match in matches[:15]:  # Last 15 days
-            try:
-                history.append({
-                    'date': match[0],
-                    'short_volume': int(match[1].replace(',', '')),
-                    'short_volume_pct': float(match[2]),
-                    'short_exempt_volume': int(match[3].replace(',', '')),
-                    'total_volume': int(match[4].replace(',', ''))
-                })
-            except (ValueError, IndexError):
-                continue
-        
-        return history
     
     def _interpret_dark_pool_sentiment(self, data: Dict) -> Dict:
         """
@@ -217,87 +216,101 @@ class StockGridIntegration:
         - POSITIVE net short volume = More shorting than buying = BEARISH
         
         This is counterintuitive but backed by research showing that
-        short volume mostly represents market makers selling to buyers.
+        dark pool "short volume" mostly represents market makers
+        selling shares to meet buyer demand.
         """
-        position = data.get('position', 0) or 0
+        sentiment = {
+            'sentiment': 'NEUTRAL',
+            'score': 50,
+            'signal': 'No clear signal',
+            'daily_trend': 'NEUTRAL'
+        }
+        
         position_dollar = data.get('position_dollar', 0) or 0
         net_short = data.get('net_short_volume', 0) or 0
+        short_ratio = data.get('short_ratio', 0.5) or 0.5
         
-        # Determine sentiment based on position
+        # Score based on 20-day position (in dollars)
+        # Negative position = bullish (more buying than shorting)
         if position_dollar < -10_000_000_000:  # < -$10B
-            sentiment = 'VERY_BULLISH'
-            signal = 'Strong institutional buying detected'
-            score = 85
+            sentiment['sentiment'] = 'VERY_BULLISH'
+            sentiment['score'] = 90
+            sentiment['signal'] = 'Extreme institutional buying detected'
         elif position_dollar < -1_000_000_000:  # < -$1B
-            sentiment = 'BULLISH'
-            signal = 'Institutional buying detected'
-            score = 70
+            sentiment['sentiment'] = 'VERY_BULLISH'
+            sentiment['score'] = 80
+            sentiment['signal'] = 'Strong institutional buying detected'
         elif position_dollar < -100_000_000:  # < -$100M
-            sentiment = 'MODERATELY_BULLISH'
-            signal = 'Moderate institutional buying'
-            score = 60
+            sentiment['sentiment'] = 'BULLISH'
+            sentiment['score'] = 70
+            sentiment['signal'] = 'Moderate institutional buying detected'
+        elif position_dollar < 0:
+            sentiment['sentiment'] = 'SLIGHTLY_BULLISH'
+            sentiment['score'] = 60
+            sentiment['signal'] = 'Light institutional buying detected'
         elif position_dollar > 10_000_000_000:  # > $10B
-            sentiment = 'VERY_BEARISH'
-            signal = 'Strong institutional selling detected'
-            score = 15
+            sentiment['sentiment'] = 'VERY_BEARISH'
+            sentiment['score'] = 10
+            sentiment['signal'] = 'Extreme institutional selling/shorting detected'
         elif position_dollar > 1_000_000_000:  # > $1B
-            sentiment = 'BEARISH'
-            signal = 'Institutional selling detected'
-            score = 30
+            sentiment['sentiment'] = 'VERY_BEARISH'
+            sentiment['score'] = 20
+            sentiment['signal'] = 'Strong institutional selling/shorting detected'
         elif position_dollar > 100_000_000:  # > $100M
-            sentiment = 'MODERATELY_BEARISH'
-            signal = 'Moderate institutional selling'
-            score = 40
-        else:
-            sentiment = 'NEUTRAL'
-            signal = 'No significant institutional bias'
-            score = 50
+            sentiment['sentiment'] = 'BEARISH'
+            sentiment['score'] = 30
+            sentiment['signal'] = 'Moderate institutional selling/shorting detected'
+        elif position_dollar > 0:
+            sentiment['sentiment'] = 'SLIGHTLY_BEARISH'
+            sentiment['score'] = 40
+            sentiment['signal'] = 'Light institutional selling detected'
         
-        # Daily trend
-        if net_short < -1_000_000:
-            daily_trend = 'BUYING'
-        elif net_short > 1_000_000:
-            daily_trend = 'SELLING'
-        else:
-            daily_trend = 'NEUTRAL'
+        # Daily trend based on today's net short
+        if net_short < 0:
+            sentiment['daily_trend'] = 'BULLISH'
+        elif net_short > 0:
+            sentiment['daily_trend'] = 'BEARISH'
         
-        return {
-            'sentiment': sentiment,
-            'signal': signal,
-            'score': score,
-            'daily_trend': daily_trend,
-            'interpretation': f"20-day position: ${position_dollar:,.0f}" if position_dollar else "N/A"
-        }
+        # Adjust for short ratio
+        if short_ratio > 0.6:
+            sentiment['signal'] += ' (High short ratio - potential squeeze setup)'
+        elif short_ratio < 0.3:
+            sentiment['signal'] += ' (Low short ratio - limited short interest)'
+        
+        return sentiment
     
     def _get_dark_pool_explanation(self, data: Dict) -> str:
-        """Generate explanation text for dark pool data."""
-        return """
-**Dark Pool Data Interpretation:**
-
-Dark pools are off-exchange trading venues where institutional investors execute large orders.
-FINRA reports short volume data from these venues daily.
-
-**Key Insight (SqueezeMetrics Research):**
-- **Negative Position** = More buying than shorting = **BULLISH** for the stock
-- **Positive Position** = More shorting than buying = **BEARISH** for the stock
-
-This is counterintuitive because "short volume" mostly represents market makers 
-selling shares short to meet buyer demand. High short volume often indicates 
-strong buying pressure from institutions.
-
-**How to Use:**
-- Position $ < -$1B: Strong institutional accumulation (bullish)
-- Position $ > $1B: Strong institutional distribution (bearish)
-- Daily Net Short < 0: Today's flow is bullish
-- Daily Net Short > 0: Today's flow is bearish
-"""
+        """Generate explanation of dark pool data."""
+        position = data.get('position', 0) or 0
+        position_dollar = data.get('position_dollar', 0) or 0
+        short_ratio = data.get('short_ratio', 0) or 0
+        
+        explanation = []
+        
+        if position < 0:
+            explanation.append(
+                f"20-day net position is {abs(position):,.0f} shares negative "
+                f"(${abs(position_dollar)/1e9:.2f}B), indicating net buying pressure."
+            )
+        else:
+            explanation.append(
+                f"20-day net position is {position:,.0f} shares positive "
+                f"(${position_dollar/1e9:.2f}B), indicating net selling pressure."
+            )
+        
+        explanation.append(
+            f"Short volume ratio is {short_ratio:.1%}, "
+            f"{'above' if short_ratio > 0.45 else 'below'} the typical 45% average."
+        )
+        
+        return ' '.join(explanation)
     
     def _empty_dark_pool_result(self, ticker: str, error: str) -> Dict:
-        """Return empty result structure."""
+        """Return empty result structure with error."""
         return {
             'ticker': ticker.upper(),
             'timestamp': datetime.now().isoformat(),
-            'source': 'StockGrid.io (FINRA TRF)',
+            'source': 'FINRA RegSHO',
             'status': 'error',
             'error': error,
             'net_short_volume': None,
@@ -307,119 +320,122 @@ strong buying pressure from institutions.
             'short_volume_history': [],
             'sentiment': {
                 'sentiment': 'UNKNOWN',
-                'signal': 'Data unavailable',
                 'score': 50,
+                'signal': f'Data unavailable: {error}',
                 'daily_trend': 'UNKNOWN'
-            },
-            'explanation': 'Dark pool data unavailable.'
+            }
         }
     
-    def get_arima_forecast(self, ticker: str, periods: int = 5, 
-                          p: int = 1, d: int = 1, q: int = 1) -> Dict:
+    def calculate_arima_forecast(self, ticker: str, forecast_days: int = 5) -> Dict:
         """
-        Generate ARIMA forecast for a stock.
+        Calculate ARIMA forecast for a stock.
         
         Args:
             ticker: Stock symbol
-            periods: Number of periods to forecast
-            p: Autoregression order
-            d: Differencing order
-            q: Moving average order
+            forecast_days: Number of days to forecast (default 5)
             
         Returns:
-            Dict with forecast data, confidence intervals, and model statistics
+            Dict with ARIMA forecast results
         """
         if not ARIMA_AVAILABLE:
-            return self._empty_arima_result(ticker, "statsmodels not installed")
+            return {
+                'status': 'error',
+                'error': 'statsmodels not installed',
+                'ticker': ticker
+            }
         
-        cache_key = f"arima_{ticker}_{p}_{d}_{q}"
+        cache_key = f"arima_{ticker}"
         if self._is_cache_valid(cache_key):
             return self._cache[cache_key]
         
         try:
-            # Get historical price data
+            # Fetch historical price data
             stock = yf.Ticker(ticker)
-            hist = stock.history(period="1y")
+            hist = stock.history(period='6mo')
             
-            if hist.empty or len(hist) < 100:
-                return self._empty_arima_result(ticker, "Insufficient historical data")
+            if hist.empty or len(hist) < 60:
+                return {
+                    'status': 'error',
+                    'error': 'Insufficient historical data',
+                    'ticker': ticker
+                }
             
             # Use closing prices
             prices = hist['Close'].dropna()
+            current_price = float(prices.iloc[-1])
+            
+            # Test for stationarity
+            adf_result = adfuller(prices, autolag='AIC')
+            is_stationary = adf_result[1] < 0.05
             
             # Fit ARIMA model
-            model = ARIMA(prices, order=(p, d, q))
+            # Using (1,1,1) as a robust default - can be optimized
+            model = ARIMA(prices, order=(1, 1, 1))
             fitted = model.fit()
             
             # Generate forecast
-            forecast = fitted.get_forecast(steps=periods)
+            forecast = fitted.get_forecast(steps=forecast_days)
             forecast_mean = forecast.predicted_mean
-            conf_int = forecast.conf_int()
+            forecast_ci = forecast.conf_int(alpha=0.05)
             
-            # Calculate model diagnostics
-            aic = fitted.aic
-            bic = fitted.bic
-            
-            # Stationarity test on original series
-            adf_result = adfuller(prices)
-            is_stationary = adf_result[1] < 0.05
-            
-            # Calculate forecast dates
-            last_date = prices.index[-1]
+            # Build forecast results
             forecast_dates = pd.date_range(
-                start=last_date + timedelta(days=1),
-                periods=periods,
+                start=prices.index[-1] + timedelta(days=1),
+                periods=forecast_days,
                 freq='B'  # Business days
             )
             
-            # Build result
+            forecast_data = []
+            for i in range(forecast_days):
+                forecast_data.append({
+                    'date': forecast_dates[i].strftime('%Y-%m-%d'),
+                    'predicted': float(forecast_mean.iloc[i]),
+                    'lower_95': float(forecast_ci.iloc[i, 0]),
+                    'upper_95': float(forecast_ci.iloc[i, 1])
+                })
+            
+            # Calculate expected change
+            final_forecast = forecast_data[-1]['predicted']
+            expected_change = final_forecast - current_price
+            expected_change_pct = (expected_change / current_price) * 100
+            
+            # Determine signal
+            if expected_change_pct > 3:
+                signal = 'STRONG_BUY'
+                confidence = 'HIGH'
+            elif expected_change_pct > 1:
+                signal = 'BUY'
+                confidence = 'MEDIUM'
+            elif expected_change_pct < -3:
+                signal = 'STRONG_SELL'
+                confidence = 'HIGH'
+            elif expected_change_pct < -1:
+                signal = 'SELL'
+                confidence = 'MEDIUM'
+            else:
+                signal = 'HOLD'
+                confidence = 'LOW'
+            
             result = {
+                'status': 'success',
                 'ticker': ticker.upper(),
                 'timestamp': datetime.now().isoformat(),
-                'model': f'ARIMA({p},{d},{q})',
-                'status': 'success',
-                'error': None,
-                
-                # Current price info
-                'current_price': float(prices.iloc[-1]),
-                'last_date': str(prices.index[-1].date()),
-                
-                # Forecast
-                'forecast': [
-                    {
-                        'date': str(forecast_dates[i].date()),
-                        'predicted': float(forecast_mean.iloc[i]),
-                        'lower_95': float(conf_int.iloc[i, 0]),
-                        'upper_95': float(conf_int.iloc[i, 1])
-                    }
-                    for i in range(periods)
-                ],
-                
-                # Model statistics
+                'model': 'ARIMA(1,1,1)',
+                'current_price': current_price,
+                'forecast': forecast_data,
                 'model_stats': {
-                    'aic': float(aic),
-                    'bic': float(bic),
-                    'is_stationary': is_stationary,
-                    'adf_pvalue': float(adf_result[1]),
-                    'observations': len(prices)
+                    'aic': float(fitted.aic),
+                    'bic': float(fitted.bic),
+                    'observations': len(prices),
+                    'is_stationary': is_stationary
                 },
-                
-                # Historical data for charting
-                'historical': [
-                    {
-                        'date': str(prices.index[i].date()),
-                        'price': float(prices.iloc[i])
-                    }
-                    for i in range(-30, 0)  # Last 30 days
-                ],
-                
-                # Interpretation
-                'interpretation': self._interpret_arima_forecast(
-                    prices.iloc[-1], forecast_mean, conf_int
-                ),
-                
-                # Explanation
-                'explanation': self._get_arima_explanation()
+                'interpretation': {
+                    'expected_change': expected_change,
+                    'expected_change_pct': expected_change_pct,
+                    'signal': signal,
+                    'confidence': confidence,
+                    'summary': f"ARIMA predicts {expected_change_pct:+.1f}% change over forecast period"
+                }
             }
             
             # Cache result
@@ -429,119 +445,120 @@ strong buying pressure from institutions.
             return result
             
         except Exception as e:
-            return self._empty_arima_result(ticker, str(e))
-    
-    def _interpret_arima_forecast(self, current: float, forecast: pd.Series, 
-                                  conf_int: pd.DataFrame) -> Dict:
-        """Interpret ARIMA forecast for trading signals."""
-        final_forecast = float(forecast.iloc[-1])
-        change_pct = ((final_forecast - current) / current) * 100
-        
-        # Confidence interval width as % of price
-        ci_width = (conf_int.iloc[-1, 1] - conf_int.iloc[-1, 0]) / current * 100
-        
-        # Determine signal
-        if change_pct > 5 and ci_width < 20:
-            signal = 'STRONG_BUY'
-            confidence = 'HIGH'
-        elif change_pct > 2:
-            signal = 'BUY'
-            confidence = 'MEDIUM' if ci_width < 30 else 'LOW'
-        elif change_pct < -5 and ci_width < 20:
-            signal = 'STRONG_SELL'
-            confidence = 'HIGH'
-        elif change_pct < -2:
-            signal = 'SELL'
-            confidence = 'MEDIUM' if ci_width < 30 else 'LOW'
-        else:
-            signal = 'HOLD'
-            confidence = 'MEDIUM'
-        
-        return {
-            'signal': signal,
-            'confidence': confidence,
-            'expected_change_pct': round(change_pct, 2),
-            'forecast_price': round(final_forecast, 2),
-            'ci_width_pct': round(ci_width, 2),
-            'summary': f"ARIMA predicts {change_pct:+.1f}% change over forecast period"
-        }
-    
-    def _get_arima_explanation(self) -> str:
-        """Generate explanation text for ARIMA model."""
-        return """
-**ARIMA Model Explanation:**
-
-ARIMA (AutoRegressive Integrated Moving Average) is a statistical model for 
-time series forecasting that combines three components:
-
-- **AR (p)**: Autoregression - uses past values to predict future values
-- **I (d)**: Integration - differencing to make the series stationary
-- **MA (q)**: Moving Average - uses past forecast errors
-
-**How to Interpret:**
-- **Forecast Line**: Predicted price trajectory
-- **Confidence Interval**: 95% probability range for actual price
-- **Narrow CI**: Higher confidence in prediction
-- **Wide CI**: Lower confidence, more uncertainty
-
-**Limitations:**
-- ARIMA assumes patterns continue (may miss sudden changes)
-- Works best for short-term forecasts (1-5 days)
-- Should be combined with fundamental and technical analysis
-
-**Best Practices:**
-- Use as one input among many, not sole decision maker
-- More reliable for liquid, established stocks
-- Re-run daily as new data becomes available
-"""
-    
-    def _empty_arima_result(self, ticker: str, error: str) -> Dict:
-        """Return empty ARIMA result."""
-        return {
-            'ticker': ticker.upper(),
-            'timestamp': datetime.now().isoformat(),
-            'model': 'ARIMA',
-            'status': 'error',
-            'error': error,
-            'current_price': None,
-            'forecast': [],
-            'model_stats': {},
-            'historical': [],
-            'interpretation': {
-                'signal': 'UNKNOWN',
-                'confidence': 'NONE',
-                'summary': f'ARIMA forecast unavailable: {error}'
-            },
-            'explanation': 'ARIMA forecast unavailable.'
-        }
+            return {
+                'status': 'error',
+                'error': str(e),
+                'ticker': ticker
+            }
     
     def get_factor_analysis(self, ticker: str) -> Dict:
         """
-        Get factor analysis signals from StockGrid.
+        Calculate factor analysis for a stock.
         
-        Factors include:
-        - New Uptrend
-        - Filtered Momentum
-        - Momentum
-        - New High
-        - Relative Strength (S&P500)
-        - ROC Curve
-        - Sustained Momentum
-        - Dark Pools
+        Factors calculated:
+        - Momentum (price change over various periods)
+        - Volatility (standard deviation of returns)
+        - Volume trend
+        - Relative strength
         """
-        cache_key = f"factor_{ticker}"
+        cache_key = f"factors_{ticker}"
         if self._is_cache_valid(cache_key):
             return self._cache[cache_key]
         
         try:
-            url = f"{self.BASE_URL}/factor-analysis/{ticker.upper()}"
-            response = self.session.get(url, timeout=30)
+            stock = yf.Ticker(ticker)
+            hist = stock.history(period='1y')
             
-            if response.status_code != 200:
-                return self._empty_factor_result(ticker, f"HTTP {response.status_code}")
+            if hist.empty or len(hist) < 60:
+                return {
+                    'status': 'error',
+                    'error': 'Insufficient data',
+                    'ticker': ticker
+                }
             
-            text = response.text
-            result = self._parse_factor_analysis(ticker, text)
+            prices = hist['Close']
+            volumes = hist['Volume']
+            returns = prices.pct_change().dropna()
+            
+            # Calculate factors
+            factors = {}
+            
+            # Momentum factors
+            factors['momentum_1m'] = float((prices.iloc[-1] / prices.iloc[-21] - 1) * 100) if len(prices) > 21 else 0
+            factors['momentum_3m'] = float((prices.iloc[-1] / prices.iloc[-63] - 1) * 100) if len(prices) > 63 else 0
+            factors['momentum_6m'] = float((prices.iloc[-1] / prices.iloc[-126] - 1) * 100) if len(prices) > 126 else 0
+            
+            # Volatility
+            factors['volatility_20d'] = float(returns.tail(20).std() * np.sqrt(252) * 100)
+            factors['volatility_60d'] = float(returns.tail(60).std() * np.sqrt(252) * 100)
+            
+            # Volume trend
+            avg_vol_20 = volumes.tail(20).mean()
+            avg_vol_60 = volumes.tail(60).mean()
+            factors['volume_trend'] = float((avg_vol_20 / avg_vol_60 - 1) * 100) if avg_vol_60 > 0 else 0
+            
+            # Price relative to moving averages
+            sma_20 = prices.tail(20).mean()
+            sma_50 = prices.tail(50).mean()
+            sma_200 = prices.tail(200).mean() if len(prices) >= 200 else prices.mean()
+            
+            current_price = float(prices.iloc[-1])
+            factors['price_vs_sma20'] = float((current_price / sma_20 - 1) * 100)
+            factors['price_vs_sma50'] = float((current_price / sma_50 - 1) * 100)
+            factors['price_vs_sma200'] = float((current_price / sma_200 - 1) * 100)
+            
+            # Calculate composite score
+            score = 50  # Start neutral
+            
+            # Momentum contribution (max ±20)
+            if factors['momentum_1m'] > 5:
+                score += 10
+            elif factors['momentum_1m'] < -5:
+                score -= 10
+            
+            if factors['momentum_3m'] > 10:
+                score += 10
+            elif factors['momentum_3m'] < -10:
+                score -= 10
+            
+            # Trend contribution (max ±20)
+            if factors['price_vs_sma20'] > 0 and factors['price_vs_sma50'] > 0:
+                score += 10
+            elif factors['price_vs_sma20'] < 0 and factors['price_vs_sma50'] < 0:
+                score -= 10
+            
+            if factors['price_vs_sma200'] > 0:
+                score += 10
+            else:
+                score -= 10
+            
+            # Volume contribution (max ±10)
+            if factors['volume_trend'] > 20:
+                score += 5
+            elif factors['volume_trend'] < -20:
+                score -= 5
+            
+            # Determine signal
+            if score >= 70:
+                signal = 'STRONG_BUY'
+            elif score >= 60:
+                signal = 'BUY'
+            elif score <= 30:
+                signal = 'STRONG_SELL'
+            elif score <= 40:
+                signal = 'SELL'
+            else:
+                signal = 'HOLD'
+            
+            result = {
+                'status': 'success',
+                'ticker': ticker.upper(),
+                'timestamp': datetime.now().isoformat(),
+                'factors': factors,
+                'composite_score': score,
+                'signal': signal,
+                'interpretation': self._interpret_factors(factors, score)
+            }
             
             # Cache result
             self._cache[cache_key] = result
@@ -550,253 +567,100 @@ time series forecasting that combines three components:
             return result
             
         except Exception as e:
-            return self._empty_factor_result(ticker, str(e))
-    
-    def _parse_factor_analysis(self, ticker: str, text: str) -> Dict:
-        """Parse factor analysis data from page."""
-        soup = BeautifulSoup(text, 'html.parser')
-        page_text = soup.get_text()
-        
-        result = {
-            'ticker': ticker.upper(),
-            'timestamp': datetime.now().isoformat(),
-            'source': 'StockGrid.io Factor Analysis',
-            'status': 'success',
-            'error': None,
-            'factors': {},
-            'explanation': self._get_factor_explanation()
-        }
-        
-        # Extract last signal information
-        signal_match = re.search(
-            r'last signal.*?(\d{4}-\d{2}-\d{2}).*?expected return.*?([\d.]+)%.*?probability.*?([\d.]+)%',
-            page_text, re.IGNORECASE | re.DOTALL
-        )
-        
-        if signal_match:
-            result['last_signal'] = {
-                'date': signal_match.group(1),
-                'expected_return': float(signal_match.group(2)),
-                'profit_probability': float(signal_match.group(3))
-            }
-        else:
-            result['last_signal'] = None
-        
-        # Extract factor statistics from tables
-        # Look for statistics patterns
-        stats_pattern = r'profitable%\s+([\d.]+)'
-        stats_match = re.search(stats_pattern, page_text)
-        
-        if stats_match:
-            result['profit_probability'] = float(stats_match.group(1))
-        
-        # Determine overall signal
-        result['overall_signal'] = self._determine_factor_signal(result)
-        
-        return result
-    
-    def _determine_factor_signal(self, data: Dict) -> Dict:
-        """Determine overall trading signal from factor analysis."""
-        last_signal = data.get('last_signal')
-        
-        if not last_signal:
             return {
-                'signal': 'NEUTRAL',
-                'confidence': 'LOW',
-                'summary': 'No recent factor signals detected'
+                'status': 'error',
+                'error': str(e),
+                'ticker': ticker
             }
+    
+    def _interpret_factors(self, factors: Dict, score: int) -> str:
+        """Generate interpretation of factor analysis."""
+        parts = []
         
-        expected_return = last_signal.get('expected_return', 0)
-        prob = last_signal.get('profit_probability', 50)
+        # Momentum interpretation
+        mom_1m = factors.get('momentum_1m', 0)
+        mom_3m = factors.get('momentum_3m', 0)
         
-        if expected_return > 10 and prob > 70:
-            signal = 'STRONG_BUY'
-            confidence = 'HIGH'
-        elif expected_return > 5 and prob > 60:
-            signal = 'BUY'
-            confidence = 'MEDIUM'
-        elif expected_return < -5 and prob < 40:
-            signal = 'SELL'
-            confidence = 'MEDIUM'
+        if mom_1m > 10 and mom_3m > 15:
+            parts.append("Strong positive momentum across timeframes")
+        elif mom_1m < -10 and mom_3m < -15:
+            parts.append("Strong negative momentum across timeframes")
+        elif mom_1m > 0 and mom_3m > 0:
+            parts.append("Positive momentum trend")
+        elif mom_1m < 0 and mom_3m < 0:
+            parts.append("Negative momentum trend")
         else:
-            signal = 'HOLD'
-            confidence = 'LOW'
+            parts.append("Mixed momentum signals")
         
-        return {
-            'signal': signal,
-            'confidence': confidence,
-            'expected_return': expected_return,
-            'profit_probability': prob,
-            'summary': f"Factor signal: {expected_return:+.1f}% expected return, {prob:.0f}% win rate"
-        }
-    
-    def _get_factor_explanation(self) -> str:
-        """Generate explanation for factor analysis."""
-        return """
-**Factor Analysis Explanation:**
-
-Factor analysis generates trade signals based on historical return distributions 
-of specific market factors. Each factor has been backtested to determine its 
-predictive power.
-
-**Available Factors:**
-- **New Uptrend**: Detects start of new bullish trends
-- **Momentum**: Measures price momentum strength
-- **Relative Strength**: Compares performance vs S&P 500
-- **Dark Pools**: Uses institutional flow data
-- **New High**: Identifies breakout to new highs
-
-**How to Use:**
-- **Expected Return**: Historical average return after signal
-- **Profit Probability**: % of times signal was profitable
-- **Profit-Loss Ratio**: Avg win / Avg loss
-
-**Best Signals:**
-- Expected Return > 10%
-- Profit Probability > 70%
-- Profit-Loss Ratio > 1.5
-
-**Note**: Past performance doesn't guarantee future results.
-Factor signals work best when combined with other analysis.
-"""
-    
-    def _empty_factor_result(self, ticker: str, error: str) -> Dict:
-        """Return empty factor analysis result."""
-        return {
-            'ticker': ticker.upper(),
-            'timestamp': datetime.now().isoformat(),
-            'source': 'StockGrid.io Factor Analysis',
-            'status': 'error',
-            'error': error,
-            'factors': {},
-            'last_signal': None,
-            'overall_signal': {
-                'signal': 'UNKNOWN',
-                'confidence': 'NONE',
-                'summary': f'Factor analysis unavailable: {error}'
-            },
-            'explanation': 'Factor analysis unavailable.'
-        }
+        # Trend interpretation
+        vs_sma20 = factors.get('price_vs_sma20', 0)
+        vs_sma200 = factors.get('price_vs_sma200', 0)
+        
+        if vs_sma20 > 0 and vs_sma200 > 0:
+            parts.append("Trading above key moving averages (bullish)")
+        elif vs_sma20 < 0 and vs_sma200 < 0:
+            parts.append("Trading below key moving averages (bearish)")
+        else:
+            parts.append("Mixed trend signals")
+        
+        # Volume interpretation
+        vol_trend = factors.get('volume_trend', 0)
+        if vol_trend > 30:
+            parts.append("Significantly elevated volume (high interest)")
+        elif vol_trend < -30:
+            parts.append("Declining volume (waning interest)")
+        
+        return '. '.join(parts) + '.'
     
     def get_full_stockgrid_analysis(self, ticker: str) -> Dict:
         """
-        Get comprehensive StockGrid analysis including all data sources.
+        Get complete analysis including dark pools, ARIMA, and factors.
         
-        Returns combined dark pool, ARIMA, and factor analysis data.
+        Args:
+            ticker: Stock symbol
+            
+        Returns:
+            Dict with all analysis components
         """
         return {
             'ticker': ticker.upper(),
             'timestamp': datetime.now().isoformat(),
             'dark_pools': self.get_dark_pool_data(ticker),
-            'arima': self.get_arima_forecast(ticker),
-            'factor_analysis': self.get_factor_analysis(ticker),
-            'combined_signal': self._calculate_combined_signal(ticker)
-        }
-    
-    def _calculate_combined_signal(self, ticker: str) -> Dict:
-        """Calculate combined signal from all StockGrid sources."""
-        dark_pool = self.get_dark_pool_data(ticker)
-        arima = self.get_arima_forecast(ticker)
-        factor = self.get_factor_analysis(ticker)
-        
-        scores = []
-        signals = []
-        
-        # Dark pool score
-        dp_score = dark_pool.get('sentiment', {}).get('score', 50)
-        scores.append(dp_score)
-        
-        # ARIMA score
-        arima_signal = arima.get('interpretation', {}).get('signal', 'HOLD')
-        arima_score = {
-            'STRONG_BUY': 90, 'BUY': 70, 'HOLD': 50, 
-            'SELL': 30, 'STRONG_SELL': 10, 'UNKNOWN': 50
-        }.get(arima_signal, 50)
-        scores.append(arima_score)
-        
-        # Factor score
-        factor_signal = factor.get('overall_signal', {}).get('signal', 'NEUTRAL')
-        factor_score = {
-            'STRONG_BUY': 90, 'BUY': 70, 'HOLD': 50,
-            'SELL': 30, 'NEUTRAL': 50, 'UNKNOWN': 50
-        }.get(factor_signal, 50)
-        scores.append(factor_score)
-        
-        # Calculate weighted average
-        avg_score = sum(scores) / len(scores)
-        
-        # Determine combined signal
-        if avg_score >= 75:
-            combined = 'STRONG_BUY'
-        elif avg_score >= 60:
-            combined = 'BUY'
-        elif avg_score <= 25:
-            combined = 'STRONG_SELL'
-        elif avg_score <= 40:
-            combined = 'SELL'
-        else:
-            combined = 'HOLD'
-        
-        return {
-            'signal': combined,
-            'score': round(avg_score, 1),
-            'components': {
-                'dark_pool_score': dp_score,
-                'arima_score': arima_score,
-                'factor_score': factor_score
-            },
-            'summary': f"Combined StockGrid signal: {combined} (score: {avg_score:.0f}/100)"
+            'arima': self.calculate_arima_forecast(ticker),
+            'factor_analysis': self.get_factor_analysis(ticker)
         }
 
 
-# Convenience functions for direct use
-def get_dark_pool_data(ticker: str) -> Dict:
-    """Get dark pool data for a ticker."""
-    return StockGridIntegration().get_dark_pool_data(ticker)
-
-def get_arima_forecast(ticker: str, periods: int = 5) -> Dict:
-    """Get ARIMA forecast for a ticker."""
-    return StockGridIntegration().get_arima_forecast(ticker, periods)
-
-def get_factor_analysis(ticker: str) -> Dict:
-    """Get factor analysis for a ticker."""
-    return StockGridIntegration().get_factor_analysis(ticker)
-
-def get_full_stockgrid_analysis(ticker: str) -> Dict:
-    """Get full StockGrid analysis for a ticker."""
-    return StockGridIntegration().get_full_stockgrid_analysis(ticker)
-
-
-if __name__ == "__main__":
-    # Test the integration
-    import json
+# Test function
+if __name__ == '__main__':
+    sg = StockGridIntegration()
     
-    print("Testing StockGrid Integration...")
-    print("=" * 60)
+    print("Testing AAPL analysis...")
+    result = sg.get_full_stockgrid_analysis('AAPL')
     
-    # Test dark pool data
-    print("\n1. Dark Pool Data for AAPL:")
-    dp_data = get_dark_pool_data("AAPL")
-    print(f"   Net Short Volume: {dp_data.get('net_short_volume'):,}" if dp_data.get('net_short_volume') else "   Net Short Volume: N/A")
-    print(f"   Position $: ${dp_data.get('position_dollar'):,.0f}" if dp_data.get('position_dollar') else "   Position $: N/A")
-    print(f"   Sentiment: {dp_data.get('sentiment', {}).get('sentiment', 'N/A')}")
+    print("\n=== DARK POOLS ===")
+    dp = result['dark_pools']
+    print(f"Status: {dp.get('status')}")
+    print(f"Short Volume: {dp.get('short_volume'):,}" if dp.get('short_volume') else "Short Volume: N/A")
+    print(f"Total Volume: {dp.get('total_volume'):,}" if dp.get('total_volume') else "Total Volume: N/A")
+    print(f"Short Ratio: {dp.get('short_ratio'):.1%}" if dp.get('short_ratio') else "Short Ratio: N/A")
+    print(f"Net Short Volume: {dp.get('net_short_volume'):,}" if dp.get('net_short_volume') else "Net Short: N/A")
+    print(f"20-Day Position: {dp.get('position'):,}" if dp.get('position') else "Position: N/A")
+    print(f"Position $: ${dp.get('position_dollar', 0)/1e9:.2f}B")
+    print(f"Sentiment: {dp.get('sentiment', {}).get('sentiment')}")
+    print(f"Signal: {dp.get('sentiment', {}).get('signal')}")
     
-    # Test ARIMA forecast
-    print("\n2. ARIMA Forecast for AAPL:")
-    arima_data = get_arima_forecast("AAPL")
-    if arima_data.get('status') == 'success':
-        print(f"   Current Price: ${arima_data.get('current_price'):.2f}")
-        print(f"   Model: {arima_data.get('model')}")
-        print(f"   Signal: {arima_data.get('interpretation', {}).get('signal', 'N/A')}")
-        if arima_data.get('forecast'):
-            print(f"   5-Day Forecast: ${arima_data['forecast'][-1]['predicted']:.2f}")
-    else:
-        print(f"   Error: {arima_data.get('error')}")
+    print("\n=== ARIMA ===")
+    arima = result['arima']
+    print(f"Status: {arima.get('status')}")
+    if arima.get('status') == 'success':
+        print(f"Current Price: ${arima.get('current_price'):.2f}")
+        print(f"5-Day Forecast: ${arima['forecast'][-1]['predicted']:.2f}")
+        print(f"Signal: {arima.get('interpretation', {}).get('signal')}")
     
-    # Test factor analysis
-    print("\n3. Factor Analysis for AAPL:")
-    factor_data = get_factor_analysis("AAPL")
-    print(f"   Signal: {factor_data.get('overall_signal', {}).get('signal', 'N/A')}")
-    
-    print("\n" + "=" * 60)
-    print("StockGrid Integration Test Complete!")
+    print("\n=== FACTORS ===")
+    fa = result['factor_analysis']
+    print(f"Status: {fa.get('status')}")
+    if fa.get('status') == 'success':
+        print(f"Composite Score: {fa.get('composite_score')}/100")
+        print(f"Signal: {fa.get('signal')}")
