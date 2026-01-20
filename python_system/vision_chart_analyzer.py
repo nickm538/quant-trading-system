@@ -150,19 +150,33 @@ class VisionChartAnalyzer:
                     else:
                         break
         
-        # Fallback to OpenRouter
+        # Fallback chain through OpenRouter models
         if self.openrouter_key:
-            print("Falling back to OpenRouter...", file=sys.stderr)
-            try:
-                return self._analyze_with_openrouter(symbol, image_data)
-            except Exception as e:
-                last_error = str(e)
+            # Model fallback chain: Claude 3.5 Sonnet -> Gemini Flash -> Claude Opus 4.5
+            openrouter_models = [
+                ('anthropic/claude-3.5-sonnet', 'Claude 3.5 Sonnet'),
+                ('google/gemini-2.0-flash-001', 'Gemini 2.0 Flash'),
+                ('anthropic/claude-sonnet-4', 'Claude Sonnet 4'),
+                ('anthropic/claude-opus-4', 'Claude Opus 4'),
+            ]
+            
+            for model_id, model_name in openrouter_models:
+                print(f"Trying OpenRouter {model_name}...", file=sys.stderr)
+                try:
+                    result = self._analyze_with_openrouter(symbol, image_data, model=model_id)
+                    if result.get('trend', {}).get('direction') != 'UNKNOWN':
+                        result['ai_model'] = f'OpenRouter {model_name}'
+                        return result
+                except Exception as e:
+                    last_error = str(e)
+                    print(f"  {model_name} failed: {str(e)[:100]}", file=sys.stderr)
+                    continue
         
         return {
             'candlestick_patterns': [],
             'trend': {'direction': 'UNKNOWN', 'strength': 'UNKNOWN', 'momentum': 'UNKNOWN'},
             'overall_bias': 'NEUTRAL',
-            'error': f'API error: {last_error}'
+            'error': f'All API fallbacks failed. Last error: {last_error}'
         }
     
     def _analyze_with_sdk(self, symbol: str, image_data: bytes) -> Dict[str, Any]:
@@ -309,7 +323,7 @@ Respond in this exact JSON format:
     "pattern_strength": "STRONG/MODERATE/WEAK"
 }}"""
     
-    def _analyze_with_openrouter(self, symbol: str, image_data: bytes) -> Dict[str, Any]:
+    def _analyze_with_openrouter(self, symbol: str, image_data: bytes, model: str = 'anthropic/claude-3.5-sonnet') -> Dict[str, Any]:
         """Analyze using OpenRouter API with vision-capable model."""
         image_base64 = base64.b64encode(image_data).decode('utf-8')
         prompt = self._get_analysis_prompt(symbol)
@@ -321,9 +335,9 @@ Respond in this exact JSON format:
             'X-Title': 'Quant Trading System'
         }
         
-        # Use Claude 3.5 Sonnet for vision analysis (best for charts)
+        # Use specified model for vision analysis
         payload = {
-            "model": "anthropic/claude-3.5-sonnet",
+            "model": model,
             "messages": [{
                 "role": "user",
                 "content": [
