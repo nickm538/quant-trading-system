@@ -28,7 +28,7 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="technical" className="w-full">
-          <TabsList className="grid w-full grid-cols-4 lg:grid-cols-8">
+          <TabsList className="grid w-full grid-cols-5 lg:grid-cols-9">
             <TabsTrigger value="technical">Technical</TabsTrigger>
             <TabsTrigger value="advanced">Pivot/Fib</TabsTrigger>
             <TabsTrigger value="candlestick">Candlesticks</TabsTrigger>
@@ -36,6 +36,7 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
             <TabsTrigger value="garch">GARCH</TabsTrigger>
             <TabsTrigger value="montecarlo">Monte Carlo</TabsTrigger>
             <TabsTrigger value="position">Position</TabsTrigger>
+            <TabsTrigger value="market">Market</TabsTrigger>
             <TabsTrigger value="all">All Data</TabsTrigger>
           </TabsList>
 
@@ -892,6 +893,94 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
                 Dollar Risk = Shares × |Current Price - Stop Loss|
               </code>
             </div>
+          </TabsContent>
+
+          <TabsContent value="market" className="space-y-4">
+            {/* Market Context - Live market status, VIX, regime, sentiment */}
+            {analysis.market_context ? (
+              <div className="space-y-6">
+                {/* Market Status */}
+                <div className="p-4 bg-muted/20 rounded-lg">
+                  <h4 className="font-semibold text-primary mb-3">🕐 Market Status</h4>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <DataItem label="Status" value={analysis.market_context.market_status?.status || 'N/A'} />
+                    <DataItem label="Session" value={analysis.market_context.market_status?.session || 'N/A'} />
+                    <DataItem label="Day" value={analysis.market_context.market_status?.day_of_week || 'N/A'} />
+                    <DataItem label="Time (EST)" value={analysis.market_context.market_status?.current_time_est?.split(' ')[1] || 'N/A'} />
+                  </div>
+                  {analysis.market_context.market_status?.reason && (
+                    <p className="text-sm text-muted-foreground mt-2">{analysis.market_context.market_status.reason}</p>
+                  )}
+                </div>
+
+                {/* VIX */}
+                {analysis.market_context.vix?.success && (
+                  <div className="p-4 bg-muted/20 rounded-lg">
+                    <h4 className="font-semibold text-primary mb-3">📈 VIX (Volatility Index)</h4>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <DataItem label="VIX" value={safeFixed(analysis.market_context.vix.vix)} />
+                      <DataItem label="Level" value={analysis.market_context.vix.level || 'N/A'} />
+                      <DataItem label="Change" value={`${analysis.market_context.vix.change >= 0 ? '+' : ''}${safeFixed(analysis.market_context.vix.change)}`} />
+                      <DataItem label="Change %" value={`${analysis.market_context.vix.change_percent >= 0 ? '+' : ''}${safeFixed(analysis.market_context.vix.change_percent)}%`} />
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-2">{analysis.market_context.vix.interpretation}</p>
+                  </div>
+                )}
+
+                {/* Market Regime */}
+                {analysis.market_context.regime?.success && (
+                  <div className="p-4 bg-muted/20 rounded-lg">
+                    <h4 className="font-semibold text-primary mb-3">🎯 Market Regime</h4>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <DataItem label="Regime" value={analysis.market_context.regime.regime || 'N/A'} />
+                      <DataItem label="SPY Trend" value={`${safeFixed(analysis.market_context.regime.spy_20d_return)}%`} />
+                      <DataItem label="Volatility" value={`${safeFixed((analysis.market_context.regime.volatility || 0) * 100)}%`} />
+                      <DataItem label="Above SMA20" value={analysis.market_context.regime.above_sma_20 ? 'Yes' : 'No'} />
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-2">{analysis.market_context.regime.description}</p>
+                  </div>
+                )}
+
+                {/* Overall Assessment */}
+                {analysis.market_context.overall && (
+                  <div className="p-4 bg-muted/20 rounded-lg border-l-4 border-primary">
+                    <h4 className="font-semibold text-primary mb-2">📋 Overall Assessment</h4>
+                    <div className="flex items-center gap-4 mb-2">
+                      <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                        analysis.market_context.overall.conditions === 'FAVORABLE' ? 'bg-green-500/20 text-green-400' :
+                        analysis.market_context.overall.conditions === 'CAUTIOUS' ? 'bg-red-500/20 text-red-400' :
+                        analysis.market_context.overall.conditions === 'VOLATILE' ? 'bg-yellow-500/20 text-yellow-400' :
+                        'bg-gray-500/20 text-gray-400'
+                      }`}>
+                        {analysis.market_context.overall.conditions}
+                      </span>
+                    </div>
+                    <p className="text-sm">{analysis.market_context.overall.recommendation}</p>
+                  </div>
+                )}
+
+                {/* Historical Patterns */}
+                {analysis.market_context.patterns?.success && analysis.market_context.patterns.matches?.length > 0 && (
+                  <div className="p-4 bg-muted/20 rounded-lg">
+                    <h4 className="font-semibold text-primary mb-3">📊 Historical Pattern Matches</h4>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-3">
+                      <DataItem label="Avg 20D Return" value={`${safeFixed(analysis.market_context.patterns.avg_subsequent_return)}%`} />
+                      <DataItem label="Bullish Patterns" value={`${analysis.market_context.patterns.bullish_count}/${analysis.market_context.patterns.matches?.length || 0}`} />
+                      <DataItem label="Outlook" value={analysis.market_context.patterns.outlook || 'N/A'} />
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {analysis.market_context.patterns.matches?.slice(0, 3).map((m: any, i: number) => (
+                        <div key={i}>{m.date}: {m.subsequent_20d_return > 0 ? '+' : ''}{safeFixed(m.subsequent_20d_return)}% (corr: {safeFixed(m.correlation, 3)})</div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="p-4 text-center text-muted-foreground">
+                Market context data not available
+              </div>
+            )}
           </TabsContent>
 
           <TabsContent value="all" className="space-y-4">
