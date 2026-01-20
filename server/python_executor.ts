@@ -88,12 +88,26 @@ export async function analyzeStock(params: StockAnalysisParams): Promise<StockAn
       console.error('Python stderr:', stderr);
     }
 
-    // Parse JSON output
-    const result = JSON.parse(stdout);
-    return result as StockAnalysisResult;
+    // Parse JSON output - handle case where stdout might have extra content
+    try {
+      // Try to find JSON in stdout (in case there's any prefix noise)
+      const jsonMatch = stdout.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const result = JSON.parse(jsonMatch[0]);
+        return result as StockAnalysisResult;
+      } else {
+        throw new Error('No JSON found in output');
+      }
+    } catch (parseError: any) {
+      console.error('JSON parse error:', parseError.message);
+      console.error('Raw stdout:', stdout.substring(0, 500));
+      throw new Error(`Failed to parse analysis result for ${symbol}: ${parseError.message}`);
+    }
   } catch (error: any) {
-    console.error('Python execution error:', error);
-    throw new Error(`Failed to analyze stock ${symbol}: ${error.message}`);
+    // Extract just the error message, not the full stderr dump
+    const errorMsg = error.message?.split('\n')[0] || 'Unknown error';
+    console.error('Python execution error:', errorMsg);
+    throw new Error(`Failed to analyze stock ${symbol}: ${errorMsg}`);
   }
 }
 
