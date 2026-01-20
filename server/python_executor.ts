@@ -71,8 +71,11 @@ export async function analyzeStock(params: StockAnalysisParams): Promise<StockAn
   // Use production analyzer with 100% real data (no placeholders)
   const command = `${PYTHON_BIN} ${PRODUCTION_ANALYZER} ${symbol} ${bankroll}`;
 
+  let stdout = '';
+  let stderr = '';
+  
   try {
-    const { stdout, stderr } = await execAsync(command, {
+    const result = await execAsync(command, {
       maxBuffer: 10 * 1024 * 1024, // 10MB buffer
       timeout: 120000, // 2 minute timeout
       env: {
@@ -83,31 +86,31 @@ export async function analyzeStock(params: StockAnalysisParams): Promise<StockAn
         LD_LIBRARY_PATH: process.env.LD_LIBRARY_PATH || '',
       },
     });
+    stdout = result.stdout;
+    stderr = result.stderr;
+  } catch (execError: any) {
+    // Even if command fails, try to get stdout/stderr from the error
+    stdout = execError.stdout || '';
+    stderr = execError.stderr || '';
+    console.error('Python command exited with error, attempting to parse output anyway');
+  }
 
-    if (stderr && !stderr.includes('INFO') && !stderr.includes('WARNING')) {
-      console.error('Python stderr:', stderr);
+  // Try to parse JSON from stdout regardless of exit code
+  try {
+    // Try to find JSON in stdout (in case there's any prefix noise)
+    const jsonMatch = stdout.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const result = JSON.parse(jsonMatch[0]);
+      return result as StockAnalysisResult;
+    } else {
+      // No JSON found - check if there's an error in stderr
+      const errorInfo = stderr ? stderr.substring(0, 200) : 'No output';
+      throw new Error(`No JSON in output. Stderr: ${errorInfo}`);
     }
-
-    // Parse JSON output - handle case where stdout might have extra content
-    try {
-      // Try to find JSON in stdout (in case there's any prefix noise)
-      const jsonMatch = stdout.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const result = JSON.parse(jsonMatch[0]);
-        return result as StockAnalysisResult;
-      } else {
-        throw new Error('No JSON found in output');
-      }
-    } catch (parseError: any) {
-      console.error('JSON parse error:', parseError.message);
-      console.error('Raw stdout:', stdout.substring(0, 500));
-      throw new Error(`Failed to parse analysis result for ${symbol}: ${parseError.message}`);
-    }
-  } catch (error: any) {
-    // Extract just the error message, not the full stderr dump
-    const errorMsg = error.message?.split('\n')[0] || 'Unknown error';
-    console.error('Python execution error:', errorMsg);
-    throw new Error(`Failed to analyze stock ${symbol}: ${errorMsg}`);
+  } catch (parseError: any) {
+    console.error('JSON parse error:', parseError.message);
+    console.error('Raw stdout (first 500 chars):', stdout.substring(0, 500));
+    throw new Error(`Failed to analyze stock ${symbol}: ${parseError.message}`);
   }
 }
 
