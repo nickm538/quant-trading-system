@@ -12,3 +12,4 @@ fastdtw
 mysql-connector-python
 websocket-client==1.7.0
 google-genai>=0.3.0
+statsmodels
