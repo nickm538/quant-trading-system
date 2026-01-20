@@ -129,35 +129,15 @@ class VisionChartAnalyzer:
         """Analyze with exponential backoff retry and OpenRouter fallback."""
         last_error = None
         
-        # Try Gemini first
-        if self.gemini_key:
-            for attempt in range(max_retries):
-                try:
-                    if attempt > 0:
-                        wait_time = 2 ** attempt
-                        print(f"Gemini retry {attempt + 1}/{max_retries} after {wait_time}s...", file=sys.stderr)
-                        time.sleep(wait_time)
-                    
-                    if HAS_GENAI and self.client:
-                        return self._analyze_with_sdk(symbol, image_data)
-                    else:
-                        return self._analyze_with_rest(symbol, image_data)
-                        
-                except Exception as e:
-                    last_error = str(e)
-                    if '429' in str(e) or 'rate' in str(e).lower() or 'quota' in str(e).lower():
-                        continue
-                    else:
-                        break
-        
-        # Fallback chain through OpenRouter models
+        # Primary: OpenRouter models (Opus 4 first for best quality)
+        # Gemini direct API is deprioritized due to quota issues
         if self.openrouter_key:
-            # Model fallback chain: Claude 3.5 Sonnet -> Gemini Flash -> Claude Opus 4.5
+            # Model fallback chain: Claude Opus 4 (best) -> Claude Sonnet 4 -> Claude 3.5 Sonnet -> Gemini Flash
             openrouter_models = [
+                ('anthropic/claude-opus-4', 'Claude Opus 4'),
+                ('anthropic/claude-sonnet-4', 'Claude Sonnet 4'),
                 ('anthropic/claude-3.5-sonnet', 'Claude 3.5 Sonnet'),
                 ('google/gemini-2.0-flash-001', 'Gemini 2.0 Flash'),
-                ('anthropic/claude-sonnet-4', 'Claude Sonnet 4'),
-                ('anthropic/claude-opus-4', 'Claude Opus 4'),
             ]
             
             for model_id, model_name in openrouter_models:
