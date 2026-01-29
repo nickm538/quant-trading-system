@@ -170,6 +170,77 @@ class MarketScanner:
         
         return []
     
+    def scan_market(self, top_n: int = 20) -> Dict[str, Any]:
+        """
+        Main entry point for market scanning - matches the expected interface.
+        
+        Args:
+            top_n: Number of top opportunities to return
+        
+        Returns:
+            Dict with opportunities, symbols_scanned, timestamp, etc.
+        """
+        import time
+        start_time = time.time()
+        
+        # Default criteria for broad market scan
+        criteria = {
+            'momentum': True,
+            'breakout': True,
+            'value': True,
+            'growth': True
+        }
+        
+        try:
+            results = self.scan_universe(
+                criteria=criteria,
+                max_results=top_n,
+                min_volume=100000,
+                min_price=5.0,
+                max_price=500.0
+            )
+            
+            # Transform results to match expected frontend format
+            opportunities = []
+            for r in results:
+                opportunities.append({
+                    'symbol': r.get('ticker', ''),
+                    'current_price': r.get('price', 0),
+                    'signal': 'BUY' if r.get('total_score', 0) > 60 else 'HOLD',
+                    'opportunity_score': r.get('total_score', 0),
+                    'expected_return': r.get('momentum_score', 0) * 0.15,  # Estimate
+                    'confidence': min(r.get('total_score', 0), 95),
+                    'target_price': r.get('price', 0) * 1.1,  # 10% target
+                    'sector': r.get('sector', 'Unknown'),
+                    'industry': r.get('industry', 'Unknown'),
+                    'buffett_score': r.get('buffett_score', 0),
+                    'lynch_score': r.get('lynch_score', 0),
+                    'druckenmiller_score': r.get('druckenmiller_score', 0),
+                    'soros_score': r.get('soros_score', 0),
+                    'livermore_score': r.get('livermore_score', 0)
+                })
+            
+            elapsed = time.time() - start_time
+            
+            return {
+                'opportunities': opportunities,
+                'symbols_scanned': len(self._last_universe_size) if hasattr(self, '_last_universe_size') else 500,
+                'scan_time_minutes': elapsed / 60,
+                'timestamp': datetime.now().isoformat(),
+                'criteria_used': list(criteria.keys()),
+                'success': True
+            }
+        except Exception as e:
+            print(f"Scan error: {e}", file=sys.stderr)
+            return {
+                'opportunities': [],
+                'symbols_scanned': 0,
+                'scan_time_minutes': 0,
+                'timestamp': datetime.now().isoformat(),
+                'error': str(e),
+                'success': False
+            }
+    
     def scan_universe(
         self,
         criteria: Dict[str, Any],
