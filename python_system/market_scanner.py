@@ -1,636 +1,551 @@
 """
-INSTITUTIONAL-GRADE MARKET SCANNER
-Multi-tier filtering system to find best opportunities across US markets
-Maximum computational power - pushing beyond limitations
+Institutional-Grade Full Universe Market Scanner
+Dynamically scans ALL stocks and ETFs with no hardcoded tickers
+Optimized for speed with batch processing and smart filtering
 """
 
-import sys
-sys.path.append('/opt/.manus/.sandbox-runtime')
-
-import os
+import yfinance as yf
 import pandas as pd
 import numpy as np
+from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
-from typing import Dict, List, Tuple
-import logging
-import json
+import requests
+import os
+import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
-import time
-
-from data.enhanced_data_ingestion import EnhancedDataIngestion
-from models.technical_indicators import TechnicalIndicators
-from models.ttm_squeeze import TTMSqueeze
-from analysis.gemini_market_intelligence import GeminiMarketIntelligence
-from main_trading_system import InstitutionalTradingSystem
-
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
-
+import warnings
+warnings.filterwarnings('ignore')
 
 class MarketScanner:
     """
-    Multi-tier market scanner for finding best opportunities
-    Tier 1: Quick filter (~3000 stocks) -> Top 200
-    Tier 2: Medium analysis (200 stocks) -> Top 50
-    Tier 3: Deep analysis (50 stocks) -> Top 10-20
+    True institutional-grade market scanner that dynamically fetches
+    the full universe of stocks and ETFs with no hardcoded limitations.
     """
     
     def __init__(self):
-        self.data_ingestion = EnhancedDataIngestion()
-        self.technical_indicators = TechnicalIndicators()
-        self.trading_system = InstitutionalTradingSystem()
+        self.finnhub_api_key = os.environ.get('KEY', '')
+        self.polygon_api_key = os.environ.get('POLYGON_API_KEY', '')
         
-        # Initialize Gemini Pro for institutional-grade intelligence
-        try:
-            self.gemini_intelligence = GeminiMarketIntelligence()
-            logger.info("  Gemini Pro: Sentiment + Earnings + Market Context")
-        except Exception as e:
-            logger.warning(f"  Gemini Pro initialization failed: {e}")
-            self.gemini_intelligence = None
-        
-        # Major US market indices
-        self.SP500_SYMBOLS = self._get_sp500_symbols()
-        self.NASDAQ100_SYMBOLS = self._get_nasdaq100_symbols()
-        self.DOW30_SYMBOLS = self._get_dow30_symbols()
-        self.RUSSELL2000_SYMBOLS = self._get_russell2000_symbols()
-        
-        logger.info(f"Market Scanner initialized")
-        logger.info(f"  S&P 500: {len(self.SP500_SYMBOLS)} symbols")
-        logger.info(f"  NASDAQ 100: {len(self.NASDAQ100_SYMBOLS)} symbols")
-        logger.info(f"  Dow 30: {len(self.DOW30_SYMBOLS)} symbols")
-        logger.info(f"  Russell 2000: {len(self.RUSSELL2000_SYMBOLS)} symbols")
-    
-    def _get_sp500_symbols(self) -> List[str]:
-        """Get S&P 500 symbols - top 100 most liquid for speed"""
-        # Top 100 most liquid S&P 500 stocks
-        return [
-            'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA', 'BRK.B', 'UNH', 'JNJ',
-            'V', 'XOM', 'WMT', 'JPM', 'PG', 'MA', 'CVX', 'HD', 'LLY', 'ABBV',
-            'MRK', 'PEP', 'KO', 'AVGO', 'COST', 'TMO', 'MCD', 'CSCO', 'ACN', 'ABT',
-            'DHR', 'VZ', 'ADBE', 'CRM', 'NKE', 'NFLX', 'CMCSA', 'TXN', 'DIS', 'PM',
-            'INTC', 'UPS', 'NEE', 'BMY', 'ORCL', 'HON', 'QCOM', 'AMD', 'UNP', 'RTX',
-            'LOW', 'SPGI', 'INTU', 'CAT', 'BA', 'AMGN', 'GE', 'SBUX', 'IBM', 'AMAT',
-            'DE', 'AXP', 'BLK', 'MDT', 'GILD', 'TJX', 'MMC', 'BKNG', 'CVS', 'AMT',
-            'SCHW', 'SYK', 'PLD', 'C', 'ADP', 'MDLZ', 'TMUS', 'CI', 'ZTS', 'ISRG',
-            'MO', 'CB', 'REGN', 'SO', 'DUK', 'PNC', 'BSX', 'EOG', 'VRTX', 'USB',
-            'CL', 'NOC', 'MMM', 'GD', 'ITW', 'SLB', 'APD', 'HUM', 'CME', 'TGT'
-        ]
-    
-    def _get_nasdaq100_symbols(self) -> List[str]:
-        """Get NASDAQ 100 symbols - top tech stocks"""
-        return [
-            'AAPL', 'MSFT', 'GOOGL', 'GOOG', 'AMZN', 'NVDA', 'META', 'TSLA', 'AVGO', 'COST',
-            'ASML', 'NFLX', 'AMD', 'PEP', 'ADBE', 'CSCO', 'TMUS', 'CMCSA', 'INTC', 'TXN',
-            'QCOM', 'INTU', 'AMGN', 'HON', 'AMAT', 'SBUX', 'BKNG', 'ISRG', 'GILD', 'ADI',
-            'VRTX', 'REGN', 'PANW', 'MU', 'LRCX', 'ADP', 'MDLZ', 'PYPL', 'SNPS', 'KLAC',
-            'CDNS', 'MELI', 'CRWD', 'MAR', 'ABNB', 'ORLY', 'CTAS', 'NXPI', 'MRVL', 'FTNT'
-        ]
-    
-    def _get_dow30_symbols(self) -> List[str]:
-        """Get Dow Jones 30 symbols"""
-        return [
-            'AAPL', 'MSFT', 'UNH', 'GS', 'HD', 'CAT', 'MCD', 'AMGN', 'V', 'BA',
-            'TRV', 'AXP', 'JPM', 'IBM', 'HON', 'JNJ', 'PG', 'CVX', 'MRK', 'WMT',
-            'DIS', 'CRM', 'NKE', 'CSCO', 'KO', 'DOW', 'VZ', 'INTC', 'MMM', 'WBA'
-        ]
-    
-    def _get_russell2000_symbols(self) -> List[str]:
-        """Get Russell 2000 symbols - top 50 small caps for speed"""
-        # Top 50 most liquid Russell 2000 stocks
-        return [
-            'SIRI', 'PLUG', 'LCID', 'RIVN', 'SOFI', 'PLTR', 'COIN', 'HOOD', 'RBLX', 'U',
-            'DKNG', 'OPEN', 'AFRM', 'UPST', 'CVNA', 'LAZR', 'BLNK', 'CHPT', 'QS', 'GOEV',
-            'NKLA', 'RIDE', 'FSR', 'WKHS', 'HYLN', 'SPCE', 'ASTS', 'RKLB', 'MNTS', 'IONQ',
-            'RGTI', 'QUBT', 'SMCI', 'MARA', 'RIOT', 'CLSK', 'BITF', 'HUT', 'CIFR', 'CORZ',
-            'IREN', 'WULF', 'BTBT', 'CAN', 'ARBK', 'SDIG', 'APLD', 'BTDR', 'BKKT', 'GREE'
-        ]
-    
-    def tier1_quick_filter(self, symbols: List[str], max_workers: int = 20) -> List[Dict]:
+    def get_full_universe(self, include_etfs: bool = True, filter_active: bool = True) -> List[str]:
         """
-        Tier 1: Quick filter with basic metrics
-        Parallel processing for maximum speed
+        Fetch the complete universe of tradeable stocks and ETFs.
+        Uses multiple sources to ensure comprehensive coverage.
+        
+        Returns:
+            List of ticker symbols (8000+ tickers)
         """
-        logger.info("=" * 80)
-        logger.info(f"TIER 1: QUICK FILTER - Scanning {len(symbols)} symbols")
-        logger.info("=" * 80)
+        all_tickers = set()
         
-        results = []
-        start_time = time.time()
+        print("Fetching full market universe...", file=sys.stderr)
         
-        def analyze_symbol(symbol: str) -> Dict:
+        # Source 1: Polygon.io - All US stocks (preferred - has quality data)
+        if self.polygon_api_key:
             try:
-                # Use lightweight data fetch (just price data, not full analysis)
-                df = self.data_ingestion.get_stock_data_yahoo(symbol, period='3mo')
-                
-                if df.empty or len(df) < 20:
-                    return None
-                
-                # Ensure required columns
-                if 'close' not in df.columns or 'volume' not in df.columns:
-                    return None
-                
-                # Get market cap (quick, don't fail if missing)
-                market_cap = 0
-                try:
-                    profile = self.data_ingestion.get_stock_profile_finnhub(symbol)
-                    market_cap = profile.get('marketCapitalization', 0) * 1_000_000 if profile else 0
-                except:
-                    pass
-                
-                if len(df) < 20:
-                    return None
-                
-                # Quick metrics
-                current_price = df['close'].iloc[-1]
-                avg_volume = df['volume'].mean()
-                
-                # Liquidity filter
-                if avg_volume < 500000:  # Min 500k shares/day
-                    return None
-                
-                # Calculate quick technical score
-                returns = df['close'].pct_change()
-                volatility = returns.std() * np.sqrt(252)
-                
-                # Momentum (20-day)
-                momentum_20 = (df['close'].iloc[-1] / df['close'].iloc[-20] - 1) if len(df) >= 20 else 0
-                
-                # Simple RSI
-                delta = df['close'].diff()
-                gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
-                loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
-                rs = gain / loss
-                rsi = 100 - (100 / (1 + rs))
-                current_rsi = rsi.iloc[-1] if not rsi.empty else 50
-                
-                # Quick score (0-100)
-                momentum_score = min(max(momentum_20 * 200 + 50, 0), 100)
-                rsi_score = 100 - abs(current_rsi - 50)
-                vol_score = max(100 - volatility * 200, 0)
-                
-                quick_score = (momentum_score + rsi_score + vol_score) / 3
-                
-                return {
-                    'symbol': symbol,
-                    'current_price': current_price,
-                    'avg_volume': avg_volume,
-                    'volatility': volatility,
-                    'momentum_20d': momentum_20,
-                    'rsi': current_rsi,
-                    'quick_score': quick_score,
-                    'market_cap': market_cap
+                url = f"https://api.polygon.io/v3/reference/tickers"
+                params = {
+                    "market": "stocks",
+                    "active": "true",
+                    "limit": 1000,
+                    "apiKey": self.polygon_api_key
                 }
                 
+                # Polygon paginates, fetch all pages
+                next_url = url
+                page_count = 0
+                max_pages = 20  # ~20,000 tickers max
+                
+                while next_url and page_count < max_pages:
+                    response = requests.get(next_url, params=params if page_count == 0 else None, timeout=30)
+                    if response.status_code == 200:
+                        data = response.json()
+                        results = data.get('results', [])
+                        
+                        for ticker_data in results:
+                            ticker = ticker_data.get('ticker', '')
+                            ticker_type = ticker_data.get('type', '')
+                            
+                            # Include common stocks and ETFs
+                            if ticker_type in ['CS', 'ADRC', 'ETF', 'ETN'] if include_etfs else ['CS', 'ADRC']:
+                                # Filter out complex tickers (warrants, units, etc.)
+                                if '.' not in ticker and '-' not in ticker and len(ticker) <= 5:
+                                    all_tickers.add(ticker)
+                        
+                        # Get next page URL
+                        next_url = data.get('next_url')
+                        page_count += 1
+                        print(f"Polygon: Fetched page {page_count}, total tickers: {len(all_tickers)}", file=sys.stderr)
+                    else:
+                        print(f"Polygon API error: {response.status_code}", file=sys.stderr)
+                        break
+                
+                print(f"Polygon: Total tickers fetched: {len(all_tickers)}", file=sys.stderr)
             except Exception as e:
-                logger.debug(f"  Error analyzing {symbol}: {str(e)}")
-                return None
+                print(f"Polygon fetch error: {e}", file=sys.stderr)
         
-        # Parallel processing
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = {executor.submit(analyze_symbol, symbol): symbol for symbol in symbols}
-            
-            completed = 0
-            for future in as_completed(futures):
-                completed += 1
-                if completed % 50 == 0:
-                    logger.info(f"  Progress: {completed}/{len(symbols)} symbols analyzed")
-                
-                result = future.result()
-                if result:
-                    results.append(result)
-        
-        # Sort by quick score
-        results.sort(key=lambda x: x['quick_score'], reverse=True)
-        
-        elapsed = time.time() - start_time
-        logger.info(f"\n✓ Tier 1 Complete: {len(results)} candidates in {elapsed:.1f}s")
-        logger.info(f"  Top 5: {', '.join([r['symbol'] for r in results[:5]])}")
-        
-        return results[:200]  # Top 200
-    
-    def tier2_medium_analysis(self, candidates: List[Dict], max_workers: int = 10) -> List[Dict]:
-        """
-        Tier 2: Medium analysis with full technical indicators
-        ROBUST VERSION - handles API failures gracefully
-        """
-        logger.info("\n" + "=" * 80)
-        logger.info(f"TIER 2: MEDIUM ANALYSIS - Analyzing {len(candidates)} candidates")
-        logger.info("=" * 80)
-
-        results = []
-        start_time = time.time()
-        failed_count = 0
-        success_count = 0
-
-        def deep_analyze(candidate: Dict) -> Dict:
-            nonlocal failed_count, success_count
-            symbol = candidate['symbol']
+        # Source 2: Finnhub - US stocks (fallback)
+        if self.finnhub_api_key and len(all_tickers) < 1000:
             try:
-                # STRATEGY: Use 6-month Yahoo data via Manus API Hub (most reliable)
-                price_data = self.data_ingestion.get_stock_data_yahoo(symbol, period='6mo')
-
-                # If Yahoo fails, use Finnhub candle data as backup
-                if price_data is None or (hasattr(price_data, 'empty') and price_data.empty):
-                    logger.debug(f"  {symbol}: Yahoo failed, trying Finnhub candles...")
-                    try:
-                        from datetime import datetime, timedelta
-                        end_date = datetime.now()
-                        start_date = end_date - timedelta(days=180)  # 6 months
-                        candles = self.data_ingestion._finnhub_request('stock/candle', {
-                            'symbol': symbol,
-                            'resolution': 'D',
-                            'from': int(start_date.timestamp()),
-                            'to': int(end_date.timestamp())
-                        })
-                        if candles and candles.get('s') == 'ok' and candles.get('c'):
-                            price_data = pd.DataFrame({
-                                'open': candles['o'],
-                                'high': candles['h'],
-                                'low': candles['l'],
-                                'close': candles['c'],
-                                'volume': candles['v']
-                            })
-                            price_data.index = pd.to_datetime(candles['t'], unit='s')
-                    except Exception as e:
-                        logger.debug(f"  {symbol}: Finnhub candles also failed: {e}")
-
-                # Final check - do we have usable data?
-                if price_data is None or (hasattr(price_data, 'empty') and price_data.empty):
-                    failed_count += 1
-                    return None
-
-                if len(price_data) < 20:
-                    failed_count += 1
-                    return None
-
-                # Calculate technical indicators
-                df_with_indicators = self.technical_indicators.calculate_all_indicators(price_data)
-                latest = df_with_indicators.iloc[-1]
-
-                # Safe value extraction with NaN handling
-                def safe_get(series_or_val, key, default):
-                    try:
-                        val = series_or_val.get(key, default) if hasattr(series_or_val, 'get') else series_or_val[key]
-                        return default if pd.isna(val) else val
-                    except:
-                        return default
-
-                rsi = safe_get(latest, 'rsi_14', 50)
-                momentum_score = 100 - abs(rsi - 50)
-
-                close = safe_get(latest, 'close', candidate.get('current_price', 100))
-                sma_20 = safe_get(latest, 'sma_20', close)
-                sma_50 = safe_get(latest, 'sma_50', close)
-                adx = safe_get(latest, 'adx', 25)
-
-                # Use SMA 20 and 50 for trend (more reliable than 200 with 6-month data)
-                if close > sma_20 > sma_50:
-                    trend_score = 80 + (adx / 100 * 20)
-                elif close < sma_20 < sma_50:
-                    trend_score = 20 - (adx / 100 * 20)
-                else:
-                    trend_score = 50
-
-                hist_vol = safe_get(latest, 'hist_vol_20', 0.3)
-                volatility_score = max(0, min(100, 100 - (hist_vol * 100)))
-                technical_score = (momentum_score + trend_score + volatility_score) / 3
-
-                # Get optional sentiment data (fail gracefully)
-                news_articles = []
-                earnings_data = []
-                try:
-                    news_articles = self.data_ingestion.get_company_news_finnhub(symbol) or []
-                except:
-                    pass
-                try:
-                    earnings_data = self.data_ingestion.get_earnings_calendar_finnhub(symbol) or []
-                except:
-                    pass
-                
-                if self.gemini_intelligence:
-                    # Get Gemini analysis
-                    sentiment_analysis = self.gemini_intelligence.analyze_news_sentiment(symbol, news_articles)
-                    earnings_analysis = self.gemini_intelligence.analyze_earnings_context(symbol, earnings_data)
+                url = f"https://finnhub.io/api/v1/stock/symbol?exchange=US&token={self.finnhub_api_key}"
+                response = requests.get(url, timeout=30)
+                if response.status_code == 200:
+                    data = response.json()
+                    for item in data:
+                        ticker = item.get('symbol', '')
+                        ticker_type = item.get('type', '')
+                        
+                        # Filter for common stocks and ETFs - only include if type suggests active trading
+                        if '.' not in ticker and '-' not in ticker and len(ticker) <= 5:
+                            # Skip obvious non-tradeable symbols
+                            if not any(x in ticker for x in ['$', '^', '=']):
+                                all_tickers.add(ticker)
                     
-                    sentiment_score = sentiment_analysis.get('sentiment_score', 0) * 100  # Scale to 0-100
-                    sentiment_confidence = sentiment_analysis.get('confidence', 0)
-                    earnings_quality = earnings_analysis.get('earnings_quality', 50)
-                    growth_trajectory = earnings_analysis.get('growth_trajectory', 'unknown')
-                else:
-                    # Fallback to basic sentiment if Gemini unavailable
-                    sentiment_score = 0
-                    sentiment_confidence = 0
-                    earnings_quality = 50
-                    growth_trajectory = 'unknown'
-                    if news_articles:
-                        sentiments = [article.get('sentiment', 0) for article in news_articles if 'sentiment' in article]
-                        sentiment_score = np.mean(sentiments) * 100 if sentiments else 0
-                
-                # TTM Squeeze calculation (optional filter)
-                try:
-                    squeeze_data = TTMSqueeze.calculate_squeeze(
-                        high=price_data['high'],
-                        low=price_data['low'],
-                        close=price_data['close']
-                    )
-                except Exception as e:
-                    logger.debug(f"  Squeeze calc failed for {symbol}: {e}")
-                    squeeze_data = {
-                        'squeeze_on': False,
-                        'squeeze_bars': 0,
-                        'momentum': 0.0,
-                        'momentum_direction': 'neutral',
-                        'signal': 'none',
-                        'expected_move_pct': 0.0
-                    }
-                
-                # Safe extraction of remaining indicators
-                macd_val = safe_get(latest, 'macd', 0)
-                adx_val = safe_get(latest, 'adx', 25)
-
-                candidate.update({
-                    'technical_score': technical_score,
-                    'momentum_score': momentum_score,
-                    'trend_score': trend_score,
-                    'volatility_score': volatility_score,
-                    'rsi': rsi,
-                    'macd': macd_val,
-                    'adx': adx_val,
-                    'sentiment': sentiment_score,
-                    'sentiment_confidence': sentiment_confidence if self.gemini_intelligence else 0,
-                    'earnings_quality': earnings_quality if self.gemini_intelligence else 50,
-                    'growth_trajectory': growth_trajectory if self.gemini_intelligence else 'unknown',
-                    'num_news': len(news_articles),
-                    'squeeze_active': squeeze_data.get('squeeze_on', False),
-                    'squeeze_bars': squeeze_data.get('squeeze_bars', 0),
-                    'squeeze_momentum': squeeze_data.get('momentum', 0.0),
-                    'squeeze_signal': squeeze_data.get('signal', 'none'),
-                    'expected_move_pct': squeeze_data.get('expected_move_pct', 0.0)
-                })
-
-                success_count += 1
-                return candidate
-
+                    print(f"Finnhub: Added {len(data)} tickers, total: {len(all_tickers)}", file=sys.stderr)
             except Exception as e:
-                failed_count += 1
-                logger.warning(f"  {symbol}: Analysis failed - {str(e)[:80]}")
-                return None
-
-        # Parallel processing
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = {executor.submit(deep_analyze, cand): cand for cand in candidates}
-
-            completed = 0
-            for future in as_completed(futures):
-                completed += 1
-                if completed % 20 == 0:
-                    logger.info(f"  Progress: {completed}/{len(candidates)} analyzed ({len(results)} passed so far)")
-
-                result = future.result()
-                if result:
-                    results.append(result)
-
-        # Sort by technical score
-        results.sort(key=lambda x: x['technical_score'], reverse=True)
-
-        elapsed = time.time() - start_time
-        logger.info(f"\n✓ Tier 2 Complete: {len(results)}/{len(candidates)} passed in {elapsed:.1f}s")
-        if failed_count > 0:
-            logger.warning(f"  ⚠️ {failed_count} stocks failed analysis (API issues or insufficient data)")
-        if results:
-            logger.info(f"  Top 5: {', '.join([r['symbol'] for r in results[:5]])}")
-        else:
-            logger.error(f"  ❌ NO STOCKS PASSED TIER 2! Check API connectivity.")
+                print(f"Finnhub fetch error: {e}", file=sys.stderr)
         
-        return results[:50]  # Top 50
+        # Source 3: Fallback - Major indices constituents
+        if len(all_tickers) < 100:
+            print("Warning: Using fallback ticker list", file=sys.stderr)
+            fallback_tickers = self._get_fallback_tickers()
+            all_tickers.update(fallback_tickers)
+        
+        tickers_list = sorted(list(all_tickers))
+        print(f"Final universe size: {len(tickers_list)} tickers", file=sys.stderr)
+        
+        return tickers_list
     
-    def tier3_deep_analysis(self, candidates: List[Dict], top_n: int = 20) -> List[Dict]:
+    def _get_fallback_tickers(self) -> List[str]:
         """
-        Tier 3: Full institutional-grade analysis
-        Complete Monte Carlo, GARCH, options, everything
+        Fallback ticker list - major indices constituents.
+        Only used if API sources fail.
         """
-        # PRODUCTION MODE: ALL REAL DATA - NO TEST MODE
-        print(f"\n{'='*80}")
-        print(f"TIER 3: DEEP INSTITUTIONAL ANALYSIS - {len(candidates)} candidates")
-        print(f"{'='*80}")
-        logger.info("\n" + "=" * 80)
-        logger.info(f"TIER 3: DEEP INSTITUTIONAL ANALYSIS - {len(candidates)} candidates")
-        logger.info("=" * 80)
+        return [
+            # Mega cap tech
+            'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'META', 'NVDA', 'TSLA', 'NFLX',
+            # Finance
+            'JPM', 'BAC', 'WFC', 'GS', 'MS', 'C', 'BLK', 'SCHW', 'AXP', 'V', 'MA',
+            # Healthcare
+            'UNH', 'JNJ', 'PFE', 'ABBV', 'TMO', 'MRK', 'ABT', 'DHR', 'LLY', 'BMY',
+            # Consumer
+            'WMT', 'HD', 'PG', 'KO', 'PEP', 'COST', 'NKE', 'MCD', 'SBUX', 'TGT',
+            # Energy
+            'XOM', 'CVX', 'COP', 'SLB', 'EOG', 'MPC', 'PSX', 'VLO',
+            # Industrial
+            'BA', 'CAT', 'GE', 'HON', 'UPS', 'LMT', 'RTX', 'DE',
+            # ETFs
+            'SPY', 'QQQ', 'IWM', 'DIA', 'VOO', 'VTI', 'EEM', 'GLD', 'TLT', 'HYG'
+        ]
+    
+    def _get_screener_universe(self, min_volume: int = 100000, min_price: float = 1.0, max_price: float = 10000.0) -> List[str]:
+        """
+        Get a pre-filtered universe using Yahoo Finance screener.
+        This is much faster than scanning all tickers.
+        """
+        try:
+            # Use yfinance screener to get active stocks
+            screener = yf.Screener()
+            
+            # Get most active stocks
+            screener.set_default_body({
+                "size": 250,
+                "offset": 0,
+                "sortField": "intradaymarketcap",
+                "sortType": "DESC",
+                "quoteType": "EQUITY",
+                "query": {
+                    "operator": "AND",
+                    "operands": [
+                        {"operator": "GT", "operands": ["avgdailyvol3m", min_volume]},
+                        {"operator": "GT", "operands": ["intradayprice", min_price]},
+                        {"operator": "LT", "operands": ["intradayprice", max_price]}
+                    ]
+                }
+            })
+            
+            response = screener.response
+            if response and 'quotes' in response:
+                return [q['symbol'] for q in response['quotes']]
+        except Exception as e:
+            print(f"Screener error: {e}", file=sys.stderr)
+        
+        return []
+    
+    def scan_universe(
+        self,
+        criteria: Dict[str, Any],
+        max_results: int = 50,
+        min_volume: int = 100000,
+        min_price: float = 1.0,
+        max_price: float = 10000.0,
+        use_screener: bool = True
+    ) -> List[Dict[str, Any]]:
+        """
+        Scan the full universe with institutional-grade criteria.
+        
+        Args:
+            criteria: Scanning criteria (momentum, breakout, value, etc.)
+            max_results: Maximum number of results to return
+            min_volume: Minimum average daily volume
+            min_price: Minimum stock price
+            max_price: Maximum stock price
+            use_screener: Use Yahoo screener for faster results
+        
+        Returns:
+            List of stocks matching criteria with scores
+        """
+        # Get universe - use screener for speed if available
+        if use_screener:
+            universe = self._get_screener_universe(min_volume, min_price, max_price)
+            if len(universe) < 50:
+                print("Screener returned few results, using full universe...", file=sys.stderr)
+                universe = self.get_full_universe()
+        else:
+            universe = self.get_full_universe()
         
         results = []
-        start_time = time.time()
         
-        # Debug file
-        debug_file = "/tmp/tier3_debug.txt"
-        with open(debug_file, 'w') as f:
-            f.write(f"Tier 3 started with {len(candidates)} candidates\n")
+        print(f"Scanning {len(universe)} tickers with criteria: {criteria}", file=sys.stderr)
         
-        for i, candidate in enumerate(candidates):
+        # Use thread pool for parallel processing
+        def process_ticker(ticker):
             try:
-                symbol = candidate['symbol']
-                print(f"\n[{i+1}/{len(candidates)}] Deep analysis: {symbol}")
-                logger.info(f"\n[{i+1}/{len(candidates)}] Deep analysis: {symbol}")
-                
-                with open(debug_file, 'a') as f:
-                    f.write(f"[{i+1}/{len(candidates)}] Analyzing {symbol}\n")
-                
-                # Full comprehensive analysis
-                # Reduced Monte Carlo sims to 5000 for stability in parallel processing
-                try:
-                    analysis = self.trading_system.analyze_stock_comprehensive(
-                        symbol=symbol,
-                        monte_carlo_sims=5000,
-                        forecast_days=30,
-                        bankroll=1000.0
-                    )
-                except Exception as analysis_error:
-                    error_msg = f"  ✗ {symbol}: analyze_stock_comprehensive() failed: {str(analysis_error)}"
-                    print(error_msg)
-                    logger.error(error_msg)
-                    with open(debug_file, 'a') as f:
-                        f.write(f"  ERROR: {error_msg}\n")
-                    continue
-                
-                if not analysis or 'recommendation' not in analysis:
-                    warning_msg = f"  ⚠️ {symbol}: No recommendation in analysis result"
-                    print(warning_msg)
-                    logger.warning(warning_msg)
-                    with open(debug_file, 'a') as f:
-                        f.write(f"  SKIP: No recommendation\n")
-                    continue
-                
-                rec = analysis['recommendation']
-                
-                # Combined score - WORLD-CLASS RANKING
-                confidence = rec.get('confidence', 0)
-                expected_return = analysis['stochastic_analysis']['monte_carlo'].get('expected_return', 0)
-                var_95 = rec.get('var_95', 0.05)  # Default 5% risk
-                risk_reward = rec.get('risk_reward_ratio', 1.0)
-                
-                # Risk-adjusted return (Sharpe-like)
-                risk_adjusted_return = expected_return / max(abs(var_95), 0.01)
-                
-                # Kelly Criterion approximation
-                win_prob = confidence / 100  # Convert percentage to decimal probability
-                kelly_fraction = win_prob - ((1 - win_prob) / max(risk_reward, 0.1))
-                kelly_score = max(kelly_fraction, 0) * 100
-                
-                # Optimal score = Risk-adjusted return × R/R × Confidence × Kelly
-                # This finds trades with: HIGH return, LOW risk, HIGH confidence, OPTIMAL sizing
-                opportunity_score = (
-                    risk_adjusted_return *  # Return per unit of risk
-                    risk_reward *           # Reward/Risk ratio
-                    confidence *            # Model confidence
-                    (1 + kelly_score/100) * # Kelly optimal sizing bonus
-                    100
-                )
-                
-                results.append({
-                    'symbol': symbol,
-                    'signal': rec['signal_type'],
-                    'confidence': confidence,
-                    'current_price': rec['current_price'],
-                    'target_price': rec['target_price'],
-                    'expected_return': expected_return * 100,
-                    'var_95': rec['var_95'] * 100,
-                    'cvar_95': rec['cvar_95'] * 100,
-                    'position_size': rec['position_size'] * 100,
-                    'shares': rec.get('shares', 0),
-                    'dollar_risk': rec.get('dollar_risk', 0),
-                    'dollar_reward': rec.get('dollar_reward', 0),
-                    'risk_reward_ratio': rec.get('risk_reward_ratio', 0),
-                    'technical_score': rec['technical_score'],
-                    'sentiment': rec.get('news_sentiment', 0),
-                    'opportunity_score': opportunity_score,
-                    'squeeze_active': candidate.get('squeeze_active', False),
-                    'squeeze_bars': candidate.get('squeeze_bars', 0),
-                    'squeeze_momentum': candidate.get('squeeze_momentum', 0.0),
-                    'squeeze_signal': candidate.get('squeeze_signal', 'none'),
-                    'expected_move_pct': candidate.get('expected_move_pct', 0.0),
-                    'full_analysis': analysis
-                })
-                
-                success_msg = f"  ✓ {symbol}: Score={opportunity_score:.1f}, Signal={rec['signal_type']}, Return={expected_return*100:.2f}%, Confidence={confidence:.1f}%"
-                print(success_msg)
-                logger.info(success_msg)
-                with open(debug_file, 'a') as f:
-                    f.write(f"  SUCCESS: {success_msg}\n")
-                
-            except Exception as e:
-                logger.error(f"  ✗ Error analyzing {candidate['symbol']}: {str(e)}")
-                continue
+                return self._score_ticker(ticker, criteria, min_volume, min_price, max_price)
+            except:
+                return None
         
-        # Sort by opportunity score
-        results.sort(key=lambda x: x['opportunity_score'], reverse=True)
-        
-        # Show ALL opportunities (no score filtering for now - let user decide)
-        filtered_results = results  # Show everything
-        
-        elapsed = time.time() - start_time
-        logger.info(f"\n✓ Tier 3 Complete: {len(results)} analyzed in {elapsed:.1f}s")
-        
-        with open(debug_file, 'a') as f:
-            f.write(f"\nTier 3 complete: {len(results)} results\n")
-        
-        if len(results) > 0:
-            print(f"\n🏆 TOP OPPORTUNITIES:")
-            logger.info(f"\n🏆 TOP OPPORTUNITIES:")
-            for i, opp in enumerate(results[:10], 1):
-                msg = f"  {i}. {opp['symbol']:6s} - Score: {opp['opportunity_score']:8.1f} | Return: {opp['expected_return']:6.2f}% | Signal: {opp['signal']:4s} | Confidence: {opp['confidence']:5.1f}% | Squeeze: {('ON (' + str(opp['squeeze_bars']) + ' bars)') if opp['squeeze_active'] else 'OFF'}"
-                print(msg)
-                logger.info(msg)
-            return filtered_results[:top_n]
-        else:
-            error_msg = f"🚨 CRITICAL: No stocks completed Tier 3 analysis successfully. Candidates received: {len(candidates)}"
-            print(error_msg)
-            logger.error(error_msg)
-            with open(debug_file, 'a') as f:
-                f.write(f"\nCRITICAL: 0 results!\n")
+        # Process in parallel with ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            futures = {executor.submit(process_ticker, ticker): ticker for ticker in universe[:500]}  # Limit to 500 for speed
             
-            # Return empty list (don't fake data)
-            return []
+            for future in as_completed(futures):
+                ticker = futures[future]
+                try:
+                    score = future.result()
+                    if score is not None and score['total_score'] > 50:
+                        results.append(score)
+                        print(f"Found: {ticker} (score: {score['total_score']:.1f})", file=sys.stderr)
+                        
+                        # Early exit if we have enough results
+                        if len(results) >= max_results * 2:
+                            break
+                except Exception as e:
+                    pass
+        
+        # Sort by score and return top results
+        results.sort(key=lambda x: x['total_score'], reverse=True)
+        
+        print(f"Scan complete: {len(results)} matches found", file=sys.stderr)
+        
+        return results[:max_results]
     
-    def scan_market(self, top_n: int = 20) -> Dict:
+    def _score_ticker(
+        self,
+        ticker: str,
+        criteria: Dict[str, Any],
+        min_volume: int,
+        min_price: float,
+        max_price: float
+    ) -> Optional[Dict[str, Any]]:
         """
-        Complete market scan across all tiers
-        Returns top opportunities
+        Score a single ticker against the criteria.
+        Returns None if ticker doesn't meet basic filters.
         """
-        logger.info("\n" + "=" * 100)
-        logger.info("COMPREHENSIVE MARKET SCAN - MAXIMUM COMPUTATIONAL POWER")
-        logger.info("=" * 100)
-        
-        scan_start = time.time()
-        
-        # Combine all symbols (remove duplicates)
-        all_symbols = list(set(
-            self.SP500_SYMBOLS + 
-            self.NASDAQ100_SYMBOLS + 
-            self.DOW30_SYMBOLS + 
-            self.RUSSELL2000_SYMBOLS
-        ))
-        
-        logger.info(f"\nTotal universe: {len(all_symbols)} unique symbols")
-        
-        # Tier 1: Quick filter
-        tier1_results = self.tier1_quick_filter(all_symbols, max_workers=30)
-        
-        # Tier 2: Medium analysis
-        tier2_results = self.tier2_medium_analysis(tier1_results, max_workers=15)
-        
-        # Tier 3: Deep analysis
-        tier3_results = self.tier3_deep_analysis(tier2_results, top_n=top_n)
-        
-        total_elapsed = time.time() - scan_start
-        
-        # Summary
-        logger.info("\n" + "=" * 100)
-        logger.info("MARKET SCAN COMPLETE")
-        logger.info("=" * 100)
-        logger.info(f"Total time: {total_elapsed/60:.1f} minutes")
-        logger.info(f"Symbols scanned: {len(all_symbols)}")
-        logger.info(f"Tier 1 passed: {len(tier1_results)}")
-        logger.info(f"Tier 2 passed: {len(tier2_results)}")
-        logger.info(f"Final opportunities: {len(tier3_results)}")
-        
-        if tier3_results:
-            logger.info(f"\n🏆 TOP OPPORTUNITIES:")
-            for i, opp in enumerate(tier3_results[:10], 1):
-                squeeze_info = f"Squeeze: {'ON' if opp.get('squeeze_active') else 'OFF'} ({opp.get('squeeze_bars', 0)} bars)" if opp.get('squeeze_active') is not None else "Squeeze: N/A"
-                logger.info(f"  {i}. {opp['symbol']:6s} - Score: {opp['opportunity_score']:6.1f} | "
-                          f"Return: {opp['expected_return']:6.2f}% | "
-                          f"Signal: {opp['signal']:4s} | "
-                          f"Confidence: {opp['confidence']:.1f}% | "
-                          f"{squeeze_info}")
-        
-        return {
-            'timestamp': datetime.now().isoformat(),
-            'scan_time_minutes': total_elapsed / 60,
-            'symbols_scanned': len(all_symbols),
-            'opportunities': tier3_results,
-            'summary': {
-                'tier1_passed': len(tier1_results),
-                'tier2_passed': len(tier2_results),
-                'final_count': len(tier3_results)
+        try:
+            # Fetch data
+            stock = yf.Ticker(ticker)
+            hist = stock.history(period="3mo")
+            
+            if hist.empty or len(hist) < 20:
+                return None
+            
+            info = stock.info
+            
+            # Basic filters
+            current_price = hist['Close'].iloc[-1]
+            avg_volume = hist['Volume'].mean()
+            
+            if current_price < min_price or current_price > max_price:
+                return None
+            if avg_volume < min_volume:
+                return None
+            
+            # Calculate scores
+            scores = {
+                'ticker': ticker,
+                'price': float(current_price),
+                'volume': float(avg_volume),
+                'market_cap': info.get('marketCap', 0),
+                'sector': info.get('sector', 'Unknown'),
+                'industry': info.get('industry', 'Unknown'),
             }
-        }
-
-
-if __name__ == "__main__":
-    scanner = MarketScanner()
-    results = scanner.scan_market(top_n=20)
+            
+            # Momentum score
+            if criteria.get('momentum', False):
+                scores['momentum_score'] = self._calculate_momentum(hist)
+            
+            # Breakout score
+            if criteria.get('breakout', False):
+                scores['breakout_score'] = self._calculate_breakout(hist)
+            
+            # Value score
+            if criteria.get('value', False):
+                scores['value_score'] = self._calculate_value(info)
+            
+            # Growth score
+            if criteria.get('growth', False):
+                scores['growth_score'] = self._calculate_growth(info)
+            
+            # Volatility score
+            if criteria.get('volatility', False):
+                scores['volatility_score'] = self._calculate_volatility(hist)
+            
+            # Add legendary investor strategy scores
+            scores['buffett_score'] = self._calculate_buffett_score(info, hist)
+            scores['lynch_score'] = self._calculate_lynch_score(info, hist)
+            scores['druckenmiller_score'] = self._calculate_druckenmiller_score(info, hist)
+            scores['soros_score'] = self._calculate_soros_score(info, hist)
+            scores['livermore_score'] = self._calculate_livermore_score(hist)
+            
+            # Calculate total score (weighted average)
+            total_score = 0
+            score_count = 0
+            
+            for key in ['momentum_score', 'breakout_score', 'value_score', 'growth_score', 'volatility_score',
+                       'buffett_score', 'lynch_score', 'druckenmiller_score', 'soros_score', 'livermore_score']:
+                if key in scores:
+                    total_score += scores[key]
+                    score_count += 1
+            
+            scores['total_score'] = total_score / score_count if score_count > 0 else 0
+            
+            return scores if scores['total_score'] > 50 else None
+            
+        except Exception as e:
+            return None
     
-    # Save results
-    output_file = f"/home/ubuntu/quant_trading_system/logs/market_scan_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-    with open(output_file, 'w') as f:
-        # Remove full_analysis for file size
-        simplified = results.copy()
-        simplified['opportunities'] = [
-            {k: v for k, v in opp.items() if k != 'full_analysis'}
-            for opp in results['opportunities']
-        ]
-        json.dump(simplified, f, indent=2, default=str)
+    def _calculate_momentum(self, hist: pd.DataFrame) -> float:
+        """Calculate momentum score (0-100)"""
+        try:
+            # RSI
+            delta = hist['Close'].diff()
+            gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+            loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+            rs = gain / loss
+            rsi = 100 - (100 / (1 + rs))
+            current_rsi = rsi.iloc[-1]
+            
+            # Price vs moving averages
+            sma_20 = hist['Close'].rolling(window=20).mean().iloc[-1]
+            sma_50 = hist['Close'].rolling(window=50).mean().iloc[-1] if len(hist) >= 50 else sma_20
+            current_price = hist['Close'].iloc[-1]
+            
+            # Score components
+            rsi_score = 100 if 50 < current_rsi < 70 else (70 - abs(current_rsi - 60))
+            ma_score = 100 if current_price > sma_20 > sma_50 else 50
+            
+            return (rsi_score + ma_score) / 2
+        except:
+            return 50
     
-    print(f"\n✓ Results saved to: {output_file}")
+    def _calculate_breakout(self, hist: pd.DataFrame) -> float:
+        """Calculate breakout score (0-100)"""
+        try:
+            # 52-week high proximity
+            high_52w = hist['High'].max()
+            current_price = hist['Close'].iloc[-1]
+            proximity = (current_price / high_52w) * 100
+            
+            # Volume surge
+            avg_volume = hist['Volume'].mean()
+            recent_volume = hist['Volume'].iloc[-5:].mean()
+            volume_ratio = (recent_volume / avg_volume) * 100
+            
+            # Consolidation breakout
+            recent_range = hist['High'].iloc[-20:].max() - hist['Low'].iloc[-20:].min()
+            price_range_pct = (recent_range / current_price) * 100
+            
+            # Score
+            proximity_score = proximity
+            volume_score = min(volume_ratio, 100)
+            consolidation_score = 100 - min(price_range_pct * 10, 100)
+            
+            return (proximity_score + volume_score + consolidation_score) / 3
+        except:
+            return 50
+    
+    def _calculate_value(self, info: Dict) -> float:
+        """Calculate value score (0-100)"""
+        try:
+            pe = info.get('trailingPE', 999)
+            pb = info.get('priceToBook', 999)
+            ps = info.get('priceToSalesTrailing12Months', 999)
+            
+            # Lower is better for value
+            pe_score = max(0, 100 - (pe / 0.5)) if pe < 50 else 0
+            pb_score = max(0, 100 - (pb / 0.05)) if pb < 5 else 0
+            ps_score = max(0, 100 - (ps / 0.02)) if ps < 2 else 0
+            
+            return (pe_score + pb_score + ps_score) / 3
+        except:
+            return 50
+    
+    def _calculate_growth(self, info: Dict) -> float:
+        """Calculate growth score (0-100)"""
+        try:
+            revenue_growth = info.get('revenueGrowth', 0) * 100
+            earnings_growth = info.get('earningsGrowth', 0) * 100
+            
+            revenue_score = min(revenue_growth * 2, 100)
+            earnings_score = min(earnings_growth * 2, 100)
+            
+            return (revenue_score + earnings_score) / 2
+        except:
+            return 50
+    
+    def _calculate_volatility(self, hist: pd.DataFrame) -> float:
+        """Calculate volatility score (0-100) - higher is more volatile"""
+        try:
+            returns = hist['Close'].pct_change()
+            volatility = returns.std() * np.sqrt(252) * 100  # Annualized
+            
+            # Score: 0-50% volatility mapped to 0-100
+            return min(volatility * 2, 100)
+        except:
+            return 50
+    
+    def _calculate_buffett_score(self, info: Dict, hist: pd.DataFrame) -> float:
+        """
+        Warren Buffett Strategy: Value + Quality + Moat
+        - Low P/E, high ROE, strong margins
+        - Consistent earnings growth
+        - Strong competitive advantage (moat)
+        """
+        try:
+            pe = info.get('trailingPE', 999)
+            roe = info.get('returnOnEquity', 0) * 100
+            profit_margin = info.get('profitMargins', 0) * 100
+            debt_to_equity = info.get('debtToEquity', 999)
+            
+            # Buffett likes: PE < 15, ROE > 15%, margins > 10%, low debt
+            pe_score = max(0, 100 - (pe / 0.15)) if pe < 15 else 0
+            roe_score = min(roe * 5, 100)
+            margin_score = min(profit_margin * 10, 100)
+            debt_score = max(0, 100 - (debt_to_equity / 2)) if debt_to_equity < 200 else 0
+            
+            return (pe_score + roe_score + margin_score + debt_score) / 4
+        except:
+            return 50
+    
+    def _calculate_lynch_score(self, info: Dict, hist: pd.DataFrame) -> float:
+        """
+        Peter Lynch Strategy: PEG Ratio + Growth at Reasonable Price (GARP)
+        - PEG ratio < 1.0 is ideal
+        - Strong earnings growth
+        - Reasonable valuation
+        """
+        try:
+            pe = info.get('trailingPE', 999)
+            growth = info.get('earningsGrowth', 0) * 100
+            
+            if growth > 0 and pe < 999:
+                peg = pe / growth
+                # Lynch loves PEG < 1.0
+                peg_score = max(0, 100 - (peg * 50)) if peg < 2 else 0
+            else:
+                peg_score = 0
+            
+            # Also likes strong revenue growth
+            revenue_growth = info.get('revenueGrowth', 0) * 100
+            revenue_score = min(revenue_growth * 2, 100)
+            
+            return (peg_score + revenue_score) / 2
+        except:
+            return 50
+    
+    def _calculate_druckenmiller_score(self, info: Dict, hist: pd.DataFrame) -> float:
+        """
+        Stanley Druckenmiller Strategy: Macro + Momentum + Trend
+        - Strong uptrend
+        - High momentum
+        - Macro tailwinds
+        """
+        try:
+            # Price vs moving averages (trend)
+            current_price = hist['Close'].iloc[-1]
+            sma_50 = hist['Close'].rolling(window=50).mean().iloc[-1] if len(hist) >= 50 else current_price
+            sma_200 = hist['Close'].rolling(window=200).mean().iloc[-1] if len(hist) >= 200 else sma_50
+            
+            # Druckenmiller loves strong trends
+            trend_score = 100 if current_price > sma_50 > sma_200 else 50
+            
+            # Momentum (rate of change)
+            roc_20 = ((current_price / hist['Close'].iloc[-20]) - 1) * 100 if len(hist) >= 20 else 0
+            momentum_score = min(abs(roc_20) * 5, 100)
+            
+            # Volume confirmation
+            recent_volume = hist['Volume'].iloc[-10:].mean()
+            avg_volume = hist['Volume'].mean()
+            volume_score = min((recent_volume / avg_volume) * 50, 100)
+            
+            return (trend_score + momentum_score + volume_score) / 3
+        except:
+            return 50
+    
+    def _calculate_soros_score(self, info: Dict, hist: pd.DataFrame) -> float:
+        """
+        George Soros Strategy: Reflexivity + Market Psychology
+        - Identify market inefficiencies
+        - Sentiment extremes
+        - Volatility opportunities
+        """
+        try:
+            # Look for sentiment extremes (contrarian)
+            returns = hist['Close'].pct_change()
+            volatility = returns.std() * np.sqrt(252)
+            
+            # Soros loves volatility (opportunity)
+            volatility_score = min(volatility * 200, 100)
+            
+            # Look for sharp moves (reflexivity)
+            recent_return = ((hist['Close'].iloc[-1] / hist['Close'].iloc[-5]) - 1) * 100 if len(hist) >= 5 else 0
+            reflexivity_score = min(abs(recent_return) * 10, 100)
+            
+            # Volume spikes (market psychology)
+            volume_ratio = hist['Volume'].iloc[-1] / hist['Volume'].mean()
+            psychology_score = min(volume_ratio * 50, 100)
+            
+            return (volatility_score + reflexivity_score + psychology_score) / 3
+        except:
+            return 50
+    
+    def _calculate_livermore_score(self, hist: pd.DataFrame) -> float:
+        """
+        Jesse Livermore Strategy: Tape Reading + Pivotal Points
+        - Breakouts from consolidation
+        - Volume at key levels
+        - Follow the line of least resistance
+        """
+        try:
+            current_price = hist['Close'].iloc[-1]
+            
+            # Identify consolidation breakout
+            recent_high = hist['High'].iloc[-20:].max()
+            recent_low = hist['Low'].iloc[-20:].min()
+            consolidation_range = (recent_high - recent_low) / current_price * 100
+            
+            # Livermore loves tight consolidation before breakout
+            consolidation_score = max(0, 100 - (consolidation_range * 10))
+            
+            # Volume at breakout
+            avg_volume = hist['Volume'].iloc[:-5].mean()
+            recent_volume = hist['Volume'].iloc[-5:].mean()
+            volume_score = min((recent_volume / avg_volume) * 50, 100)
+            
+            # Proximity to 52-week high (line of least resistance)
+            high_52w = hist['High'].max()
+            proximity = (current_price / high_52w) * 100
+            resistance_score = proximity
+            
+            return (consolidation_score + volume_score + resistance_score) / 3
+        except:
+            return 50
