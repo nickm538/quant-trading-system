@@ -25,7 +25,53 @@ warnings.filterwarnings('ignore')
 logging.disable(logging.CRITICAL)
 import time
 import numpy as np
+import math
 import talib
+
+# Custom JSON encoder to handle numpy types and NaN values
+class SafeJSONEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        elif isinstance(obj, np.floating):
+            if np.isnan(obj) or np.isinf(obj):
+                return None
+            return float(obj)
+        elif isinstance(obj, np.ndarray):
+            return [self.default(x) for x in obj.tolist()]
+        elif isinstance(obj, np.bool_):
+            return bool(obj)
+        elif isinstance(obj, (float, int)) and (math.isnan(obj) if isinstance(obj, float) else False):
+            return None
+        elif isinstance(obj, (float, int)) and (math.isinf(obj) if isinstance(obj, float) else False):
+            return None
+        return super().default(obj)
+
+def safe_json_dumps(obj, **kwargs):
+    """Safely convert object to JSON, handling NaN and numpy types"""
+    def clean_value(v):
+        if isinstance(v, dict):
+            return {k: clean_value(val) for k, val in v.items()}
+        elif isinstance(v, list):
+            return [clean_value(x) for x in v]
+        elif isinstance(v, float):
+            if math.isnan(v) or math.isinf(v):
+                return None
+            return v
+        elif isinstance(v, np.floating):
+            if np.isnan(v) or np.isinf(v):
+                return None
+            return float(v)
+        elif isinstance(v, np.integer):
+            return int(v)
+        elif isinstance(v, np.ndarray):
+            return [clean_value(x) for x in v.tolist()]
+        elif isinstance(v, np.bool_):
+            return bool(v)
+        return v
+    
+    cleaned = clean_value(obj)
+    return json.dumps(cleaned, cls=SafeJSONEncoder, **kwargs)
 from perfect_production_analyzer import PerfectProductionAnalyzer
 from expert_reasoning import ExpertReasoningEngine
 from pattern_recognition import PatternRecognitionEngine
@@ -550,13 +596,13 @@ def main():
         
         # Restore original stdout for JSON output
         sys.stdout = _original_stdout
-        print(json.dumps(output, indent=2))
+        print(safe_json_dumps(output, indent=2))
         
     except Exception as e:
         import traceback
         # Restore original stdout for JSON output
         sys.stdout = _original_stdout
-        print(json.dumps({
+        print(safe_json_dumps({
             "error": str(e),
             "traceback": traceback.format_exc()
         }))

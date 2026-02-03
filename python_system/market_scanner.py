@@ -275,7 +275,20 @@ class MarketScanner:
         
         results = []
         
-        print(f"Scanning {len(universe)} tickers with criteria: {criteria}", file=sys.stderr)
+        # CRITICAL: Shuffle the universe to avoid alphabetical bias
+        # This ensures we sample from ALL letters/sectors, not just A-D
+        import random
+        shuffled_universe = list(universe)
+        random.shuffle(shuffled_universe)
+        
+        # Use a larger sample size for better coverage (1000 tickers)
+        sample_size = min(1000, len(shuffled_universe))
+        sample = shuffled_universe[:sample_size]
+        
+        print(f"Scanning {sample_size} randomly sampled tickers from {len(universe)} total with criteria: {criteria}", file=sys.stderr)
+        
+        # Track universe size for reporting
+        self._last_universe_size = len(universe)
         
         # Use thread pool for parallel processing
         def process_ticker(ticker):
@@ -285,8 +298,8 @@ class MarketScanner:
                 return None
         
         # Process in parallel with ThreadPoolExecutor
-        with ThreadPoolExecutor(max_workers=10) as executor:
-            futures = {executor.submit(process_ticker, ticker): ticker for ticker in universe[:500]}  # Limit to 500 for speed
+        with ThreadPoolExecutor(max_workers=15) as executor:  # Increased workers for speed
+            futures = {executor.submit(process_ticker, ticker): ticker for ticker in sample}
             
             for future in as_completed(futures):
                 ticker = futures[future]
