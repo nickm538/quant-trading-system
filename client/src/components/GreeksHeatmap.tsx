@@ -92,7 +92,18 @@ export function GreeksHeatmap({ data }: GreeksHeatmapProps) {
         <div className="space-y-4">
           {/* Greek Selector */}
           <Tabs value={selectedGreek} onValueChange={(v) => setSelectedGreek(v as GreekType)}>
-            <TabsList className="grid w-full grid-cols-5">
+            {/* Mobile: scrollable */}
+            <div className="md:hidden overflow-x-auto -mx-1 px-1 pb-1">
+              <TabsList className="inline-flex w-max gap-1 h-auto p-1">
+                <TabsTrigger value="delta" className="px-3 py-2 text-xs">Delta</TabsTrigger>
+                <TabsTrigger value="gamma" className="px-3 py-2 text-xs">Gamma</TabsTrigger>
+                <TabsTrigger value="theta" className="px-3 py-2 text-xs">Theta</TabsTrigger>
+                <TabsTrigger value="vega" className="px-3 py-2 text-xs">Vega</TabsTrigger>
+                <TabsTrigger value="rho" className="px-3 py-2 text-xs">Rho</TabsTrigger>
+              </TabsList>
+            </div>
+            {/* Desktop: grid */}
+            <TabsList className="hidden md:grid w-full grid-cols-5">
               <TabsTrigger value="delta">Delta</TabsTrigger>
               <TabsTrigger value="gamma">Gamma</TabsTrigger>
               <TabsTrigger value="theta">Theta</TabsTrigger>

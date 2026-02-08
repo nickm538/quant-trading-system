@@ -28,7 +28,24 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="technical" className="w-full">
-          <TabsList className="grid w-full grid-cols-5 lg:grid-cols-11">
+          {/* Mobile: horizontally scrollable tab bar */}
+          <div className="md:hidden overflow-x-auto -mx-2 px-2 pb-2 scrollbar-thin">
+            <TabsList className="inline-flex w-max gap-1 h-auto p-1">
+              <TabsTrigger value="technical" className="px-3 py-2 text-xs">Technical</TabsTrigger>
+              <TabsTrigger value="advanced" className="px-3 py-2 text-xs">Pivot/Fib</TabsTrigger>
+              <TabsTrigger value="candlestick" className="px-3 py-2 text-xs">Candles</TabsTrigger>
+              <TabsTrigger value="fundamentals" className="px-3 py-2 text-xs">Cash Flow</TabsTrigger>
+              <TabsTrigger value="garch" className="px-3 py-2 text-xs">GARCH</TabsTrigger>
+              <TabsTrigger value="montecarlo" className="px-3 py-2 text-xs">Monte Carlo</TabsTrigger>
+              <TabsTrigger value="position" className="px-3 py-2 text-xs">Position</TabsTrigger>
+              <TabsTrigger value="market" className="px-3 py-2 text-xs">Market</TabsTrigger>
+              <TabsTrigger value="darkpools" className="px-3 py-2 text-xs">Dark Pools</TabsTrigger>
+              <TabsTrigger value="arima" className="px-3 py-2 text-xs">ARIMA</TabsTrigger>
+              <TabsTrigger value="all" className="px-3 py-2 text-xs">All Data</TabsTrigger>
+            </TabsList>
+          </div>
+          {/* Desktop: full grid */}
+          <TabsList className="hidden md:grid w-full grid-cols-11">
             <TabsTrigger value="technical">Technical</TabsTrigger>
             <TabsTrigger value="advanced">Pivot/Fib</TabsTrigger>
             <TabsTrigger value="candlestick">Candlesticks</TabsTrigger>

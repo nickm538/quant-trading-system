@@ -76,7 +76,27 @@ export function ExpertReasoningDisplay({ analysis }: ExpertReasoningProps) {
 
       {/* Tabbed Detailed Analysis */}
       <Tabs defaultValue="factors" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        {/* Mobile: 2x2 grid */}
+        <TabsList className="grid w-full grid-cols-2 gap-1 h-auto md:hidden">
+          <TabsTrigger value="factors" className="text-xs py-2">
+            <Target className="h-3 w-3 mr-1" />
+            Factors
+          </TabsTrigger>
+          <TabsTrigger value="execution" className="text-xs py-2">
+            <Lightbulb className="h-3 w-3 mr-1" />
+            Execution
+          </TabsTrigger>
+          <TabsTrigger value="traders" className="text-xs py-2">
+            <Users className="h-3 w-3 mr-1" />
+            Legends
+          </TabsTrigger>
+          <TabsTrigger value="history" className="text-xs py-2">
+            <History className="h-3 w-3 mr-1" />
+            History
+          </TabsTrigger>
+        </TabsList>
+        {/* Desktop: 4-column grid */}
+        <TabsList className="hidden md:grid w-full grid-cols-4">
           <TabsTrigger value="factors">
             <Target className="h-4 w-4 mr-2" />
             Factors
