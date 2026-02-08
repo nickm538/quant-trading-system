@@ -27,6 +27,45 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
         <CardTitle className="text-primary">📊 Detailed Raw Data & Calculations</CardTitle>
       </CardHeader>
       <CardContent>
+        {/* Noise Filter & Data Quality Banner */}
+        {analysis.noise_filter && !analysis.noise_filter.error && (
+          <div className="mb-4 space-y-2">
+            <div className="flex flex-wrap items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border/50">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-semibold">Data Quality:</span>
+                <span className={`text-sm font-bold px-2 py-0.5 rounded ${(analysis.noise_filter.data_quality?.score ?? 0) >= 80 ? 'bg-green-500/20 text-green-400' : (analysis.noise_filter.data_quality?.score ?? 0) >= 60 ? 'bg-yellow-500/20 text-yellow-400' : 'bg-red-500/20 text-red-400'}`}>
+                  {analysis.noise_filter.data_quality?.score ?? 'N/A'}/100
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-semibold">Signal Strength:</span>
+                <span className="text-sm text-muted-foreground">{analysis.noise_filter.signal_strength?.interpretation || 'N/A'}</span>
+              </div>
+              {analysis.confidence_adjustment && (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-semibold">Confidence Adj:</span>
+                  <span className={`text-sm font-bold ${analysis.confidence_adjustment.noise_filter_delta > 0 ? 'text-green-400' : analysis.confidence_adjustment.noise_filter_delta < 0 ? 'text-red-400' : 'text-muted-foreground'}`}>
+                    {analysis.confidence_adjustment.noise_filter_delta > 0 ? '+' : ''}{safeFixed(analysis.confidence_adjustment.noise_filter_delta, 1)} pts
+                  </span>
+                </div>
+              )}
+            </div>
+            {/* Bias Warnings */}
+            {analysis.noise_filter.bias_warnings?.filter((b: any) => b.severity !== 'INFO').length > 0 && (
+              <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
+                <span className="text-sm font-semibold text-yellow-400">Bias Warnings:</span>
+                <div className="mt-1 space-y-1">
+                  {analysis.noise_filter.bias_warnings.filter((b: any) => b.severity !== 'INFO').map((b: any, i: number) => (
+                    <div key={i} className="text-xs text-yellow-300/80">
+                      <span className={`font-bold ${b.severity === 'HIGH' ? 'text-red-400' : 'text-yellow-400'}`}>[{b.severity}]</span> {b.note}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         <Tabs defaultValue="technical" className="w-full">
           {/* Mobile: horizontally scrollable tab bar */}
           <div className="md:hidden overflow-x-auto -mx-2 px-2 pb-2 scrollbar-thin">
@@ -972,6 +1011,30 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
                       <DataItem label="FCF Yield" value={`${safeFixed(analysis.enhanced_fundamentals.cash_flow.fcf_yield_pct)}%`} />
                       <DataItem label="FCF Margin" value={`${safeFixed(analysis.enhanced_fundamentals.cash_flow.fcf_margin_pct)}%`} />
                       <DataItem label="Op Cash Flow" value={`$${safeFixed(analysis.enhanced_fundamentals.cash_flow.operating_cash_flow / 1e9)}B`} />
+                    </div>
+                  </div>
+                )}
+                
+                {analysis.enhanced_fundamentals.profitability && (
+                  <div className="mt-4">
+                    <h5 className="font-semibold mb-2">Profitability Metrics</h5>
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                      <DataItem label="Gross Margin" value={analysis.enhanced_fundamentals.profitability.gross_margin_pct != null ? `${safeFixed(analysis.enhanced_fundamentals.profitability.gross_margin_pct)}%` : 'N/A'} />
+                      <DataItem label="Operating Margin" value={analysis.enhanced_fundamentals.profitability.operating_margin_pct != null ? `${safeFixed(analysis.enhanced_fundamentals.profitability.operating_margin_pct)}%` : 'N/A'} />
+                      <DataItem label="Profit Margin" value={analysis.enhanced_fundamentals.profitability.profit_margin_pct != null ? `${safeFixed(analysis.enhanced_fundamentals.profitability.profit_margin_pct)}%` : 'N/A'} />
+                      <DataItem label="ROE" value={analysis.enhanced_fundamentals.profitability.roe_pct != null ? `${safeFixed(analysis.enhanced_fundamentals.profitability.roe_pct)}%` : 'N/A'} />
+                      <DataItem label="ROA" value={analysis.enhanced_fundamentals.profitability.roa_pct != null ? `${safeFixed(analysis.enhanced_fundamentals.profitability.roa_pct)}%` : 'N/A'} />
+                    </div>
+                  </div>
+                )}
+                
+                {analysis.enhanced_fundamentals.growth && (
+                  <div className="mt-4">
+                    <h5 className="font-semibold mb-2">Growth Metrics</h5>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                      <DataItem label="Earnings Growth" value={analysis.enhanced_fundamentals.growth.earnings_growth_pct != null ? `${safeFixed(analysis.enhanced_fundamentals.growth.earnings_growth_pct)}%` : 'N/A'} />
+                      <DataItem label="Revenue Growth" value={analysis.enhanced_fundamentals.growth.revenue_growth_pct != null ? `${safeFixed(analysis.enhanced_fundamentals.growth.revenue_growth_pct)}%` : 'N/A'} />
+                      <DataItem label="Quarterly Earnings Growth" value={analysis.enhanced_fundamentals.growth.earnings_quarterly_growth_pct != null ? `${safeFixed(analysis.enhanced_fundamentals.growth.earnings_quarterly_growth_pct)}%` : 'N/A'} />
                     </div>
                   </div>
                 )}

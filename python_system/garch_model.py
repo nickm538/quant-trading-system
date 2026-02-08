@@ -28,7 +28,7 @@ def fit_garch_model(returns, dist='t'):
         returns = returns[np.isfinite(returns)]
         
         if len(returns) < 30:
-            return get_fallback_garch()
+            return get_fallback_garch(returns)
         
         # Scale returns to percentage (arch expects percentage returns)
         returns_pct = returns * 100
@@ -97,28 +97,44 @@ def fit_garch_model(returns, dist='t'):
         
     except Exception as e:
         print(f"GARCH fitting error: {e}")
-        return get_fallback_garch()
+        return get_fallback_garch(returns)
 
 
-def get_fallback_garch():
+def get_fallback_garch(returns=None):
     """
-    Return fallback GARCH parameters when fitting fails
+    Return fallback GARCH parameters when fitting fails.
+    Uses actual historical volatility from returns if available,
+    NOT a hardcoded value — hardcoded vol would corrupt Monte Carlo.
     """
+    hist_vol = 0.25  # Last resort only if no returns at all
+    n_obs = 0
+    if returns is not None:
+        try:
+            clean = np.array(returns)
+            clean = clean[np.isfinite(clean)]
+            n_obs = len(clean)
+            if n_obs >= 5:
+                hist_vol = float(np.std(clean) * np.sqrt(252))
+                # Sanity: vol should be between 5% and 200%
+                hist_vol = max(0.05, min(2.0, hist_vol))
+        except Exception:
+            pass
+    
     return {
-        'model': 'GARCH(1,1)',
+        'model': 'GARCH(1,1)-FALLBACK',
         'distribution': 'Student-t',
         'omega': 0.0,
         'alpha': 0.1,
         'beta': 0.85,
         'fat_tail_df': 5.0,
-        'current_volatility': 0.25,
-        'unconditional_volatility': 0.25,
+        'current_volatility': hist_vol,
+        'unconditional_volatility': hist_vol,
         'persistence': 0.95,
         'aic': None,
         'bic': None,
         'log_likelihood': None,
         'converged': False,
-        'n_obs': 0
+        'n_obs': n_obs
     }
 
 

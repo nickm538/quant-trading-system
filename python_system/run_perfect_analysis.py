@@ -253,9 +253,9 @@ def main():
         max_shares = int(bankroll / current_price)
         position_size = min(position_size, max_shares)
         
-        # If position size is 0, set to 1 share minimum for valid signals
-        if position_size == 0 and result['recommendation'] in ['BUY', 'STRONG_BUY', 'SELL', 'STRONG_SELL']:
-            position_size = 1
+        # NOTE: If position_size = 0, the risk math says "don't trade this."
+        # We do NOT override to 1 share — that would violate risk management.
+        # A 0-share position is a valid output meaning the setup doesn't justify capital.
         
         # Calculate REAL ADX and volatility from price history
         rsi = technical.get('rsi', 50)
@@ -448,8 +448,8 @@ def main():
             },
             'risk_assessment': {
                 'risk_reward_ratio': abs(target_price - current_price) / abs(current_price - stop_loss) if stop_loss != current_price else 1.0,
-                'potential_gain_pct': ((target_price - current_price) / current_price),
-                'potential_loss_pct': ((current_price - stop_loss) / current_price)
+                'potential_gain_pct': ((target_price - current_price) / current_price * 100),
+                'potential_loss_pct': ((current_price - stop_loss) / current_price * 100)
             }
         })
         
@@ -950,6 +950,99 @@ def main():
             print(f"  Legends refreshed. Consensus: {fresh_consensus.get('action', 'N/A')}", file=sys.stderr, flush=True)
         except Exception as leg_e:
             print(f"  Legends refresh failed: {leg_e}", file=sys.stderr, flush=True)
+
+        # ====================================================================
+        # NOISE FILTER - Separate signal from noise, detect bias, adjust confidence
+        # Runs AFTER all data is collected, BEFORE personal recommendation
+        # ====================================================================
+        print(f"[{_time.time()-_pipeline_start:.1f}s] Running Noise Filter Engine...", file=sys.stderr, flush=True)
+        try:
+            from noise_filter_engine import NoiseFilterEngine
+            noise_engine = NoiseFilterEngine()
+            
+            # Map pipeline output to noise filter's expected input format
+            ef = output.get('enhanced_fundamentals') or {}
+            mc = output.get('market_context') or {}
+            dp = output.get('stockgrid_analysis', {}).get('dark_pools', {}) if output.get('stockgrid_analysis') else {}
+            
+            noise_input = {
+                'price_data': {
+                    'current': current_price,
+                    'change_pct': result.get('price_change_pct', 0),
+                    '52w_high': result.get('fundamentals', {}).get('52w_high', current_price),
+                    '52w_low': result.get('fundamentals', {}).get('52w_low', current_price),
+                    'volume': result.get('fundamentals', {}).get('volume', 0),
+                    'avg_volume': result.get('fundamentals', {}).get('avg_volume', 0)
+                },
+                'technicals': {
+                    'rsi_14': rsi,
+                    'macd': technical.get('macd', 0),
+                    'macd_signal': technical.get('macd_signal', 0),
+                    'adx': real_adx,
+                    'bb_upper': technical.get('bb_upper', 0),
+                    'bb_lower': technical.get('bb_lower', 0),
+                    'sma_50': technical.get('sma_50', 0),
+                    'sma_200': technical.get('sma_200', 0),
+                    # Derive trend from SMA crossover for noise filter
+                    'trend': 'BULLISH' if technical.get('sma_50', 0) > technical.get('sma_200', 0) else ('BEARISH' if technical.get('sma_200', 0) > technical.get('sma_50', 0) else 'NEUTRAL')
+                },
+                'fundamentals': {
+                    'pe_ratio': result.get('fundamentals', {}).get('pe_ratio', 0),
+                    'profit_margin': result.get('fundamentals', {}).get('profit_margin', 0),
+                    'roe': result.get('fundamentals', {}).get('roe', 0) or result.get('fundamentals', {}).get('return_on_equity', 0),
+                    'debt_to_equity': result.get('fundamentals', {}).get('debt_to_equity', 0) or result.get('fundamentals', {}).get('debt_to_equity_ratio', 0),
+                    'revenue_growth': result.get('fundamentals', {}).get('revenue_growth', 0),
+                    'earnings_growth': result.get('fundamentals', {}).get('earnings_growth', 0)
+                },
+                'smart_money': {
+                    'signal': 'ACCUMULATION' if dp.get('sentiment', 'neutral') == 'bullish' else ('DISTRIBUTION' if dp.get('sentiment', 'neutral') == 'bearish' else 'NEUTRAL'),
+                    'smart_money_score': dp.get('score', 50),
+                    'confidence': dp.get('confidence', 0),
+                    'dark_pool_sentiment': dp.get('sentiment', 'neutral'),
+                    'net_short_position': dp.get('net_position', 0),
+                    'institutional_pct': ef.get('share_structure', {}).get('institutional_ownership_pct', 0) if isinstance(ef, dict) else 0,
+                    'short_interest': {
+                        'short_percent_float': ef.get('share_structure', {}).get('short_pct_of_float', 0) if isinstance(ef, dict) else 0
+                    }
+                },
+                'macro': {
+                    'vix': {
+                        'level': mc.get('vix', {}).get('current', 20) if isinstance(mc, dict) and isinstance(mc.get('vix'), dict) else 20,
+                        'regime': mc.get('vix', {}).get('regime', 'NEUTRAL') if isinstance(mc, dict) and isinstance(mc.get('vix'), dict) else 'NEUTRAL'
+                    },
+                    'market_regime': mc.get('regime', {}).get('regime', 'unknown') if isinstance(mc, dict) and isinstance(mc.get('regime'), dict) else 'unknown'
+                }
+            }
+            
+            noise_result = noise_engine.filter_and_validate(noise_input)
+            output['noise_filter'] = noise_result
+            
+            # Apply confidence adjustment to the overall confidence
+            conf_adj = noise_result.get('recommendation_confidence_adjustment', {}).get('adjustment', 0)
+            if conf_adj != 0:
+                original_conf = output.get('confidence', 50)
+                # Scale adjustment: noise filter returns -2 to +1.5 range, map to confidence points
+                adjusted_conf = max(10, min(95, original_conf + conf_adj * 5))
+                output['confidence'] = adjusted_conf
+                output['confidence_adjustment'] = {
+                    'original': original_conf,
+                    'adjusted': adjusted_conf,
+                    'noise_filter_delta': conf_adj * 5,
+                    'reasons': noise_result.get('recommendation_confidence_adjustment', {}).get('reasons', [])
+                }
+                print(f"  Noise filter: confidence {original_conf} -> {adjusted_conf} (adj: {conf_adj*5:+.1f})", file=sys.stderr, flush=True)
+            
+            # Log bias warnings
+            biases = noise_result.get('bias_warnings', [])
+            if biases:
+                high_biases = [b for b in biases if b.get('severity') == 'HIGH']
+                if high_biases:
+                    print(f"  WARNING: {len(high_biases)} high-severity bias warnings detected", file=sys.stderr, flush=True)
+                    for b in high_biases:
+                        print(f"    - {b.get('type', 'unknown')}: {b.get('note', '')}", file=sys.stderr, flush=True)
+        except Exception as nf_e:
+            print(f"  Noise filter failed: {nf_e}", file=sys.stderr, flush=True)
+            output['noise_filter'] = {'error': str(nf_e)}
 
         print(f"[{_time.time()-_pipeline_start:.1f}s] Starting Personal Recommendation...", file=sys.stderr, flush=True)
         # Generate Personal "If I Were Trading" Recommendation

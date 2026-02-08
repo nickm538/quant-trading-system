@@ -251,6 +251,7 @@ class PersonalRecommendationEngine:
         score = 50.0
         
         metrics = fd_data.get('financial_metrics', {})
+        fm = {}
         if isinstance(metrics, dict):
             fm_raw = metrics.get('financial_metrics', metrics)
             # financial_metrics can be a list of quarterly metrics - take the most recent
@@ -258,18 +259,21 @@ class PersonalRecommendationEngine:
                 fm = fm_raw[0] if isinstance(fm_raw[0], dict) else {}
             elif isinstance(fm_raw, dict):
                 fm = fm_raw
-            else:
-                fm = {}
+        elif isinstance(metrics, list) and len(metrics) > 0:
+            # Handle case where financial_metrics is a flat list
+            fm = metrics[0] if isinstance(metrics[0], dict) else {}
+        
+        if fm:
             
-            # ROE > 15% is good
-            roe = fm.get('roe')
+            # ROE > 15% is good (FD API uses 'return_on_equity', fallback to 'roe')
+            roe = fm.get('return_on_equity') or fm.get('roe')
             if roe and roe > 0.15:
                 score += 10
             elif roe and roe < 0:
                 score -= 15
             
-            # Debt/Equity < 1 is healthy
-            de = fm.get('debt_to_equity')
+            # Debt/Equity < 1 is healthy (FD API uses 'debt_to_equity_ratio', fallback to 'debt_to_equity')
+            de = fm.get('debt_to_equity_ratio') or fm.get('debt_to_equity')
             if de and de < 0.5:
                 score += 10
             elif de and de > 2.0:

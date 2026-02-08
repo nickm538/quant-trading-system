@@ -48,7 +48,12 @@ class OptionsScanner:
     
     def __init__(self):
         self.options_engine = InstitutionalOptionsEngine()
-        self.greeks_calc = GreeksCalculator(risk_free_rate=0.05)  # 5% risk-free rate
+        try:
+            from risk_free_rate import get_risk_free_rate
+            rfr = get_risk_free_rate()
+        except Exception:
+            rfr = 0.045  # Fallback if dynamic fetch fails
+        self.greeks_calc = GreeksCalculator(risk_free_rate=rfr)
         self.ttm_squeeze = TTMSqueeze()  # TTM Squeeze indicator for volatility compression detection
         
         # Universe of stocks to scan (sector-agnostic)
