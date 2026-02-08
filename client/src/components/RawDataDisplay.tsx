@@ -1728,7 +1728,62 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
                   </div>
                 )}
 
+                {/* Additional Metrics */}
+                <div className="p-4 bg-muted/20 rounded-lg">
+                  <h4 className="font-semibold text-primary mb-3">📋 Daily Metrics</h4>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <DataItem label="Short Volume" value={analysis.stockgrid_analysis.dark_pools.short_volume ? `${(analysis.stockgrid_analysis.dark_pools.short_volume / 1000000).toFixed(2)}M` : 'N/A'} />
+                    <DataItem label="Total Volume" value={analysis.stockgrid_analysis.dark_pools.total_volume ? `${(analysis.stockgrid_analysis.dark_pools.total_volume / 1000000).toFixed(2)}M` : 'N/A'} />
+                    <DataItem label="Short Ratio" value={analysis.stockgrid_analysis.dark_pools.short_ratio ? `${(analysis.stockgrid_analysis.dark_pools.short_ratio * 100).toFixed(1)}%` : 'N/A'} />
+                    <DataItem label="Data Date" value={analysis.stockgrid_analysis.dark_pools.date || 'N/A'} />
+                  </div>
+                </div>
+
+                {/* Short Volume History */}
+                {analysis.stockgrid_analysis.dark_pools.short_volume_history?.length > 0 && (
+                  <div className="p-4 bg-muted/20 rounded-lg">
+                    <h4 className="font-semibold text-primary mb-3">📈 Short Volume History (Last {analysis.stockgrid_analysis.dark_pools.short_volume_history.length} Days)</h4>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="border-b border-muted">
+                            <th className="text-left py-1 px-2">Date</th>
+                            <th className="text-right py-1 px-2">Short Vol</th>
+                            <th className="text-right py-1 px-2">Total Vol</th>
+                            <th className="text-right py-1 px-2">Short %</th>
+                            <th className="text-right py-1 px-2">Net Short</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {analysis.stockgrid_analysis.dark_pools.short_volume_history.slice(0, 10).map((day: any, i: number) => {
+                            const netShort = day.short_volume && day.total_volume ? (2 * day.short_volume) - day.total_volume : 0;
+                            return (
+                              <tr key={i} className="border-b border-muted/30">
+                                <td className="py-1 px-2">{day.date}</td>
+                                <td className="text-right py-1 px-2">{day.short_volume ? `${(day.short_volume / 1000000).toFixed(2)}M` : 'N/A'}</td>
+                                <td className="text-right py-1 px-2">{day.total_volume ? `${(day.total_volume / 1000000).toFixed(2)}M` : 'N/A'}</td>
+                                <td className="text-right py-1 px-2">{day.short_ratio ? `${(day.short_ratio * 100).toFixed(1)}%` : 'N/A'}</td>
+                                <td className={`text-right py-1 px-2 font-medium ${netShort < 0 ? 'text-green-400' : netShort > 0 ? 'text-red-400' : ''}`}>
+                                  {netShort ? `${(netShort / 1000000).toFixed(2)}M` : '0'}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
                 {/* Explanation */}
+                {analysis.stockgrid_analysis.dark_pools.explanation && (
+                  <div className="p-4 bg-muted/20 rounded-lg border-l-4 border-blue-500">
+                    <h4 className="font-semibold text-blue-400 mb-2">🔍 Analysis</h4>
+                    <p className="text-sm">{analysis.stockgrid_analysis.dark_pools.explanation}</p>
+                  </div>
+                )}
+
+                {/* How to Interpret */}
                 <div className="p-4 bg-muted/10 rounded-lg border border-muted">
                   <h4 className="font-semibold text-muted-foreground mb-2">ℹ️ How to Interpret Dark Pool Data</h4>
                   <div className="text-xs text-muted-foreground space-y-2">

@@ -932,6 +932,25 @@ def main():
             'vision_chart': 'OpenRouter (Gemini Flash / Claude)' if output.get('candlestick_patterns', {}).get('vision_ai_analysis') else 'Not available'
         }
         
+        # ====================================================================
+        # LEGENDARY TRADER PERSPECTIVES (REFRESH WITH FULL DATA)
+        # Re-run legends AFTER all parallel data is available so each legend
+        # gets enhanced_fundamentals, market_context, dark pools, EXA, etc.
+        # ====================================================================
+        print(f"[{_time.time()-_pipeline_start:.1f}s] Refreshing Legendary Trader Perspectives with full data...", file=sys.stderr, flush=True)
+        try:
+            from legendary_trader_wisdom import LegendaryTraderWisdom
+            legend_engine = LegendaryTraderWisdom()
+            fresh_perspectives = legend_engine.get_trader_perspectives(output)
+            fresh_consensus = legend_engine.get_consensus_action(fresh_perspectives)
+            # Update the expert_reasoning with fresh legends data
+            if 'expert_reasoning' in output and isinstance(output['expert_reasoning'], dict):
+                output['expert_reasoning']['legendary_trader_perspectives'] = fresh_perspectives
+                output['expert_reasoning']['trader_consensus'] = fresh_consensus
+            print(f"  Legends refreshed. Consensus: {fresh_consensus.get('action', 'N/A')}", file=sys.stderr, flush=True)
+        except Exception as leg_e:
+            print(f"  Legends refresh failed: {leg_e}", file=sys.stderr, flush=True)
+
         print(f"[{_time.time()-_pipeline_start:.1f}s] Starting Personal Recommendation...", file=sys.stderr, flush=True)
         # Generate Personal "If I Were Trading" Recommendation
         # This MUST run last because it synthesizes ALL other analysis data

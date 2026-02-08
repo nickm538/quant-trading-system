@@ -276,35 +276,131 @@ export function ExpertReasoningDisplay({ analysis }: ExpertReasoningProps) {
 
         {/* Legendary Traders */}
         <TabsContent value="traders" className="space-y-4">
+          {/* Consensus Summary */}
           {reasoning.trader_consensus && (
-            <Alert>
-              <Users className="h-4 w-4" />
-              <AlertDescription>
-                <Streamdown>{reasoning.trader_consensus}</Streamdown>
-              </AlertDescription>
-            </Alert>
+            <Card className="border-primary/30">
+              <CardHeader className="pb-2">
+                <div className="flex items-center gap-2">
+                  <Users className="h-5 w-5 text-primary" />
+                  <CardTitle>Legendary Consensus</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {typeof reasoning.trader_consensus === 'object' ? (
+                  <div className="space-y-3">
+                    <div className="prose prose-sm max-w-none dark:prose-invert">
+                      <Streamdown>{reasoning.trader_consensus.summary || JSON.stringify(reasoning.trader_consensus)}</Streamdown>
+                    </div>
+                    {reasoning.trader_consensus.aggregate_score != null && (
+                      <div className="flex items-center gap-3 mt-2">
+                        <span className="text-sm text-muted-foreground">Aggregate Score:</span>
+                        <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all ${
+                              reasoning.trader_consensus.aggregate_score >= 60 ? 'bg-green-500' :
+                              reasoning.trader_consensus.aggregate_score >= 40 ? 'bg-yellow-500' : 'bg-red-500'
+                            }`}
+                            style={{ width: `${Math.min(100, reasoning.trader_consensus.aggregate_score)}%` }}
+                          />
+                        </div>
+                        <span className="text-sm font-semibold">{reasoning.trader_consensus.aggregate_score}%</span>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="prose prose-sm max-w-none dark:prose-invert">
+                    <Streamdown>{String(reasoning.trader_consensus)}</Streamdown>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           )}
 
+          {/* Individual Trader Perspectives */}
           {reasoning.legendary_trader_perspectives && (
             <div className="grid gap-4">
-              {Object.entries(reasoning.legendary_trader_perspectives).map(([trader, advice]: [string, any]) => {
-                const traderNames: Record<string, string> = {
-                  warren_buffett: "Warren Buffett",
-                  george_soros: "George Soros",
-                  stanley_druckenmiller: "Stanley Druckenmiller",
-                  peter_lynch: "Peter Lynch",
-                  paul_tudor_jones: "Paul Tudor Jones",
-                  jesse_livermore: "Jesse Livermore"
+              {Object.entries(reasoning.legendary_trader_perspectives).map(([trader, perspective]: [string, any]) => {
+                const traderInfo: Record<string, { name: string; style: string }> = {
+                  warren_buffett: { name: "Warren Buffett", style: "Value & Quality" },
+                  george_soros: { name: "George Soros", style: "Macro & Reflexivity" },
+                  stanley_druckenmiller: { name: "Stanley Druckenmiller", style: "Risk/Reward & Sizing" },
+                  peter_lynch: { name: "Peter Lynch", style: "Growth at Reasonable Price" },
+                  paul_tudor_jones: { name: "Paul Tudor Jones", style: "Technical Asymmetry" },
+                  jesse_livermore: { name: "Jesse Livermore", style: "Trend & Tape Reading" }
                 };
+
+                const info = traderInfo[trader] || { name: trader, style: '' };
+                const isStructured = typeof perspective === 'object' && perspective !== null;
+                const action = isStructured ? perspective.action : '';
+                const conviction = isStructured ? perspective.conviction : '';
+                const score = isStructured ? perspective.score : 0;
+                const maxScore = isStructured ? perspective.max_score : 100;
+                const reasoning_text = isStructured ? perspective.reasoning : String(perspective);
+                const keyMetrics = isStructured ? perspective.key_metrics : null;
+
+                const actionColor = action?.includes('BUY') || action?.includes('SIZE UP') || action?.includes('PYRAMID')
+                  ? 'text-green-500'
+                  : action?.includes('SELL') || action?.includes('AVOID') || action?.includes('PASS')
+                  ? 'text-red-500'
+                  : 'text-yellow-500';
+
+                const scorePct = maxScore > 0 ? (score / maxScore) * 100 : 0;
 
                 return (
                   <Card key={trader}>
-                    <CardHeader>
-                      <CardTitle className="text-lg">{traderNames[trader]}</CardTitle>
+                    <CardHeader className="pb-2">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <div>
+                          <CardTitle className="text-lg">{info.name}</CardTitle>
+                          <p className="text-xs text-muted-foreground mt-0.5">{info.style}</p>
+                        </div>
+                        {isStructured && (
+                          <div className="flex items-center gap-3">
+                            <span className={`text-sm font-bold ${actionColor}`}>{action}</span>
+                            {conviction && (
+                              <span className={`text-xs px-2 py-0.5 rounded-full ${
+                                conviction === 'HIGH' ? 'bg-green-500/20 text-green-500' :
+                                conviction === 'MODERATE' ? 'bg-yellow-500/20 text-yellow-500' :
+                                conviction === 'LOW' ? 'bg-orange-500/20 text-orange-500' :
+                                'bg-muted text-muted-foreground'
+                              }`}>
+                                {conviction}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      {/* Score bar */}
+                      {isStructured && maxScore > 0 && (
+                        <div className="flex items-center gap-2 mt-2">
+                          <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all ${
+                                scorePct >= 60 ? 'bg-green-500' :
+                                scorePct >= 40 ? 'bg-yellow-500' : 'bg-red-500'
+                              }`}
+                              style={{ width: `${scorePct}%` }}
+                            />
+                          </div>
+                          <span className="text-xs text-muted-foreground">{score}/{maxScore}</span>
+                        </div>
+                      )}
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="space-y-3">
+                      {/* Key Metrics */}
+                      {keyMetrics && (
+                        <div className="flex flex-wrap gap-2 mb-3">
+                          {Object.entries(keyMetrics).map(([k, v]) => (
+                            <span key={k} className="text-xs bg-muted px-2 py-1 rounded">
+                              <span className="text-muted-foreground">{k.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}:</span>{' '}
+                              <span className="font-medium">{String(v)}</span>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      {/* Detailed Reasoning */}
                       <div className="prose prose-sm max-w-none dark:prose-invert">
-                        <Streamdown>{advice}</Streamdown>
+                        <Streamdown>{reasoning_text}</Streamdown>
                       </div>
                     </CardContent>
                   </Card>

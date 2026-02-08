@@ -83,9 +83,22 @@ class StockGridIntegration:
                 return self._empty_dark_pool_result(ticker, "No FINRA data available")
             
             # Get current stock price for dollar calculations
+            current_price = 0
             try:
-                stock = yf.Ticker(ticker)
-                current_price = stock.info.get('regularMarketPrice') or stock.info.get('currentPrice', 0)
+                import os
+                poly_key = os.environ.get('POLYGON_API_KEY', '')
+                if poly_key:
+                    r = requests.get(
+                        f'https://api.polygon.io/v2/aggs/ticker/{ticker}/prev?adjusted=true&apiKey={poly_key}',
+                        timeout=5
+                    )
+                    if r.status_code == 200:
+                        results = r.json().get('results', [])
+                        if results:
+                            current_price = results[0].get('c', 0)
+                if not current_price:
+                    stock = yf.Ticker(ticker)
+                    current_price = stock.info.get('regularMarketPrice') or stock.info.get('currentPrice', 0)
             except:
                 current_price = 0
             
