@@ -174,12 +174,89 @@ export function TTMSqueezeScanner() {
           {/* Single Stock Results */}
           {result && !result.error && result.status !== 'error' && (
             <div className="space-y-4">
-              {/* Price Header */}
-              <div className="flex items-center gap-4 flex-wrap">
-                <span className="text-2xl font-bold">{result.symbol}</span>
-                <span className="text-2xl">${typeof result.current_price === 'number' ? result.current_price.toFixed(2) : 'N/A'}</span>
-                <span className="text-xs text-muted-foreground">{result.data_source || 'Real-time'}</span>
-              </div>
+              {/* Directional Banner - PROMINENT bull/bear indicator */}
+              {(() => {
+                const momentum = result.momentum || 0;
+                const signal = result.signal || '';
+                const strength = result.signal_strength || '';
+                const squeezeOn = result.squeeze_on;
+                
+                // Determine direction
+                let direction: 'BULLISH' | 'BEARISH' | 'NEUTRAL' = 'NEUTRAL';
+                let directionDetail = '';
+                let urgency = '';
+                
+                if (signal === 'BULLISH_BREAKOUT') {
+                  direction = 'BULLISH';
+                  directionDetail = strength === 'STRONG' ? 'Squeeze fired UP with accelerating momentum' : 'Squeeze fired UP but momentum decelerating';
+                  urgency = strength === 'STRONG' ? 'ACTIVE LONG SETUP' : 'MATURING — TIGHTEN STOPS';
+                } else if (signal === 'BEARISH_BREAKOUT') {
+                  direction = 'BEARISH';
+                  directionDetail = strength === 'STRONG' ? 'Squeeze fired DOWN with accelerating momentum' : 'Squeeze fired DOWN but momentum decelerating';
+                  urgency = strength === 'STRONG' ? 'ACTIVE SHORT SETUP' : 'MATURING — TIGHTEN STOPS';
+                } else if (squeezeOn) {
+                  if (strength === 'BULLISH_BUILDING' || momentum > 0) {
+                    direction = 'BULLISH';
+                    directionDetail = 'Squeeze ON — Bullish momentum building inside compression';
+                    urgency = 'WATCH FOR UPSIDE FIRE';
+                  } else if (strength === 'BEARISH_BUILDING' || momentum < 0) {
+                    direction = 'BEARISH';
+                    directionDetail = 'Squeeze ON — Bearish momentum building inside compression';
+                    urgency = 'WATCH FOR DOWNSIDE FIRE';
+                  } else {
+                    directionDetail = 'Squeeze ON — No clear directional bias yet';
+                    urgency = 'WAIT FOR MOMENTUM DIRECTION';
+                  }
+                } else {
+                  if (momentum > 0) {
+                    direction = 'BULLISH';
+                    directionDetail = 'No squeeze — Bullish momentum present';
+                    urgency = 'NO SQUEEZE SETUP';
+                  } else if (momentum < 0) {
+                    direction = 'BEARISH';
+                    directionDetail = 'No squeeze — Bearish momentum present';
+                    urgency = 'NO SQUEEZE SETUP';
+                  } else {
+                    directionDetail = 'No squeeze — Flat momentum';
+                    urgency = 'NO SETUP';
+                  }
+                }
+                
+                const bgColor = direction === 'BULLISH' 
+                  ? 'from-green-600 to-green-800' 
+                  : direction === 'BEARISH' 
+                  ? 'from-red-600 to-red-800' 
+                  : 'from-gray-600 to-gray-800';
+                const icon = direction === 'BULLISH' ? '🐂' : direction === 'BEARISH' ? '🐻' : '⏳';
+                
+                return (
+                  <div className={`bg-gradient-to-r ${bgColor} rounded-xl p-4 md:p-6 text-white`}>
+                    <div className="flex items-center justify-between flex-wrap gap-3">
+                      <div className="flex items-center gap-3">
+                        <span className="text-3xl md:text-4xl">{icon}</span>
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xl md:text-2xl font-bold">{result.symbol}</span>
+                            <span className="text-xl md:text-2xl">${typeof result.current_price === 'number' ? result.current_price.toFixed(2) : 'N/A'}</span>
+                          </div>
+                          <div className="text-sm md:text-base opacity-90">{directionDetail}</div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className={`text-2xl md:text-3xl font-black tracking-wider`}>
+                          {direction}
+                        </div>
+                        <div className="text-xs md:text-sm font-semibold opacity-80 tracking-wide">{urgency}</div>
+                      </div>
+                    </div>
+                    <div className="mt-3 flex items-center gap-4 text-sm opacity-80 flex-wrap">
+                      <span>Momentum: {momentum >= 0 ? '+' : ''}{momentum.toFixed(4)}</span>
+                      <span>Signal: {signal || 'NONE'}</span>
+                      <span>{result.data_source || 'Real-time'}</span>
+                    </div>
+                  </div>
+                );
+              })()}
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {/* Squeeze Status */}

@@ -115,6 +115,78 @@ export function BreakoutDetector() {
 
           {/* Single Stock Results */}
           {result && !result.error && result.status === 'success' && (
+            <div className="space-y-4">
+              {/* Directional Banner - PROMINENT bull/bear indicator */}
+              {(() => {
+                const bias = result.direction_bias || 'NEUTRAL';
+                const score = result.breakout_score || 0;
+                const prob = result.breakout_probability || 'LOW';
+                const signalCount = result.signal_count || 0;
+                const synergies = result.synergies || [];
+                const squeezeOn = result.ttm_squeeze?.squeeze_on;
+                const squeezeMomentum = result.ttm_squeeze?.momentum || 0;
+                
+                let directionDetail = '';
+                let urgency = '';
+                
+                if (bias === 'BULLISH') {
+                  if (score >= 60) {
+                    directionDetail = `Strong bullish breakout setup — ${signalCount} signals active${squeezeOn ? ', squeeze coiling' : ''}`;
+                    urgency = prob === 'VERY HIGH' ? 'HIGH CONVICTION LONG' : prob === 'HIGH' ? 'LONG SETUP DEVELOPING' : 'MODERATE LONG BIAS';
+                  } else {
+                    directionDetail = `Mild bullish bias — ${signalCount} signals, needs more confirmation`;
+                    urgency = 'EARLY STAGE — MONITOR';
+                  }
+                } else if (bias === 'BEARISH') {
+                  if (score >= 60) {
+                    directionDetail = `Strong bearish breakdown setup — ${signalCount} signals active${squeezeOn ? ', squeeze coiling' : ''}`;
+                    urgency = prob === 'VERY HIGH' ? 'HIGH CONVICTION SHORT' : prob === 'HIGH' ? 'SHORT SETUP DEVELOPING' : 'MODERATE SHORT BIAS';
+                  } else {
+                    directionDetail = `Mild bearish bias — ${signalCount} signals, needs more confirmation`;
+                    urgency = 'EARLY STAGE — MONITOR';
+                  }
+                } else {
+                  directionDetail = `No clear directional bias — ${signalCount} signals, mixed readings`;
+                  urgency = 'NO DIRECTIONAL EDGE';
+                }
+                
+                const bgColor = bias === 'BULLISH' 
+                  ? 'from-green-600 to-green-800' 
+                  : bias === 'BEARISH' 
+                  ? 'from-red-600 to-red-800' 
+                  : 'from-gray-600 to-gray-800';
+                const icon = bias === 'BULLISH' ? '🐂' : bias === 'BEARISH' ? '🐻' : '⇔';
+                
+                return (
+                  <div className={`bg-gradient-to-r ${bgColor} rounded-xl p-4 md:p-6 text-white`}>
+                    <div className="flex items-center justify-between flex-wrap gap-3">
+                      <div className="flex items-center gap-3">
+                        <span className="text-3xl md:text-4xl">{icon}</span>
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xl md:text-2xl font-bold">{result.symbol}</span>
+                            <span className="text-xl md:text-2xl">${result.current_price?.toFixed(2) || 'N/A'}</span>
+                          </div>
+                          <div className="text-sm md:text-base opacity-90">{directionDetail}</div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-2xl md:text-3xl font-black tracking-wider">
+                          {bias}
+                        </div>
+                        <div className="text-xs md:text-sm font-semibold opacity-80 tracking-wide">{urgency}</div>
+                      </div>
+                    </div>
+                    <div className="mt-3 flex items-center gap-4 text-sm opacity-80 flex-wrap">
+                      <span>Score: {score}/100</span>
+                      <span>Probability: {prob}</span>
+                      <span>Synergies: {synergies.length}</span>
+                      {squeezeOn && <span className="text-yellow-300">🔴 Squeeze ON (Mom: {squeezeMomentum >= 0 ? '+' : ''}{squeezeMomentum.toFixed(4)})</span>}
+                    </div>
+                  </div>
+                );
+              })()}
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {/* Overall Score */}
               <Card className="md:col-span-2 lg:col-span-1">
@@ -304,6 +376,7 @@ export function BreakoutDetector() {
                   )}
                 </CardContent>
               </Card>
+            </div>
             </div>
           )}
         </TabsContent>
