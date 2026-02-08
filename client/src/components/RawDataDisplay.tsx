@@ -628,40 +628,144 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
                   );
                 })()}
                 
-                {/* Signal Conflict Detection */}
-                {analysis.candlestick_patterns.vision_ai_analysis && (() => {
-                  const algoBias = analysis.candlestick_patterns.overall_bias?.toUpperCase();
-                  const aiBias = analysis.candlestick_patterns.vision_ai_analysis.overall_bias?.toUpperCase();
-                  const hasConflict = algoBias && aiBias && 
-                    ((algoBias.includes('BULL') && aiBias.includes('BEAR')) || 
-                     (algoBias.includes('BEAR') && aiBias.includes('BULL')));
-                  
-                  if (hasConflict) {
-                    return (
-                      <div className="mt-4 p-4 bg-yellow-50 dark:bg-yellow-950 rounded-lg border-2 border-yellow-400 dark:border-yellow-600">
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className="text-2xl">⚠️</span>
-                          <h5 className="font-bold text-yellow-800 dark:text-yellow-200">Signal Conflict Detected!</h5>
+                {/* ====== COMPREHENSIVE SIGNAL CONFLICT ANALYSIS ====== */}
+                {analysis.candlestick_conflict_analysis && !analysis.candlestick_conflict_analysis.error && (() => {
+                  const cca = analysis.candlestick_conflict_analysis;
+                  const summary = cca.summary;
+                  if (!summary) return null;
+
+                  const agreementColors: Record<string, string> = {
+                    green: 'bg-green-100 dark:bg-green-900/50 border-green-400 dark:border-green-600 text-green-800 dark:text-green-200',
+                    red: 'bg-red-100 dark:bg-red-900/50 border-red-400 dark:border-red-600 text-red-800 dark:text-red-200',
+                    yellow: 'bg-yellow-100 dark:bg-yellow-900/50 border-yellow-400 dark:border-yellow-600 text-yellow-800 dark:text-yellow-200',
+                    gray: 'bg-muted/30 border-border text-muted-foreground',
+                  };
+
+                  const dirColors: Record<string, string> = {
+                    BULLISH: 'text-green-600 dark:text-green-400',
+                    BEARISH: 'text-red-600 dark:text-red-400',
+                    NEUTRAL: 'text-yellow-600 dark:text-yellow-400',
+                    UNAVAILABLE: 'text-muted-foreground',
+                  };
+
+                  const dirBg: Record<string, string> = {
+                    BULLISH: 'bg-green-100 dark:bg-green-900/40',
+                    BEARISH: 'bg-red-100 dark:bg-red-900/40',
+                    NEUTRAL: 'bg-yellow-100 dark:bg-yellow-900/40',
+                  };
+
+                  const sevColors: Record<string, string> = {
+                    HIGH: 'bg-red-500/20 text-red-400 border-red-500/40',
+                    MODERATE: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/40',
+                    LOW: 'bg-blue-500/20 text-blue-400 border-blue-500/40',
+                  };
+
+                  return (
+                    <div className="mt-4 space-y-3">
+                      {/* Agreement Banner */}
+                      <div className={`p-4 rounded-lg border-2 ${agreementColors[summary.agreement_color] || agreementColors.gray}`}>
+                        <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xl">
+                              {summary.agreement_color === 'green' ? '✅' : summary.agreement_color === 'red' ? '🔴' : '⚠️'}
+                            </span>
+                            <h5 className="font-bold text-base">{summary.agreement_label}</h5>
+                          </div>
+                          {summary.conflict_count > 0 && (
+                            <span className={`text-xs font-bold px-2 py-1 rounded border ${sevColors[summary.max_severity] || sevColors.LOW}`}>
+                              {summary.max_severity} SEVERITY
+                            </span>
+                          )}
                         </div>
-                        <p className="text-sm text-yellow-700 dark:text-yellow-300 mb-2">
-                          <strong>Algorithmic Analysis</strong> shows <span className={algoBias?.includes('BULL') ? 'text-green-600 font-bold' : 'text-red-600 font-bold'}>{algoBias}</span> while{' '}
-                          <strong>Vision AI</strong> shows <span className={aiBias?.includes('BULL') ? 'text-green-600 font-bold' : 'text-red-600 font-bold'}>{aiBias}</span>
-                        </p>
-                        <p className="text-xs text-yellow-600 dark:text-yellow-400">
-                          <strong>What this means:</strong> The two analysis methods disagree. This often happens when:
-                        </p>
-                        <ul className="text-xs text-yellow-600 dark:text-yellow-400 mt-1 ml-4 list-disc">
-                          <li>Different timeframes are being analyzed (algorithmic uses recent OHLC data, Vision AI sees the Finviz daily chart)</li>
-                          <li>A trend reversal may be forming (one method catches it before the other)</li>
-                          <li>The stock is in a consolidation/choppy phase with mixed signals</li>
-                        </ul>
-                        <p className="text-xs text-yellow-700 dark:text-yellow-300 mt-2 font-medium">
-                          💡 <strong>Recommendation:</strong> Use additional confirmation (volume, support/resistance, other indicators) before making trading decisions.
-                        </p>
+
+                        {/* Signal Breakdown Table */}
+                        {summary.signal_breakdown?.length > 0 && (
+                          <div className="mb-3">
+                            <h6 className="text-xs font-semibold mb-2 uppercase tracking-wider opacity-70">Signal Breakdown ({summary.total_methods} Methods)</h6>
+                            <div className="grid gap-1.5">
+                              {summary.signal_breakdown.map((sig: any, idx: number) => (
+                                <div key={idx} className={`flex items-center justify-between p-2 rounded ${dirBg[sig.direction] || 'bg-muted/20'}`}>
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <span className={`text-xs font-bold w-16 text-center px-1.5 py-0.5 rounded ${dirColors[sig.direction]}`}>
+                                      {sig.direction}
+                                    </span>
+                                    <span className="text-sm font-medium truncate">{sig.label}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2 flex-shrink-0">
+                                    <span className="text-xs text-muted-foreground">{sig.raw_signal}</span>
+                                    <span className="text-xs opacity-50">({(sig.weight * 100).toFixed(0)}% wt)</span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Weighted Consensus Bar */}
+                        {(summary.weighted_bullish_pct > 0 || summary.weighted_bearish_pct > 0) && (
+                          <div className="mb-2">
+                            <div className="flex justify-between text-xs mb-1">
+                              <span className="text-green-600 dark:text-green-400 font-medium">Bullish {summary.weighted_bullish_pct}%</span>
+                              <span className="text-red-600 dark:text-red-400 font-medium">Bearish {summary.weighted_bearish_pct}%</span>
+                            </div>
+                            <div className="h-2.5 rounded-full bg-muted/40 overflow-hidden flex">
+                              <div className="bg-green-500 h-full transition-all" style={{ width: `${summary.weighted_bullish_pct}%` }} />
+                              <div className="bg-gray-400 h-full transition-all flex-1" />
+                              <div className="bg-red-500 h-full transition-all" style={{ width: `${summary.weighted_bearish_pct}%` }} />
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    );
-                  }
-                  return null;
+
+                      {/* Individual Conflict Explanations */}
+                      {cca.has_conflicts && summary.conflicts?.length > 0 && (
+                        <div className="space-y-2">
+                          <h6 className="text-sm font-semibold flex items-center gap-2">
+                            <span>🔍</span>
+                            Why Do These Methods Disagree? ({summary.conflict_count} conflict{summary.conflict_count > 1 ? 's' : ''})
+                          </h6>
+                          {summary.conflicts.map((c: any, idx: number) => (
+                            <div key={idx} className={`p-3 rounded-lg border ${c.is_ok ? 'bg-blue-50 dark:bg-blue-950/30 border-blue-300 dark:border-blue-700' : 'bg-orange-50 dark:bg-orange-950/30 border-orange-300 dark:border-orange-700'}`}>
+                              {/* Conflict Header */}
+                              <div className="flex flex-wrap items-center gap-2 mb-2">
+                                <span className={`text-xs font-bold px-2 py-0.5 rounded ${dirColors[c.signal_a]} ${dirBg[c.signal_a]}`}>
+                                  {c.method_a_label}: {c.signal_a}
+                                </span>
+                                <span className="text-xs text-muted-foreground">vs</span>
+                                <span className={`text-xs font-bold px-2 py-0.5 rounded ${dirColors[c.signal_b]} ${dirBg[c.signal_b]}`}>
+                                  {c.method_b_label}: {c.signal_b}
+                                </span>
+                                <span className={`text-xs font-bold px-1.5 py-0.5 rounded border ml-auto ${sevColors[c.severity] || sevColors.LOW}`}>
+                                  {c.severity}
+                                </span>
+                              </div>
+
+                              {/* WHY explanation */}
+                              <p className="text-sm leading-relaxed mb-2">{c.why}</p>
+
+                              {/* Is it OK? Assessment */}
+                              <div className={`p-2 rounded text-xs ${c.is_ok ? 'bg-blue-100 dark:bg-blue-900/30' : 'bg-orange-100 dark:bg-orange-900/30'}`}>
+                                <span className="font-bold">{c.is_ok ? '✅ Assessment:' : '⚠️ Concern:'}</span>{' '}
+                                {c.assessment}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* No Conflicts - All Clear */}
+                      {!cca.has_conflicts && summary.total_methods >= 2 && (
+                        <div className="p-3 rounded-lg bg-green-50 dark:bg-green-950/30 border border-green-300 dark:border-green-700">
+                          <p className="text-sm text-green-700 dark:text-green-300">
+                            <span className="font-bold">✅ No Conflicts Detected.</span>{' '}
+                            All {summary.total_methods} chart reading methods are in agreement.
+                            {summary.bullish_count === summary.total_methods && ' All methods read BULLISH — strong signal alignment.'}
+                            {summary.bearish_count === summary.total_methods && ' All methods read BEARISH — strong signal alignment.'}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  );
                 })()}
                 
                 {/* Vision AI Chart Analysis */}

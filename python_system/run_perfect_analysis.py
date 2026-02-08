@@ -80,6 +80,7 @@ from production_validator import ProductionValidator, circuit_breaker
 from advanced_options_analyzer import AdvancedOptionsAnalyzer
 from advanced_technicals import AdvancedTechnicals
 from candlestick_patterns import CandlestickPatternDetector
+from candlestick_conflict_analyzer import CandlestickConflictAnalyzer
 from enhanced_fundamentals import EnhancedFundamentalsAnalyzer
 from market_intelligence import MarketIntelligence
 try:
@@ -1043,6 +1044,17 @@ def main():
         except Exception as nf_e:
             print(f"  Noise filter failed: {nf_e}", file=sys.stderr, flush=True)
             output['noise_filter'] = {'error': str(nf_e)}
+
+        # ====================================================================
+        # CANDLESTICK CONFLICT ANALYSIS
+        # Detect and explain when chart reading methods disagree
+        # ====================================================================
+        try:
+            conflict_analyzer = CandlestickConflictAnalyzer()
+            output['candlestick_conflict_analysis'] = conflict_analyzer.analyze(output)
+        except Exception as cca_e:
+            output['candlestick_conflict_analysis'] = {'error': str(cca_e), 'has_conflicts': False}
+            print(f"Candlestick conflict analysis failed: {cca_e}", file=sys.stderr)
 
         print(f"[{_time.time()-_pipeline_start:.1f}s] Starting Personal Recommendation...", file=sys.stderr, flush=True)
         # Generate Personal "If I Were Trading" Recommendation
