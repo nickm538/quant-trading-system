@@ -450,12 +450,14 @@ class EnhancedFundamentalsAnalyzer:
             if isinstance(m, list) and len(m) > 0:
                 m = m[0]
             if isinstance(m, dict):
-                info['trailingPE'] = m.get('pe_ratio')
+                # FinancialDatasets.ai uses full field names (e.g., 'price_to_earnings_ratio')
+                # Map to yfinance-compatible short names
+                info['trailingPE'] = m.get('price_to_earnings_ratio') or m.get('pe_ratio')
                 info['forwardPE'] = m.get('forward_pe_ratio')
                 info['priceToBook'] = m.get('price_to_book_ratio')
                 info['priceToSalesTrailing12Months'] = m.get('price_to_sales_ratio')
-                info['returnOnEquity'] = m.get('roe')
-                info['returnOnAssets'] = m.get('roa')
+                info['returnOnEquity'] = m.get('return_on_equity') or m.get('roe')
+                info['returnOnAssets'] = m.get('return_on_assets') or m.get('roa')
                 info['profitMargins'] = m.get('net_margin')
                 info['operatingMargins'] = m.get('operating_margin')
                 info['grossMargins'] = m.get('gross_margin')
@@ -471,12 +473,24 @@ class EnhancedFundamentalsAnalyzer:
                 info['totalDebt'] = m.get('total_debt')
                 info['totalCash'] = m.get('total_cash')
                 info['pegRatio'] = m.get('peg_ratio')
+                # Also map additional useful fields from FD API
+                info['returnOnInvestedCapital'] = m.get('return_on_invested_capital')
+                info['freeCashFlowYield'] = m.get('free_cash_flow_yield')
+                info['revenueGrowthRate'] = m.get('revenue_growth')
+                info['earningsGrowthRate'] = m.get('earnings_growth')
+                info['freeCashFlowGrowth'] = m.get('free_cash_flow_growth')
+                info['operatingIncomeGrowth'] = m.get('operating_income_growth')
+                info['ebitdaGrowth'] = m.get('ebitda_growth')
+                info['bookValueGrowth'] = m.get('book_value_growth')
+                info['epsGrowth'] = m.get('earnings_per_share_growth')
+                info['interestCoverage'] = m.get('interest_coverage')
+                info['enterpriseToEbitda'] = m.get('enterprise_value_to_ebitda_ratio') or m.get('ev_to_ebitda')
         elif isinstance(fd_metrics, dict):
-            # Direct metrics dict
+            # Direct metrics dict (fallback path)
             m = fd_metrics
-            info['trailingPE'] = m.get('pe_ratio')
-            info['returnOnEquity'] = m.get('roe')
-            info['returnOnAssets'] = m.get('roa')
+            info['trailingPE'] = m.get('price_to_earnings_ratio') or m.get('pe_ratio')
+            info['returnOnEquity'] = m.get('return_on_equity') or m.get('roe')
+            info['returnOnAssets'] = m.get('return_on_assets') or m.get('roa')
             info['profitMargins'] = m.get('net_margin')
             info['operatingMargins'] = m.get('operating_margin')
             info['grossMargins'] = m.get('gross_margin')
@@ -486,6 +500,10 @@ class EnhancedFundamentalsAnalyzer:
             info['operatingCashflow'] = m.get('operating_cash_flow')
             info['ebitda'] = m.get('ebitda')
             info['totalRevenue'] = m.get('revenue')
+            info['returnOnInvestedCapital'] = m.get('return_on_invested_capital')
+            info['freeCashFlowYield'] = m.get('free_cash_flow_yield')
+            info['interestCoverage'] = m.get('interest_coverage')
+            info['enterpriseToEbitda'] = m.get('enterprise_value_to_ebitda_ratio') or m.get('ev_to_ebitda')
         
         # Extract from income_statement
         income = fd_data.get('income_statement', {})
@@ -1718,6 +1736,96 @@ class EnhancedFundamentalsAnalyzer:
                                 'assessment': assessment,
                                 'components': cagr_values
                             }
+            except Exception:
+                pass
+        
+        # FinancialDatasets.ai fallback for CAGR if still incomplete
+        if trends['revenue_5yr_cagr'] is None or trends['earnings_5yr_cagr'] is None:
+            try:
+                fd_client = FinancialDatasetsClient()
+                
+                # Fetch income statements from FinancialDatasets.ai
+                fd_income = fd_client.get_income_statements(symbol, period='annual', limit=6)
+                if fd_income and 'income_statements' in fd_income:
+                    stmts = fd_income['income_statements']
+                    if isinstance(stmts, list) and len(stmts) >= 2:
+                        # Sort by report_period ascending (oldest first)
+                        stmts = sorted(stmts, key=lambda x: x.get('report_period', ''), reverse=False)
+                        
+                        # Calculate Revenue CAGR from FD
+                        revenues = [s.get('revenue') for s in stmts if s.get('revenue') and s.get('revenue') > 0]
+                        if len(revenues) >= 2 and trends['revenue_1yr_cagr'] is None:
+                            trends['revenue_1yr_cagr'] = self._calculate_cagr(revenues[-2], revenues[-1], 1)
+                        if len(revenues) >= 4 and trends['revenue_3yr_cagr'] is None:
+                            trends['revenue_3yr_cagr'] = self._calculate_cagr(revenues[-4], revenues[-1], 3)
+                        if len(revenues) >= 5 and trends['revenue_5yr_cagr'] is None:
+                            trends['revenue_5yr_cagr'] = self._calculate_cagr(revenues[0], revenues[-1], len(revenues)-1)
+                        
+                        # Calculate Earnings CAGR from FD
+                        earnings = [s.get('net_income') for s in stmts if s.get('net_income') and s.get('net_income') > 0]
+                        if len(earnings) >= 2 and trends['earnings_1yr_cagr'] is None:
+                            trends['earnings_1yr_cagr'] = self._calculate_cagr(earnings[-2], earnings[-1], 1)
+                        if len(earnings) >= 4 and trends['earnings_3yr_cagr'] is None:
+                            trends['earnings_3yr_cagr'] = self._calculate_cagr(earnings[-4], earnings[-1], 3)
+                        if len(earnings) >= 5 and trends['earnings_5yr_cagr'] is None:
+                            trends['earnings_5yr_cagr'] = self._calculate_cagr(earnings[0], earnings[-1], len(earnings)-1)
+                        
+                        # Build revenue trend from FD if not already populated
+                        if not trends['revenue_trend']:
+                            for s in reversed(stmts[:6]):
+                                rev = s.get('revenue')
+                                earn = s.get('net_income')
+                                gross = s.get('gross_profit')
+                                op_inc = s.get('operating_income')
+                                trends['revenue_trend'].append({
+                                    'year': s.get('report_period', '')[:4],
+                                    'revenue': rev,
+                                    'net_income': earn,
+                                    'gross_margin': round(gross / rev * 100, 2) if gross and rev and rev > 0 else None,
+                                    'operating_margin': round(op_inc / rev * 100, 2) if op_inc and rev and rev > 0 else None,
+                                    'net_margin': round(earn / rev * 100, 2) if earn and rev and rev > 0 else None
+                                })
+                        
+                        # Recalculate CAGR summary
+                        cagr_values = []
+                        if trends['revenue_5yr_cagr'] is not None:
+                            cagr_values.append(('Revenue', trends['revenue_5yr_cagr']))
+                        if trends['earnings_5yr_cagr'] is not None:
+                            cagr_values.append(('Earnings', trends['earnings_5yr_cagr']))
+                        if trends['stock_price_5yr_cagr'] is not None:
+                            cagr_values.append(('Stock Price', trends['stock_price_5yr_cagr']))
+                        
+                        if cagr_values:
+                            avg_cagr = sum(v[1] for v in cagr_values) / len(cagr_values)
+                            if avg_cagr > 20:
+                                assessment = 'Exceptional Growth'
+                            elif avg_cagr > 10:
+                                assessment = 'Strong Growth'
+                            elif avg_cagr > 5:
+                                assessment = 'Moderate Growth'
+                            elif avg_cagr > 0:
+                                assessment = 'Slow Growth'
+                            else:
+                                assessment = 'Declining'
+                            
+                            trends['cagr_summary'] = {
+                                'average_5yr_cagr': round(avg_cagr, 2),
+                                'assessment': assessment,
+                                'components': cagr_values
+                            }
+                
+                # Fetch cash flow for FCF CAGR from FD
+                if trends['fcf_5yr_cagr'] is None:
+                    fd_cf = fd_client.get_cash_flow_statements(symbol, period='annual', limit=6)
+                    if fd_cf and 'cash_flow_statements' in fd_cf:
+                        cf_stmts = fd_cf['cash_flow_statements']
+                        if isinstance(cf_stmts, list) and len(cf_stmts) >= 2:
+                            cf_stmts = sorted(cf_stmts, key=lambda x: x.get('report_period', ''), reverse=False)
+                            fcf_values = [s.get('free_cash_flow') for s in cf_stmts if s.get('free_cash_flow') and s.get('free_cash_flow') > 0]
+                            if len(fcf_values) >= 4 and trends['fcf_3yr_cagr'] is None:
+                                trends['fcf_3yr_cagr'] = self._calculate_cagr(fcf_values[-4], fcf_values[-1], 3)
+                            if len(fcf_values) >= 5 and trends['fcf_5yr_cagr'] is None:
+                                trends['fcf_5yr_cagr'] = self._calculate_cagr(fcf_values[0], fcf_values[-1], len(fcf_values)-1)
             except Exception:
                 pass
         

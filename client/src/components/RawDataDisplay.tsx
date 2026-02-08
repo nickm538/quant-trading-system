@@ -738,15 +738,22 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
                   </div>
                 )}
                 
-                {analysis.enhanced_fundamentals.liquidity && (
+                {analysis.enhanced_fundamentals.liquidity_analysis && (
                   <div className="mt-4">
-                    <h5 className="font-semibold mb-2">Liquidity & Float</h5>
+                    <h5 className="font-semibold mb-2">Liquidity Analysis</h5>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                      <DataItem label="Free Float %" value={`${safeFixed(analysis.enhanced_fundamentals.liquidity.free_float_pct * 100, 1)}%`} />
-                      <DataItem label="Liquidity Score" value={`${safeFixed(analysis.enhanced_fundamentals.liquidity.liquidity_score, 1)}/100`} />
-                      <DataItem label="Avg Volume" value={`${safeFixed(analysis.enhanced_fundamentals.liquidity.avg_volume / 1e6)}M`} />
-                      <DataItem label="Current Ratio" value={safeFixed(analysis.enhanced_fundamentals.liquidity.current_ratio)} />
+                      <DataItem label="Risk Level" value={analysis.enhanced_fundamentals.liquidity_analysis.risk_level || 'N/A'} />
+                      <DataItem label="Current Ratio" value={safeFixed(analysis.enhanced_fundamentals.liquidity_analysis.current_ratio)} />
+                      <DataItem label="Quick Ratio" value={safeFixed(analysis.enhanced_fundamentals.liquidity_analysis.quick_ratio)} />
+                      <DataItem label="Free Float %" value={analysis.enhanced_fundamentals.share_structure?.free_float_pct ? `${safeFixed(analysis.enhanced_fundamentals.share_structure.free_float_pct)}%` : 'N/A'} />
                     </div>
+                    {analysis.enhanced_fundamentals.liquidity_analysis.signals?.length > 0 && (
+                      <div className="mt-2 text-sm text-muted-foreground">
+                        {analysis.enhanced_fundamentals.liquidity_analysis.signals.map((s: string, i: number) => (
+                          <div key={i}>• {s}</div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
                 
@@ -1355,11 +1362,17 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
                     <h4 className="font-semibold text-primary mb-3">🎯 Market Regime</h4>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                       <DataItem label="Regime" value={analysis.market_context.regime.regime || 'N/A'} />
-                      <DataItem label="SPY Trend" value={`${safeFixed(analysis.market_context.regime.spy_20d_return)}%`} />
-                      <DataItem label="Volatility" value={`${safeFixed((analysis.market_context.regime.volatility || 0) * 100)}%`} />
-                      <DataItem label="Above SMA20" value={analysis.market_context.regime.above_sma_20 ? 'Yes' : 'No'} />
+                      <DataItem label="SPY Momentum" value={`${safeFixed(analysis.market_context.regime.momentum_20d)}%`} />
+                      <DataItem label="Volatility" value={`${safeFixed(analysis.market_context.regime.volatility_annualized)}%`} />
+                      <DataItem label="Confidence" value={`${safeFixed(analysis.market_context.regime.confidence)}%`} />
                     </div>
-                    <p className="text-sm text-muted-foreground mt-2">{analysis.market_context.regime.description}</p>
+                    {analysis.market_context.regime.characteristics?.length > 0 && (
+                      <div className="text-sm text-muted-foreground mt-2">
+                        {analysis.market_context.regime.characteristics.map((c: string, i: number) => (
+                          <span key={i}>{i > 0 ? ' | ' : ''}{c}</span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -1382,16 +1395,16 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
                 )}
 
                 {/* Historical Patterns */}
-                {analysis.market_context.patterns?.success && analysis.market_context.patterns.matches?.length > 0 && (
+                {analysis.market_context.patterns?.success && analysis.market_context.patterns.patterns_found > 0 && (
                   <div className="p-4 bg-muted/20 rounded-lg">
                     <h4 className="font-semibold text-primary mb-3">📊 Historical Pattern Matches</h4>
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-3">
-                      <DataItem label="Avg 20D Return" value={`${safeFixed(analysis.market_context.patterns.avg_subsequent_return)}%`} />
-                      <DataItem label="Bullish Patterns" value={`${analysis.market_context.patterns.bullish_count}/${analysis.market_context.patterns.matches?.length || 0}`} />
-                      <DataItem label="Outlook" value={analysis.market_context.patterns.outlook || 'N/A'} />
+                      <DataItem label="Avg 20D Return" value={`${safeFixed(analysis.market_context.patterns.average_subsequent_return)}%`} />
+                      <DataItem label="Bullish Probability" value={`${safeFixed(analysis.market_context.patterns.bullish_probability)}%`} />
+                      <DataItem label="Patterns Found" value={analysis.market_context.patterns.patterns_found || 0} />
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      {analysis.market_context.patterns.matches?.slice(0, 3).map((m: any, i: number) => (
+                      {analysis.market_context.patterns.top_matches?.slice(0, 3).map((m: any, i: number) => (
                         <div key={i}>{m.date}: {m.subsequent_20d_return > 0 ? '+' : ''}{safeFixed(m.subsequent_20d_return)}% (corr: {safeFixed(m.correlation, 3)})</div>
                       ))}
                     </div>
