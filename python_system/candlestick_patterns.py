@@ -526,22 +526,33 @@ class CandlestickPatternDetector:
         else:
             chikou_signal = 'BEARISH'
         
-        # Overall Ichimoku signal
+        # Overall Ichimoku signal - 4 sub-signals scored
         bullish_signals = sum([
             cloud_signal == 'BULLISH',
             tk_cross == 'BULLISH',
             chikou_signal == 'BULLISH',
             cloud_color == 'GREEN'
         ])
+        bearish_signals = 4 - bullish_signals
         
-        if bullish_signals >= 3:
+        if bullish_signals >= 4:
             overall = 'STRONG_BULLISH'
-        elif bullish_signals >= 2:
+        elif bullish_signals == 3:
             overall = 'BULLISH'
-        elif bullish_signals <= 1:
+        elif bullish_signals == 2:
+            overall = 'NEUTRAL'
+        elif bullish_signals == 1:
             overall = 'BEARISH'
         else:
-            overall = 'NEUTRAL'
+            overall = 'STRONG_BEARISH'
+        
+        # Cloud thickness as % of price (thicker = stronger S/R)
+        cloud_thickness = abs(senkou_a - senkou_b)
+        cloud_thickness_pct = round((cloud_thickness / current_price) * 100, 2) if current_price > 0 else 0
+        
+        # TK distance (momentum gauge)
+        tk_distance = round(tenkan - kijun, 2)
+        tk_distance_pct = round((tk_distance / current_price) * 100, 2) if current_price > 0 else 0
         
         return {
             'success': True,
@@ -551,13 +562,19 @@ class CandlestickPatternDetector:
             'senkou_span_b': round(senkou_b, 2),
             'cloud_top': round(cloud_top, 2),
             'cloud_bottom': round(cloud_bottom, 2),
+            'cloud_thickness': round(cloud_thickness, 2),
+            'cloud_thickness_pct': cloud_thickness_pct,
             'cloud_position': cloud_position,
             'cloud_signal': cloud_signal,
             'cloud_color': cloud_color,
             'cloud_trend': cloud_trend,
             'tk_cross': tk_cross,
             'tk_signal': tk_signal,
+            'tk_distance': tk_distance,
+            'tk_distance_pct': tk_distance_pct,
             'chikou_signal': chikou_signal,
+            'bullish_count': bullish_signals,
+            'bearish_count': bearish_signals,
             'overall_signal': overall,
             'interpretation': self._interpret_ichimoku(overall, cloud_position, tk_cross)
         }
@@ -565,13 +582,15 @@ class CandlestickPatternDetector:
     def _interpret_ichimoku(self, overall: str, cloud_position: str, tk_cross: str) -> str:
         """Generate human-readable Ichimoku interpretation."""
         if overall == 'STRONG_BULLISH':
-            return 'Strong bullish setup: Price above cloud, TK bullish cross, positive momentum. Consider long positions.'
+            return 'Strong bullish setup: All 4 signals align bullish (price above cloud, TK bullish cross, green cloud, Chikou confirms). Consider long positions with confidence.'
         elif overall == 'BULLISH':
-            return 'Moderately bullish: Most signals align bullish but some caution warranted. Look for pullbacks to enter.'
+            return 'Moderately bullish: 3 of 4 signals align bullish. Look for pullbacks to enter long positions, but watch the dissenting signal.'
+        elif overall == 'NEUTRAL':
+            return 'Mixed signals: 2 bullish vs 2 bearish. The market is in transition. Wait for clearer direction before committing capital.'
         elif overall == 'BEARISH':
-            return 'Bearish setup: Multiple bearish signals present. Avoid longs, consider shorts on rallies.'
-        else:
-            return 'Mixed signals: Wait for clearer direction before taking positions.'
+            return 'Bearish setup: 3 of 4 signals bearish. Avoid new longs, consider shorts on rallies to resistance.'
+        else:  # STRONG_BEARISH
+            return 'Strong bearish setup: All 4 signals align bearish (price below cloud, TK bearish cross, red cloud, Chikou confirms). Avoid longs, consider protective puts.'
     
     def _create_pattern_result(self, pattern_name: str, date: str, index: int, price: float) -> Dict:
         """Create standardized pattern result dictionary."""

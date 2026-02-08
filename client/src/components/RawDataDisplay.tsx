@@ -83,6 +83,35 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
                   <DataItem label="Nearest Support" value={`$${safeFixed(analysis.advanced_technicals.key_levels?.nearest_support?.price)}`} />
                 </div>
                 
+                {/* Dynamic Guidance Based on Results */}
+                {(() => {
+                  const price = analysis.advanced_technicals.current_price;
+                  const pivotStd = analysis.advanced_technicals.pivot_points?.standard;
+                  const nearestSupport = analysis.advanced_technicals.key_levels?.nearest_support?.price;
+                  const nearestResistance = analysis.advanced_technicals.key_levels?.nearest_resistance?.price;
+                  
+                  if (!price || !pivotStd) return null;
+                  
+                  const abovePivot = price > (pivotStd.pivot || 0);
+                  const distToPivot = pivotStd.pivot ? ((price - pivotStd.pivot) / pivotStd.pivot * 100).toFixed(1) : 'N/A';
+                  
+                  return (
+                    <div className={`p-3 rounded-lg border-l-4 ${
+                      abovePivot ? 'bg-green-50 dark:bg-green-950 border-green-500' : 'bg-red-50 dark:bg-red-950 border-red-500'
+                    }`}>
+                      <p className="text-sm font-medium mb-1">
+                        {abovePivot ? '✅ Price is ABOVE the daily pivot' : '⚠️ Price is BELOW the daily pivot'} ({distToPivot}% {abovePivot ? 'above' : 'below'})
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {abovePivot 
+                          ? `Bullish bias. Watch R1 ($${safeFixed(pivotStd.r1)}) as next resistance. If rejected, pivot ($${safeFixed(pivotStd.pivot)}) becomes support.`
+                          : `Bearish bias. Watch S1 ($${safeFixed(pivotStd.s1)}) as next support. If broken, S2 ($${safeFixed(pivotStd.s2)}) is the next target.`
+                        }
+                      </p>
+                    </div>
+                  );
+                })()}
+                
                 {analysis.advanced_technicals.pivot_points && (
                   <div className="mt-4">
                     <h5 className="font-semibold mb-2">Standard Pivot Points</h5>
@@ -108,6 +137,40 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
                     </div>
                   </div>
                 )}
+                
+                {/* Education: Pivot Points & Fibonacci */}
+                <div className="mt-6 p-4 bg-indigo-50 dark:bg-indigo-950 rounded-lg border border-indigo-200 dark:border-indigo-800">
+                  <h5 className="font-semibold mb-3 text-indigo-900 dark:text-indigo-100">🎓 How to Use Pivot Points & Fibonacci</h5>
+                  <div className="text-xs text-indigo-800 dark:text-indigo-200 space-y-3">
+                    <div>
+                      <p className="font-medium mb-1">Pivot Points (Calculated from Previous Day's High, Low, Close):</p>
+                      <ul className="space-y-1 ml-3 list-disc">
+                        <li><strong>Pivot (P)</strong> = (High + Low + Close) / 3. This is the day's equilibrium. Price above = bullish bias, below = bearish bias.</li>
+                        <li><strong>R1, R2, R3</strong> = Resistance levels. Each acts as a potential ceiling. R1 is the first target for longs; R3 is extreme overbought territory.</li>
+                        <li><strong>S1, S2, S3</strong> = Support levels. Each acts as a potential floor. S1 is the first target for shorts; S3 is extreme oversold territory.</li>
+                      </ul>
+                    </div>
+                    <div>
+                      <p className="font-medium mb-1">Fibonacci Retracement (Based on Recent Swing High/Low):</p>
+                      <ul className="space-y-1 ml-3 list-disc">
+                        <li><strong>23.6%</strong> = Shallow pullback. Strong trends often bounce here.</li>
+                        <li><strong>38.2%</strong> = Moderate pullback. Most common retracement in healthy trends.</li>
+                        <li><strong>50.0%</strong> = Not a true Fibonacci number, but widely watched. "Half-back" level.</li>
+                        <li><strong>61.8%</strong> = The "Golden Ratio." Deep pullback but still within trend. Key decision level.</li>
+                        <li><strong>78.6%</strong> = Very deep pullback. If this breaks, the trend may be reversing.</li>
+                      </ul>
+                    </div>
+                    <div className="p-2 bg-indigo-100 dark:bg-indigo-900 rounded">
+                      <p className="font-medium">💡 Pro Tips:</p>
+                      <ul className="space-y-1 ml-3 list-disc">
+                        <li>When pivot support/resistance <strong>aligns</strong> with a Fibonacci level, that zone is significantly stronger ("confluence").</li>
+                        <li>Day traders use pivots for intraday entries/exits. Swing traders use Fibonacci for multi-day setups.</li>
+                        <li>Volume confirmation at these levels increases reliability. A bounce on heavy volume is more trustworthy than one on thin volume.</li>
+                        <li>If price gaps above R1 at open, R2 becomes the next target. If it gaps below S1, S2 is in play.</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
               </div>
             ) : (
               <div className="text-center text-muted-foreground py-8">
@@ -168,69 +231,113 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
                 
                 {analysis.candlestick_patterns.ichimoku && (
                   <div className="mt-4">
-                    <h5 className="font-semibold mb-2">Ichimoku Cloud</h5>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                      <DataItem label="Trend" value={analysis.candlestick_patterns.ichimoku.overall_signal || analysis.candlestick_patterns.ichimoku.trend || 'N/A'} />
+                    <h5 className="font-semibold mb-2">☁️ Ichimoku Cloud Analysis</h5>
+                    
+                    {/* Overall Signal Badge */}
+                    <div className="flex items-center gap-3 mb-3">
+                      <span className={`px-3 py-1.5 rounded-full text-sm font-bold ${
+                        analysis.candlestick_patterns.ichimoku.overall_signal?.includes('BULLISH') ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300' :
+                        analysis.candlestick_patterns.ichimoku.overall_signal?.includes('BEARISH') ? 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300' :
+                        'bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300'
+                      }`}>
+                        {analysis.candlestick_patterns.ichimoku.overall_signal || 'N/A'}
+                      </span>
+                      {analysis.candlestick_patterns.ichimoku.interpretation && (
+                        <span className="text-sm text-muted-foreground italic">{analysis.candlestick_patterns.ichimoku.interpretation}</span>
+                      )}
+                    </div>
+                    
+                    {/* 5 Ichimoku Components */}
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-3">
+                      <DataItem label="Tenkan-sen (9)" value={analysis.candlestick_patterns.ichimoku.tenkan_sen ? `$${safeFixed(analysis.candlestick_patterns.ichimoku.tenkan_sen)}` : 'N/A'} />
+                      <DataItem label="Kijun-sen (26)" value={analysis.candlestick_patterns.ichimoku.kijun_sen ? `$${safeFixed(analysis.candlestick_patterns.ichimoku.kijun_sen)}` : 'N/A'} />
+                      <DataItem label="Senkou A" value={analysis.candlestick_patterns.ichimoku.senkou_span_a ? `$${safeFixed(analysis.candlestick_patterns.ichimoku.senkou_span_a)}` : 'N/A'} />
+                      <DataItem label="Senkou B" value={analysis.candlestick_patterns.ichimoku.senkou_span_b ? `$${safeFixed(analysis.candlestick_patterns.ichimoku.senkou_span_b)}` : 'N/A'} />
+                      <DataItem label="Chikou Span" value={analysis.candlestick_patterns.ichimoku.chikou_signal || 'N/A'} />
+                    </div>
+                    
+                    {/* Signal Components */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
                       <DataItem label="TK Cross" value={analysis.candlestick_patterns.ichimoku.tk_cross || 'N/A'} />
                       <DataItem label="Cloud Color" value={analysis.candlestick_patterns.ichimoku.cloud_color || 'N/A'} />
                       <DataItem label="Price vs Cloud" value={analysis.candlestick_patterns.ichimoku.cloud_position || analysis.candlestick_patterns.ichimoku.price_vs_cloud || 'N/A'} />
+                      <DataItem label="Cloud Range" value={analysis.candlestick_patterns.ichimoku.cloud_top && analysis.candlestick_patterns.ichimoku.cloud_bottom ? `$${safeFixed(analysis.candlestick_patterns.ichimoku.cloud_bottom)} - $${safeFixed(analysis.candlestick_patterns.ichimoku.cloud_top)}` : 'N/A'} />
                     </div>
-                    {/* Ichimoku Explanation */}
+                    
+                    {/* Ichimoku Education */}
                     <div className="mt-3 p-3 bg-muted/30 rounded-lg text-xs text-muted-foreground">
-                      <p className="font-medium mb-1">📖 Understanding Ichimoku Cloud:</p>
+                      <p className="font-medium mb-1">📖 Understanding Ichimoku Cloud (5 Components):</p>
                       <ul className="space-y-1 ml-2">
-                        <li><span className="font-medium">Trend:</span> Overall signal (BULLISH/BEARISH/NEUTRAL) based on all Ichimoku components</li>
-                        <li><span className="font-medium">TK Cross:</span> Tenkan-sen (9-period) crossing Kijun-sen (26-period). Bullish when Tenkan crosses above Kijun</li>
-                        <li><span className="font-medium">Cloud Color:</span> GREEN = bullish (Senkou A &gt; Senkou B), RED = bearish (Senkou A &lt; Senkou B)</li>
-                        <li><span className="font-medium">Price vs Cloud:</span> ABOVE_CLOUD = bullish, BELOW_CLOUD = bearish, IN_CLOUD = consolidation</li>
+                        <li><span className="font-medium">Tenkan-sen (Conversion):</span> (9-period High + Low) / 2. Acts as fast signal line. When above Kijun = bullish momentum.</li>
+                        <li><span className="font-medium">Kijun-sen (Base):</span> (26-period High + Low) / 2. Acts as support/resistance and trend confirmation.</li>
+                        <li><span className="font-medium">Senkou A (Leading A):</span> (Tenkan + Kijun) / 2, plotted 26 periods ahead. Forms one edge of the cloud.</li>
+                        <li><span className="font-medium">Senkou B (Leading B):</span> (52-period High + Low) / 2, plotted 26 periods ahead. Forms the other edge.</li>
+                        <li><span className="font-medium">Chikou Span (Lagging):</span> Current close plotted 26 periods back. Confirms trend when above/below past prices.</li>
                       </ul>
-                      {analysis.candlestick_patterns.ichimoku.interpretation && (
-                        <p className="mt-2 italic">{analysis.candlestick_patterns.ichimoku.interpretation}</p>
-                      )}
+                      <p className="mt-2 font-medium">Signal Scoring (4 signals):</p>
+                      <ul className="space-y-1 ml-2">
+                        <li>3-4 bullish signals = <span className="text-green-600 dark:text-green-400 font-medium">STRONG BULLISH</span></li>
+                        <li>2 bullish signals = <span className="text-green-500 dark:text-green-400">BULLISH</span></li>
+                        <li>0-1 bullish signals = <span className="text-red-500 dark:text-red-400">BEARISH</span></li>
+                      </ul>
+                      <p className="mt-2 italic">Tip: The cloud itself acts as dynamic support/resistance. Thicker clouds = stronger S/R zones. Price entering the cloud often signals consolidation before the next move.</p>
                     </div>
                   </div>
                 )}
                 
-                {/* Golden Cross / Death Cross Analysis */}
-                {analysis.candlestick_patterns.golden_death_cross && (
-                  <div className="mt-4">
-                    <h5 className="font-semibold mb-2">⚔️ Golden Cross / Death Cross Analysis</h5>
-                    <div className={`p-4 rounded-lg border ${analysis.candlestick_patterns.golden_death_cross.golden_cross ? 'bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800' : analysis.candlestick_patterns.golden_death_cross.death_cross ? 'bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800' : 'bg-muted/20 border-border'}`}>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
-                        <DataItem label="50-Day SMA" value={`$${analysis.candlestick_patterns.golden_death_cross.sma_50?.toFixed(2) || 'N/A'}`} />
-                        <DataItem label="200-Day SMA" value={`$${analysis.candlestick_patterns.golden_death_cross.sma_200?.toFixed(2) || 'N/A'}`} />
-                        <DataItem label="Signal" value={analysis.candlestick_patterns.golden_death_cross.signal || 'N/A'} />
-                        <DataItem label="Days Since Cross" value={analysis.candlestick_patterns.golden_death_cross.days_since_cross || 'N/A'} />
-                      </div>
-                      <div className="flex items-center gap-4 mb-3">
-                        <div className={`px-3 py-1 rounded-full text-sm font-medium ${analysis.candlestick_patterns.golden_death_cross.golden_cross ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300' : 'bg-muted text-muted-foreground'}`}>
-                          {analysis.candlestick_patterns.golden_death_cross.golden_cross ? '✅ Golden Cross Active' : '❌ No Golden Cross'}
+                {/* Golden Cross / Death Cross Analysis - Only show when a cross is actually detected */}
+                {analysis.candlestick_patterns.golden_death_cross && (() => {
+                  const gdc = analysis.candlestick_patterns.golden_death_cross;
+                  const hasGoldenCross = gdc.recent_golden_cross === true;
+                  const hasDeathCross = gdc.recent_death_cross === true;
+                  const hasCrossEvent = hasGoldenCross || hasDeathCross;
+                  
+                  // Only render this section if a cross was recently detected
+                  if (!hasCrossEvent) return null;
+                  
+                  return (
+                    <div className="mt-4">
+                      <h5 className="font-semibold mb-2">⚔️ {hasGoldenCross ? 'Golden Cross' : 'Death Cross'} Detected!</h5>
+                      <div className={`p-4 rounded-lg border-2 ${hasGoldenCross ? 'bg-green-50 dark:bg-green-950 border-green-400 dark:border-green-600' : 'bg-red-50 dark:bg-red-950 border-red-400 dark:border-red-600'}`}>
+                        
+                        {/* Alert Banner */}
+                        <div className={`flex items-center gap-2 mb-3 p-2 rounded-lg ${hasGoldenCross ? 'bg-green-100 dark:bg-green-900' : 'bg-red-100 dark:bg-red-900'}`}>
+                          <span className="text-2xl">{hasGoldenCross ? '🔔' : '⚠️'}</span>
+                          <div>
+                            <p className={`font-bold ${hasGoldenCross ? 'text-green-800 dark:text-green-200' : 'text-red-800 dark:text-red-200'}`}>
+                              {hasGoldenCross ? 'GOLDEN CROSS' : 'DEATH CROSS'} — {gdc.days_since_cross ? `${gdc.days_since_cross} day(s) ago` : 'Recent'}
+                            </p>
+                            <p className={`text-xs ${hasGoldenCross ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'}`}>
+                              {hasGoldenCross ? 'The 50-day SMA crossed ABOVE the 200-day SMA — a major bullish trend signal' : 'The 50-day SMA crossed BELOW the 200-day SMA — a major bearish trend signal'}
+                            </p>
+                          </div>
                         </div>
-                        <div className={`px-3 py-1 rounded-full text-sm font-medium ${analysis.candlestick_patterns.golden_death_cross.death_cross ? 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300' : 'bg-muted text-muted-foreground'}`}>
-                          {analysis.candlestick_patterns.golden_death_cross.death_cross ? '⚠️ Death Cross Active' : '❌ No Death Cross'}
+                        
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
+                          <DataItem label="50-Day SMA" value={`$${safeFixed(gdc.sma_50)}`} />
+                          <DataItem label="200-Day SMA" value={`$${safeFixed(gdc.sma_200)}`} />
+                          <DataItem label="Signal" value={gdc.signal || 'N/A'} />
+                          <DataItem label="Days Since Cross" value={gdc.days_since_cross || 'N/A'} />
                         </div>
+                        
+                        {gdc.explanation && (
+                          <div className="text-sm text-muted-foreground whitespace-pre-line mt-2">{gdc.explanation}</div>
+                        )}
                       </div>
-                      {analysis.candlestick_patterns.golden_death_cross.recent_golden_cross && (
-                        <div className="text-sm text-green-600 dark:text-green-400 mb-2">🔔 Recent Golden Cross detected!</div>
-                      )}
-                      {analysis.candlestick_patterns.golden_death_cross.recent_death_cross && (
-                        <div className="text-sm text-red-600 dark:text-red-400 mb-2">🔔 Recent Death Cross detected!</div>
-                      )}
-                      {analysis.candlestick_patterns.golden_death_cross.explanation && (
-                        <div className="text-sm text-muted-foreground whitespace-pre-line">{analysis.candlestick_patterns.golden_death_cross.explanation}</div>
-                      )}
+                      
+                      {/* Education */}
+                      <div className="mt-3 p-3 bg-muted/30 rounded-lg text-xs text-muted-foreground">
+                        <p className="font-medium mb-1">📖 Understanding Golden/Death Cross:</p>
+                        <ul className="space-y-1 ml-2">
+                          <li><span className="font-medium">Golden Cross:</span> 50-day SMA crosses ABOVE 200-day SMA. Historically preceded average gains of 15-25% over 12 months.</li>
+                          <li><span className="font-medium">Death Cross:</span> 50-day SMA crosses BELOW 200-day SMA. Historically preceded average declines of 10-20%.</li>
+                          <li><span className="font-medium">Confirmation:</span> Volume should increase on the cross day. Low-volume crosses are less reliable.</li>
+                          <li><span className="font-medium">Caveat:</span> These are lagging indicators. By the time the cross occurs, a significant portion of the move may have already happened. Always confirm with other indicators.</li>
+                        </ul>
+                      </div>
                     </div>
-                    {/* Golden/Death Cross Explanation */}
-                    <div className="mt-3 p-3 bg-muted/30 rounded-lg text-xs text-muted-foreground">
-                      <p className="font-medium mb-1">📖 Understanding Golden/Death Cross:</p>
-                      <ul className="space-y-1 ml-2">
-                        <li><span className="font-medium">Golden Cross:</span> 50-day SMA crosses ABOVE 200-day SMA - bullish signal indicating potential uptrend</li>
-                        <li><span className="font-medium">Death Cross:</span> 50-day SMA crosses BELOW 200-day SMA - bearish signal indicating potential downtrend</li>
-                        <li><span className="font-medium">Best Use:</span> Confirm with volume and other indicators. Crosses work best in trending markets, not sideways markets</li>
-                      </ul>
-                    </div>
-                  </div>
-                )}
+                  );
+                })()}
                 
                 {/* Signal Conflict Detection */}
                 {analysis.candlestick_patterns.vision_ai_analysis && (() => {
@@ -376,6 +483,207 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
                             </div>
                           ))}
                         </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                {/* EXA AI Real-Time Web Intelligence */}
+                {analysis.exa_intelligence && !analysis.exa_intelligence.error && (
+                  <div className="mt-6 p-4 bg-cyan-50 dark:bg-cyan-950 rounded-lg border border-cyan-200 dark:border-cyan-800">
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="text-cyan-600 dark:text-cyan-400">🌐</span>
+                      <h5 className="font-semibold text-cyan-900 dark:text-cyan-100">EXA AI Real-Time Web Intelligence</h5>
+                      <span className="text-xs bg-cyan-100 dark:bg-cyan-900 px-2 py-0.5 rounded text-cyan-700 dark:text-cyan-300">
+                        Neural Search • {analysis.exa_intelligence.timestamp ? new Date(analysis.exa_intelligence.timestamp).toLocaleDateString() : 'Live'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-cyan-700 dark:text-cyan-300 mb-4">
+                      EXA AI performs neural web search across financial sites (TradingView, StockCharts, Finviz, SeekingAlpha, etc.) to find real-time candlestick chart analysis, expert opinions, and pattern mentions from professional analysts.
+                    </p>
+                    
+                    {/* Synthesis / Key Findings */}
+                    {analysis.exa_intelligence.candlestick_analysis?.synthesis && (() => {
+                      const syn = analysis.exa_intelligence.candlestick_analysis.synthesis;
+                      return (
+                        <div className="space-y-3">
+                          {/* Consensus & Confidence */}
+                          <div className="flex items-center gap-3 flex-wrap">
+                            <span className={`px-3 py-1.5 rounded-full text-sm font-bold ${
+                              syn.consensus_trend === 'bullish' ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300' :
+                              syn.consensus_trend === 'bearish' ? 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300' :
+                              'bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300'
+                            }`}>
+                              Web Consensus: {syn.consensus_trend?.toUpperCase() || 'N/A'}
+                            </span>
+                            <span className={`px-3 py-1.5 rounded-full text-sm font-bold ${
+                              syn.expert_consensus === 'bullish' ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300' :
+                              syn.expert_consensus === 'bearish' ? 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300' :
+                              'bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300'
+                            }`}>
+                              Expert Consensus: {syn.expert_consensus?.toUpperCase() || 'N/A'}
+                            </span>
+                            <span className="text-sm text-muted-foreground">
+                              Confidence: {syn.confidence || 0}% • {syn.total_sources_analyzed || 0} sources
+                            </span>
+                          </div>
+                          
+                          {/* Key Findings */}
+                          {syn.key_findings?.length > 0 && (
+                            <div className="p-3 bg-white dark:bg-gray-800 rounded border">
+                              <h6 className="font-medium mb-2 text-sm">Key Findings from Web Analysis</h6>
+                              <ul className="text-sm space-y-1">
+                                {syn.key_findings.map((finding: string, idx: number) => (
+                                  <li key={idx} className="flex items-start gap-2">
+                                    <span className="text-cyan-500 mt-0.5">▸</span>
+                                    <span>{finding}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                          
+                          {/* Candlestick Patterns from Web */}
+                          {syn.candlestick_patterns_detected?.length > 0 && (
+                            <div>
+                              <h6 className="font-medium mb-2 text-sm">Candlestick Patterns Mentioned by Analysts</h6>
+                              <div className="flex flex-wrap gap-2">
+                                {syn.candlestick_patterns_detected.map((p: any, idx: number) => (
+                                  <span key={idx} className="px-2 py-1 bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200 rounded text-xs font-medium">
+                                    {p.pattern} ({p.mentions} mention{p.mentions > 1 ? 's' : ''})
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          
+                          {/* Chart Patterns from Web */}
+                          {syn.chart_patterns_detected?.length > 0 && (
+                            <div>
+                              <h6 className="font-medium mb-2 text-sm">Chart Patterns Identified by Analysts</h6>
+                              <div className="flex flex-wrap gap-2">
+                                {syn.chart_patterns_detected.map((p: any, idx: number) => (
+                                  <span key={idx} className={`px-2 py-1 rounded text-xs font-medium ${
+                                    p.pattern?.toLowerCase().includes('bullish') ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200' :
+                                    p.pattern?.toLowerCase().includes('bearish') ? 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200' :
+                                    'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200'
+                                  }`}>
+                                    {p.pattern} ({p.mentions})
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          
+                          {/* Support / Resistance from Web */}
+                          {(syn.support_levels?.length > 0 || syn.resistance_levels?.length > 0) && (
+                            <div className="grid grid-cols-2 gap-4">
+                              {syn.support_levels?.length > 0 && (
+                                <div>
+                                  <h6 className="font-medium text-green-700 dark:text-green-400 mb-1 text-sm">Web-Sourced Support</h6>
+                                  <div className="text-sm space-y-1">
+                                    {syn.support_levels.slice(0, 5).map((level: number, idx: number) => (
+                                      <div key={idx} className="text-green-600 dark:text-green-400">${typeof level === 'number' ? level.toFixed(2) : level}</div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                              {syn.resistance_levels?.length > 0 && (
+                                <div>
+                                  <h6 className="font-medium text-red-700 dark:text-red-400 mb-1 text-sm">Web-Sourced Resistance</h6>
+                                  <div className="text-sm space-y-1">
+                                    {syn.resistance_levels.slice(0, 5).map((level: number, idx: number) => (
+                                      <div key={idx} className="text-red-600 dark:text-red-400">${typeof level === 'number' ? level.toFixed(2) : level}</div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+                    
+                    {/* Market Sentiment from EXA */}
+                    {analysis.exa_intelligence.market_sentiment?.overall_sentiment && (
+                      <div className="mt-4 p-3 bg-white dark:bg-gray-800 rounded border">
+                        <h6 className="font-medium mb-2 text-sm">Market Sentiment (from News Analysis)</h6>
+                        <div className="flex items-center gap-4 mb-2">
+                          <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                            analysis.exa_intelligence.market_sentiment.overall_sentiment.bias === 'bullish' ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300' :
+                            analysis.exa_intelligence.market_sentiment.overall_sentiment.bias === 'bearish' ? 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300' :
+                            'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'
+                          }`}>
+                            {analysis.exa_intelligence.market_sentiment.overall_sentiment.bias?.toUpperCase()}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            Bullish: {analysis.exa_intelligence.market_sentiment.overall_sentiment.bullish_pct}% • 
+                            Bearish: {analysis.exa_intelligence.market_sentiment.overall_sentiment.bearish_pct}% • 
+                            Neutral: {analysis.exa_intelligence.market_sentiment.overall_sentiment.neutral_pct}%
+                          </span>
+                        </div>
+                        {analysis.exa_intelligence.market_sentiment.key_headlines?.length > 0 && (
+                          <div className="text-xs text-muted-foreground space-y-1">
+                            {analysis.exa_intelligence.market_sentiment.key_headlines.slice(0, 3).map((h: string, idx: number) => (
+                              <p key={idx}>• {h}</p>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    
+                    {/* Insider / Dark Pool from EXA */}
+                    {analysis.exa_intelligence.insider_dark_pool && (
+                      <div className="mt-4 p-3 bg-white dark:bg-gray-800 rounded border">
+                        <h6 className="font-medium mb-2 text-sm">Insider & Dark Pool Intelligence (Web Sources)</h6>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                          <div className="p-2 bg-muted/30 rounded">
+                            <div className="text-muted-foreground">Insider Reports</div>
+                            <div className="font-semibold">{analysis.exa_intelligence.insider_dark_pool.insider_activity?.length || 0}</div>
+                          </div>
+                          <div className="p-2 bg-muted/30 rounded">
+                            <div className="text-muted-foreground">Dark Pool Mentions</div>
+                            <div className="font-semibold">{analysis.exa_intelligence.insider_dark_pool.dark_pool_mentions?.length || 0}</div>
+                          </div>
+                          <div className="p-2 bg-muted/30 rounded">
+                            <div className="text-muted-foreground">Unusual Options</div>
+                            <div className="font-semibold">{analysis.exa_intelligence.insider_dark_pool.unusual_options?.length || 0}</div>
+                          </div>
+                          <div className="p-2 bg-muted/30 rounded">
+                            <div className="text-muted-foreground">Congress Trades</div>
+                            <div className="font-semibold">{analysis.exa_intelligence.insider_dark_pool.congress_trades?.length || 0}</div>
+                          </div>
+                        </div>
+                        {analysis.exa_intelligence.insider_dark_pool.insider_activity?.length > 0 && (
+                          <div className="mt-2 text-xs text-muted-foreground">
+                            <p className="font-medium">Recent Insider Activity:</p>
+                            {analysis.exa_intelligence.insider_dark_pool.insider_activity.slice(0, 3).map((item: any, idx: number) => (
+                              <p key={idx} className="ml-2">• {item.title}</p>
+                            ))}
+                          </div>
+                        )}
+                        {analysis.exa_intelligence.insider_dark_pool.congress_trades?.length > 0 && (
+                          <div className="mt-2 text-xs text-muted-foreground">
+                            <p className="font-medium">Congress Trades:</p>
+                            {analysis.exa_intelligence.insider_dark_pool.congress_trades.slice(0, 3).map((item: any, idx: number) => (
+                              <p key={idx} className="ml-2">• {item.title}</p>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    
+                    {/* Source URLs */}
+                    {analysis.exa_intelligence.candlestick_analysis?.source_urls?.length > 0 && (
+                      <div className="mt-3 text-xs text-muted-foreground">
+                        <details>
+                          <summary className="cursor-pointer font-medium">View Source URLs ({analysis.exa_intelligence.candlestick_analysis.source_urls.length})</summary>
+                          <div className="mt-1 space-y-1 ml-2">
+                            {analysis.exa_intelligence.candlestick_analysis.source_urls.slice(0, 10).map((url: string, idx: number) => (
+                              <a key={idx} href={url} target="_blank" rel="noopener noreferrer" className="block text-cyan-600 dark:text-cyan-400 hover:underline truncate">{url}</a>
+                            ))}
+                          </div>
+                        </details>
                       </div>
                     )}
                   </div>
@@ -700,6 +1008,118 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
                     )}
                   </div>
                 )}
+                
+                {/* Dynamic Cash Flow Guidance Based on Results */}
+                {(() => {
+                  const val = analysis.enhanced_fundamentals.valuation;
+                  const cf = analysis.enhanced_fundamentals.cash_flow;
+                  const garp = analysis.enhanced_fundamentals.garp_analysis;
+                  const health = analysis.enhanced_fundamentals.financial_health;
+                  
+                  if (!val && !cf) return null;
+                  
+                  const pe = val?.pe_ratio;
+                  const fcfYield = cf?.fcf_yield_pct;
+                  const zScore = health?.altman_z_score;
+                  const garpScore = garp?.score;
+                  
+                  // Determine overall fundamental health
+                  let healthSignal = 'neutral';
+                  let healthColor = 'yellow';
+                  if (zScore > 3 && fcfYield > 3 && pe < 25) { healthSignal = 'strong'; healthColor = 'green'; }
+                  else if (zScore > 2.5 && fcfYield > 1) { healthSignal = 'healthy'; healthColor = 'green'; }
+                  else if (zScore < 1.8 || fcfYield < 0) { healthSignal = 'concerning'; healthColor = 'red'; }
+                  
+                  return (
+                    <div className={`mt-4 p-4 rounded-lg border-l-4 ${
+                      healthColor === 'green' ? 'bg-green-50 dark:bg-green-950 border-green-500' :
+                      healthColor === 'red' ? 'bg-red-50 dark:bg-red-950 border-red-500' :
+                      'bg-yellow-50 dark:bg-yellow-950 border-yellow-500'
+                    }`}>
+                      <h5 className="font-semibold mb-2 text-sm">🎯 What These Fundamentals Tell You</h5>
+                      <div className="text-xs space-y-2">
+                        {pe && (
+                          <p>
+                            <strong>Valuation:</strong> P/E of {safeFixed(pe)} means you're paying ${safeFixed(pe)} for every $1 of earnings.
+                            {pe < 15 ? ' This is relatively cheap — either a value opportunity or the market sees problems ahead.' :
+                             pe < 25 ? ' This is fairly valued for a growth company.' :
+                             pe < 40 ? ' This is premium-priced. The market expects strong future growth to justify this multiple.' :
+                             ' This is very expensive. Only justified if the company is growing earnings 25%+ annually.'}
+                          </p>
+                        )}
+                        {fcfYield && (
+                          <p>
+                            <strong>Cash Flow:</strong> FCF Yield of {safeFixed(fcfYield)}%.
+                            {fcfYield > 5 ? ' Excellent. The company generates significant free cash relative to its price. This is a cash machine.' :
+                             fcfYield > 2 ? ' Healthy cash generation. The company can fund growth, buybacks, or dividends.' :
+                             fcfYield > 0 ? ' Modest cash flow. The company is reinvesting heavily, which is fine for growth but watch for sustainability.' :
+                             ' Negative FCF. The company is burning cash. This is acceptable for high-growth companies but risky for mature ones.'}
+                          </p>
+                        )}
+                        {zScore && (
+                          <p>
+                            <strong>Bankruptcy Risk:</strong> Altman Z-Score of {safeFixed(zScore)}.
+                            {zScore > 3 ? ' Safe zone. Very low bankruptcy risk.' :
+                             zScore > 1.8 ? ' Gray zone. Not immediately concerning but worth monitoring.' :
+                             ' Distress zone. Elevated bankruptcy risk. Proceed with extreme caution.'}
+                          </p>
+                        )}
+                        {garpScore && (
+                          <p>
+                            <strong>GARP (Growth at Reasonable Price):</strong> Score of {safeFixed(garpScore, 0)}/100.
+                            {garpScore > 70 ? ' Strong GARP candidate — good growth at a reasonable valuation.' :
+                             garpScore > 40 ? ' Moderate GARP score. Either growth is slowing or valuation is stretched.' :
+                             ' Weak GARP score. The growth-to-price ratio is unfavorable.'}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
+                
+                {/* Cash Flow Education */}
+                <div className="mt-6 p-4 bg-emerald-50 dark:bg-emerald-950 rounded-lg border border-emerald-200 dark:border-emerald-800">
+                  <h5 className="font-semibold mb-3 text-emerald-900 dark:text-emerald-100">🎓 Understanding Cash Flow & Valuation Metrics</h5>
+                  <div className="text-xs text-emerald-800 dark:text-emerald-200 space-y-3">
+                    <div>
+                      <p className="font-medium mb-1">Why Cash Flow Matters More Than Earnings:</p>
+                      <p>Earnings can be manipulated through accounting tricks (depreciation schedules, revenue recognition, one-time charges). Cash flow is harder to fake — either the cash is in the bank or it isn't. Think of earnings as what the company <em>says</em> it made, and cash flow as what it <em>actually</em> made.</p>
+                    </div>
+                    <div>
+                      <p className="font-medium mb-1">Key Metrics Explained:</p>
+                      <ul className="space-y-1 ml-3 list-disc">
+                        <li><strong>Free Cash Flow (FCF)</strong> = Operating cash flow minus capital expenditures. This is the money left over after running the business and maintaining equipment. It's what's available for dividends, buybacks, debt paydown, or acquisitions.</li>
+                        <li><strong>FCF Yield</strong> = FCF / Market Cap. Think of it as the "interest rate" you earn on your investment. A 5% FCF yield means the company generates 5 cents of free cash for every dollar of market value.</li>
+                        <li><strong>FCF Margin</strong> = FCF / Revenue. Shows how efficiently the company converts sales into cash. Software companies often have 25-40% FCF margins; retailers might have 3-5%.</li>
+                        <li><strong>P/E Ratio</strong> = Price / Earnings per share. The most common valuation metric. Compare to industry peers, not across sectors (tech P/E of 30 is different from utility P/E of 30).</li>
+                        <li><strong>PEG Ratio</strong> = P/E / Growth Rate. Adjusts valuation for growth. PEG < 1 = potentially undervalued. PEG > 2 = potentially overvalued.</li>
+                        <li><strong>EV/EBITDA</strong> = Enterprise Value / EBITDA. Better than P/E for comparing companies with different debt levels. Lower = cheaper.</li>
+                      </ul>
+                    </div>
+                    <div>
+                      <p className="font-medium mb-1">GARP Analysis (Growth at Reasonable Price):</p>
+                      <p>Popularized by Peter Lynch, GARP combines growth investing with value discipline. A high GARP score means the company offers strong earnings growth relative to its valuation — the sweet spot between overpaying for growth and settling for cheap-but-stagnant companies.</p>
+                    </div>
+                    <div>
+                      <p className="font-medium mb-1">Altman Z-Score (Bankruptcy Predictor):</p>
+                      <ul className="space-y-1 ml-3 list-disc">
+                        <li><strong>&gt; 3.0</strong> = Safe zone. Very low probability of bankruptcy.</li>
+                        <li><strong>1.8 - 3.0</strong> = Gray zone. Some financial stress. Monitor quarterly.</li>
+                        <li><strong>&lt; 1.8</strong> = Distress zone. Elevated bankruptcy risk. Not necessarily imminent, but a red flag.</li>
+                      </ul>
+                    </div>
+                    <div className="p-2 bg-emerald-100 dark:bg-emerald-900 rounded">
+                      <p className="font-medium">💡 Pro Tips:</p>
+                      <ul className="space-y-1 ml-3 list-disc">
+                        <li>Always compare valuation metrics to <strong>industry peers</strong>, not the broad market. A P/E of 40 is cheap for a high-growth SaaS company but expensive for a bank.</li>
+                        <li>Watch for <strong>declining FCF margins</strong> over multiple quarters — this often precedes earnings misses.</li>
+                        <li>High insider ownership (>10%) often aligns management incentives with shareholders.</li>
+                        <li>Short interest above 10% of float can create squeeze potential but also signals bearish institutional sentiment.</li>
+                        <li>Revenue CAGR vs. FCF CAGR divergence: If revenue grows faster than FCF, the company may be sacrificing profitability for growth.</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
               </div>
             ) : (
               <div className="text-center text-muted-foreground py-8">
@@ -1149,22 +1569,98 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
                   </div>
                 )}
 
-                {/* Explanation */}
-                <div className="p-4 bg-muted/10 rounded-lg border border-muted">
-                  <h4 className="font-semibold text-muted-foreground mb-2">ℹ️ How to Interpret ARIMA Forecasts</h4>
-                  <div className="text-xs text-muted-foreground space-y-2">
-                    <p><strong>ARIMA (AutoRegressive Integrated Moving Average)</strong> is a statistical model for time series forecasting:</p>
-                    <ul className="list-disc list-inside ml-2">
-                      <li><strong>AR (p)</strong>: Uses past values to predict future values</li>
-                      <li><strong>I (d)</strong>: Differencing to make the series stationary</li>
-                      <li><strong>MA (q)</strong>: Uses past forecast errors</li>
-                    </ul>
-                    <p className="mt-2"><strong>Confidence Intervals:</strong></p>
-                    <ul className="list-disc list-inside ml-2">
-                      <li>Narrow CI = Higher confidence in prediction</li>
-                      <li>Wide CI = More uncertainty</li>
-                    </ul>
-                    <p className="mt-2 italic"><strong>Note:</strong> ARIMA works best for short-term forecasts (1-5 days) and should be combined with other analysis.</p>
+                {/* Dynamic ARIMA Guidance Based on Results */}
+                {analysis.stockgrid_analysis.arima.interpretation && (() => {
+                  const interp = analysis.stockgrid_analysis.arima.interpretation;
+                  const forecast = analysis.stockgrid_analysis.arima.forecast;
+                  const stats = analysis.stockgrid_analysis.arima.model_stats;
+                  const changePct = interp.expected_change_pct || 0;
+                  const isStationary = stats?.is_stationary;
+                  
+                  // Calculate CI width as % of price for reliability assessment
+                  const lastForecast = forecast?.[forecast.length - 1];
+                  const ciWidth = lastForecast ? ((lastForecast.upper_95 - lastForecast.lower_95) / lastForecast.predicted * 100) : null;
+                  const isReliable = ciWidth !== null && ciWidth < 10;
+                  
+                  return (
+                    <div className={`p-4 rounded-lg border-l-4 ${
+                      changePct > 1 ? 'bg-green-50 dark:bg-green-950 border-green-500' :
+                      changePct < -1 ? 'bg-red-50 dark:bg-red-950 border-red-500' :
+                      'bg-yellow-50 dark:bg-yellow-950 border-yellow-500'
+                    }`}>
+                      <h5 className="font-semibold mb-2 text-sm">🎯 What This ARIMA Forecast Means For You</h5>
+                      <div className="text-xs space-y-2">
+                        <p>
+                          <strong>Direction:</strong> ARIMA projects a <strong>{changePct > 0 ? `+${safeFixed(changePct)}%` : `${safeFixed(changePct)}%`}</strong> move over 5 days.
+                          {changePct > 2 ? ' This is a meaningful bullish projection.' :
+                           changePct < -2 ? ' This is a meaningful bearish projection.' :
+                           ' This is a relatively flat projection, suggesting consolidation.'}
+                        </p>
+                        <p>
+                          <strong>Reliability:</strong> {ciWidth !== null ? (
+                            ciWidth < 5 ? `The confidence interval is tight (${safeFixed(ciWidth)}% width), indicating high model confidence. This forecast is more reliable than average.` :
+                            ciWidth < 10 ? `The confidence interval is moderate (${safeFixed(ciWidth)}% width). Reasonable confidence, but use other indicators for confirmation.` :
+                            `The confidence interval is wide (${safeFixed(ciWidth)}% width), indicating significant uncertainty. Treat this as directional guidance only, not a precise target.`
+                          ) : 'Unable to assess CI width.'}
+                        </p>
+                        {!isStationary && (
+                          <p className="text-yellow-700 dark:text-yellow-300">
+                            ⚠️ <strong>Caution:</strong> The series required differencing to achieve stationarity. This means the stock has a strong trend component that ARIMA may struggle to capture during trend reversals.
+                          </p>
+                        )}
+                        <p>
+                          <strong>How to use:</strong> {changePct > 1 && isReliable ? 
+                            'The model supports a bullish short-term thesis. Consider this as one confirmation signal alongside your technical and fundamental analysis.' :
+                            changePct < -1 && isReliable ?
+                            'The model supports a bearish short-term thesis. Consider tightening stops or reducing position size.' :
+                            'The model shows no strong directional conviction. This is a wait-and-see signal. Do not force a trade based on this alone.'}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })()}
+                
+                {/* Comprehensive ARIMA Education */}
+                <div className="p-4 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <h5 className="font-semibold mb-3 text-blue-900 dark:text-blue-100">🎓 Understanding ARIMA Forecasting</h5>
+                  <div className="text-xs text-blue-800 dark:text-blue-200 space-y-3">
+                    <div>
+                      <p className="font-medium mb-1">What ARIMA Does (Think of it like weather forecasting for stocks):</p>
+                      <p>ARIMA looks at the stock's recent price history and finds mathematical patterns in how prices move from day to day. It's like noticing that after 3 rainy days, there's usually a sunny day — except with prices.</p>
+                    </div>
+                    <div>
+                      <p className="font-medium mb-1">The Three Components:</p>
+                      <ul className="space-y-1 ml-3 list-disc">
+                        <li><strong>AR (AutoRegressive)</strong> = "Yesterday's price influences today's price." Uses past values. The (p) number tells you how many days back it looks.</li>
+                        <li><strong>I (Integrated)</strong> = "Remove the trend first." Differencing makes the data stationary (flat). The (d) number is how many times it differences.</li>
+                        <li><strong>MA (Moving Average)</strong> = "Learn from past mistakes." Uses previous forecast errors to self-correct. The (q) number is how many error terms it uses.</li>
+                      </ul>
+                    </div>
+                    <div>
+                      <p className="font-medium mb-1">Reading the Forecast Table:</p>
+                      <ul className="space-y-1 ml-3 list-disc">
+                        <li><strong>Predicted</strong> = The model's best guess for that day's closing price.</li>
+                        <li><strong>95% CI Low/High</strong> = There's a 95% chance the actual price falls within this range. Wider = more uncertainty.</li>
+                        <li>Notice how the CI <strong>widens</strong> each day — this is normal. Predictions get less reliable further out.</li>
+                      </ul>
+                    </div>
+                    <div>
+                      <p className="font-medium mb-1">Model Quality Metrics:</p>
+                      <ul className="space-y-1 ml-3 list-disc">
+                        <li><strong>AIC/BIC</strong> = Lower is better. These measure how well the model fits without overfitting. Compare across different stocks to gauge relative quality.</li>
+                        <li><strong>Stationary = Yes</strong> means the model's assumptions are met. "No" means the data needed extra processing (less ideal).</li>
+                      </ul>
+                    </div>
+                    <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded">
+                      <p className="font-medium">💡 Pro Tips:</p>
+                      <ul className="space-y-1 ml-3 list-disc">
+                        <li>ARIMA is <strong>best for 1-3 day forecasts</strong>. Day 4-5 predictions are significantly less reliable.</li>
+                        <li>ARIMA does NOT account for earnings, news, or market sentiment. It's purely mathematical.</li>
+                        <li>If the CI range is wider than 5% of the price, the forecast has low practical value for trading decisions.</li>
+                        <li>ARIMA works best on <strong>liquid, large-cap stocks</strong> with consistent trading patterns. It struggles with penny stocks, IPOs, and meme stocks.</li>
+                        <li>Use ARIMA as <strong>one input among many</strong>. When ARIMA agrees with your technical analysis (RSI, MACD, etc.), the combined signal is stronger.</li>
+                      </ul>
+                    </div>
                   </div>
                 </div>
               </div>
