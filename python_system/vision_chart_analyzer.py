@@ -129,15 +129,15 @@ class VisionChartAnalyzer:
         """Analyze with exponential backoff retry and OpenRouter fallback."""
         last_error = None
         
-        # Primary: OpenRouter models (Opus 4 first for best quality)
+        # Primary: OpenRouter models (fast models first to avoid blocking pipeline)
         # Gemini direct API is deprioritized due to quota issues
         if self.openrouter_key:
-            # Model fallback chain: Claude Opus 4 (best) -> Claude Sonnet 4 -> Claude 3.5 Sonnet -> Gemini Flash
+            # Model fallback chain: Fast models first, then premium
+            # Opus 4 moved to end because it can take 60-120s and block the pipeline
             openrouter_models = [
-                ('anthropic/claude-opus-4', 'Claude Opus 4'),
+                ('google/gemini-2.0-flash-001', 'Gemini 2.0 Flash'),
                 ('anthropic/claude-sonnet-4', 'Claude Sonnet 4'),
                 ('anthropic/claude-3.5-sonnet', 'Claude 3.5 Sonnet'),
-                ('google/gemini-2.0-flash-001', 'Gemini 2.0 Flash'),
             ]
             
             for model_id, model_name in openrouter_models:
@@ -338,7 +338,7 @@ Respond in this exact JSON format:
             "https://openrouter.ai/api/v1/chat/completions",
             headers=headers,
             json=payload,
-            timeout=90
+            timeout=30
         )
         response.raise_for_status()
         

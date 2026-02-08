@@ -151,7 +151,7 @@ class ProductionValidator:
         
         # Validate signal
         if 'signal' in analysis:
-            if analysis['signal'] not in ['BUY', 'SELL', 'HOLD']:
+            if analysis['signal'] not in ['STRONG_BUY', 'BUY', 'SELL', 'STRONG_SELL', 'HOLD']:
                 errors.append(f"Invalid signal: {analysis['signal']}")
         
         # Validate position size
@@ -161,9 +161,9 @@ class ProductionValidator:
         
         # Validate stop loss vs current price
         if 'stop_loss' in analysis and 'current_price' in analysis:
-            if analysis['signal'] == 'BUY' and analysis['stop_loss'] >= analysis['current_price']:
+            if analysis['signal'] in ('BUY', 'STRONG_BUY') and analysis['stop_loss'] >= analysis['current_price']:
                 errors.append(f"Stop loss ({analysis['stop_loss']}) must be below current price ({analysis['current_price']}) for BUY signal")
-            elif analysis['signal'] == 'SELL' and analysis['stop_loss'] <= analysis['current_price']:
+            elif analysis['signal'] in ('SELL', 'STRONG_SELL') and analysis['stop_loss'] <= analysis['current_price']:
                 errors.append(f"Stop loss ({analysis['stop_loss']}) must be above current price ({analysis['current_price']}) for SELL signal")
         
         # Validate risk/reward ratio

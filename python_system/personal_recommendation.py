@@ -252,7 +252,14 @@ class PersonalRecommendationEngine:
         
         metrics = fd_data.get('financial_metrics', {})
         if isinstance(metrics, dict):
-            fm = metrics.get('financial_metrics', metrics)
+            fm_raw = metrics.get('financial_metrics', metrics)
+            # financial_metrics can be a list of quarterly metrics - take the most recent
+            if isinstance(fm_raw, list) and len(fm_raw) > 0:
+                fm = fm_raw[0] if isinstance(fm_raw[0], dict) else {}
+            elif isinstance(fm_raw, dict):
+                fm = fm_raw
+            else:
+                fm = {}
             
             # ROE > 15% is good
             roe = fm.get('roe')

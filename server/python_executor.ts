@@ -77,13 +77,21 @@ export async function analyzeStock(params: StockAnalysisParams): Promise<StockAn
   try {
     const result = await execAsync(command, {
       maxBuffer: 10 * 1024 * 1024, // 10MB buffer
-      timeout: 120000, // 2 minute timeout
+      timeout: 180000, // 3 minute timeout
       env: {
         ...process.env,
         PYTHONPATH: '',
         PYTHONHOME: '',
         // Add library path for numpy/scipy C extensions in Nix
         LD_LIBRARY_PATH: process.env.LD_LIBRARY_PATH || '',
+        // Pass API keys for data fallbacks
+        POLYGON_API_KEY: process.env.POLYGON_API_KEY || '',
+        FINNHUB_API_KEY: process.env.FINNHUB_API_KEY || '',
+        EXA_API_KEY: process.env.EXA_API_KEY || '',
+        OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY || '',
+        GEMINI_API_KEY: process.env.GEMINI_API_KEY || '',
+        TAAPI_API_KEY: process.env.TAAPI_API_KEY || '',
+        FINANCIAL_DATASETS_API_KEY: process.env.FINANCIAL_DATASETS_API_KEY || '',
       },
     });
     stdout = result.stdout;

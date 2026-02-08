@@ -538,10 +538,36 @@ def main():
             candlestick_result = candle_detector.analyze(symbol)
             
             # Enhance with Vision AI chart analysis if available
+            # Use multiprocessing with timeout to prevent blocking the entire pipeline
+            # Note: ThreadPoolExecutor's context manager blocks on exit waiting for threads,
+            # so we use a threading.Thread with daemon=True instead
+            import time as _time
+            _pipeline_start = _time.time()
+            print(f"[{_time.time()-_pipeline_start:.1f}s] Starting Vision AI...", file=sys.stderr, flush=True)
             if HAS_VISION:
                 try:
-                    vision_analyzer = VisionChartAnalyzer()
-                    vision_result = vision_analyzer.analyze(symbol)
+                    import threading
+                    import queue
+                    
+                    vision_queue = queue.Queue()
+                    def _run_vision_thread(sym, q):
+                        try:
+                            va = VisionChartAnalyzer()
+                            result = va.analyze(sym)
+                            q.put(result)
+                        except Exception as e:
+                            q.put({'success': False, 'error': str(e)})
+                    
+                    vision_thread = threading.Thread(target=_run_vision_thread, args=(symbol, vision_queue), daemon=True)
+                    vision_thread.start()
+                    vision_thread.join(timeout=45)  # Hard 45s cap
+                    
+                    if not vision_queue.empty():
+                        vision_result = vision_queue.get_nowait()
+                    else:
+                        vision_result = {'success': False, 'error': 'Vision AI timed out (45s cap)'}
+                        print(f"Vision AI timed out for {symbol}, continuing without it", file=sys.stderr)
+                    
                     if vision_result.get('success'):
                         # Merge Vision AI patterns with algorithmic patterns
                         candlestick_result['vision_ai_analysis'] = {
@@ -556,16 +582,84 @@ def main():
                             'chart_source': vision_result.get('chart_source', 'Finviz'),
                             'ai_model': vision_result.get('ai_model', 'Vision AI')
                         }
+                    elif vision_result.get('error'):
+                        candlestick_result['vision_ai_error'] = vision_result['error']
                 except Exception as ve:
                     candlestick_result['vision_ai_error'] = str(ve)
             
-            # Add Golden/Death Cross analysis from comprehensive_technicals
+            print(f"[{_time.time()-_pipeline_start:.1f}s] Vision AI done, starting Golden/Death Cross...", file=sys.stderr, flush=True)
+            # Add Golden/Death Cross analysis using Polygon daily data
+            # (avoids calling yfinance which hangs in containerized environments)
             try:
-                from comprehensive_technicals_v2 import ComprehensiveTechnicalAnalyzer
-                comp_tech = ComprehensiveTechnicalAnalyzer()
-                comp_result = comp_tech.analyze(symbol)
-                if comp_result.get('golden_death_cross'):
-                    candlestick_result['golden_death_cross'] = comp_result['golden_death_cross']
+                # Fetch 1-year daily data from Polygon for SMA-50/200 calculation
+                from polygon import RESTClient as PolygonClient
+                from datetime import datetime, timedelta
+                poly_key = os.environ.get('POLYGON_API_KEY', '')
+                if poly_key:
+                    poly_client = PolygonClient(api_key=poly_key)
+                    end_date = datetime.now().strftime('%Y-%m-%d')
+                    start_date = (datetime.now() - timedelta(days=400)).strftime('%Y-%m-%d')  # 400 days to ensure 200+ trading days
+                    aggs = list(poly_client.list_aggs(symbol, 1, 'day', start_date, end_date, limit=500))
+                    close_series = pd.Series([a.close for a in aggs])
+                    print(f"  Golden Cross: Got {len(close_series)} daily bars from Polygon", file=sys.stderr, flush=True)
+                else:
+                    close_series = pd.Series([])
+                if len(close_series) >= 200:
+                    sma_50 = close_series.rolling(window=50).mean()
+                    sma_200 = close_series.rolling(window=200).mean()
+                    
+                    current_50 = float(sma_50.iloc[-1]) if not pd.isna(sma_50.iloc[-1]) else 0
+                    current_200 = float(sma_200.iloc[-1]) if not pd.isna(sma_200.iloc[-1]) else 0
+                    
+                    # Check for recent crosses (within last 5 days)
+                    recent_golden = False
+                    recent_death = False
+                    days_since_cross = None
+                    
+                    for i in range(1, min(6, len(sma_50))):
+                        if not pd.isna(sma_50.iloc[-i]) and not pd.isna(sma_200.iloc[-i]):
+                            curr_50 = sma_50.iloc[-i]
+                            curr_200 = sma_200.iloc[-i]
+                            prev_50_check = sma_50.iloc[-i-1] if i+1 <= len(sma_50) else curr_50
+                            prev_200_check = sma_200.iloc[-i-1] if i+1 <= len(sma_200) else curr_200
+                            
+                            if curr_50 > curr_200 and prev_50_check <= prev_200_check:
+                                recent_golden = True
+                                days_since_cross = i
+                                break
+                            elif curr_50 < curr_200 and prev_50_check >= prev_200_check:
+                                recent_death = True
+                                days_since_cross = i
+                                break
+                    
+                    if recent_golden:
+                        signal = 'GOLDEN_CROSS'
+                        explanation = f'GOLDEN CROSS DETECTED ({days_since_cross} day(s) ago). The 50-day SMA crossed ABOVE the 200-day SMA - a major bullish trend change signal.'
+                    elif recent_death:
+                        signal = 'DEATH_CROSS'
+                        explanation = f'DEATH CROSS DETECTED ({days_since_cross} day(s) ago). The 50-day SMA crossed BELOW the 200-day SMA - a major bearish trend change signal.'
+                    elif current_50 > current_200:
+                        distance_pct = ((current_50 - current_200) / current_200) * 100
+                        signal = 'BULLISH_TREND'
+                        explanation = f'BULLISH TREND: 50 SMA (${current_50:.2f}) is {distance_pct:.1f}% above 200 SMA (${current_200:.2f}). Confirmed uptrend.'
+                    else:
+                        distance_pct = ((current_200 - current_50) / current_200) * 100
+                        signal = 'BEARISH_TREND'
+                        explanation = f'BEARISH TREND: 50 SMA (${current_50:.2f}) is {distance_pct:.1f}% below 200 SMA (${current_200:.2f}). Confirmed downtrend.'
+                    
+                    candlestick_result['golden_death_cross'] = {
+                        'sma_50': round(current_50, 2),
+                        'sma_200': round(current_200, 2),
+                        'golden_cross': current_50 > current_200,
+                        'death_cross': current_50 < current_200,
+                        'recent_golden_cross': recent_golden,
+                        'recent_death_cross': recent_death,
+                        'days_since_cross': days_since_cross,
+                        'signal': signal,
+                        'explanation': explanation
+                    }
+                else:
+                    candlestick_result['golden_death_cross'] = {'error': f'Need 200+ days of data, only have {len(close_series)}'}
             except Exception as gdc_e:
                 candlestick_result['golden_death_cross_error'] = str(gdc_e)
             
@@ -573,36 +667,61 @@ def main():
         except Exception as e:
             output['candlestick_patterns'] = {'error': str(e)}
         
-        # Run Enhanced Fundamentals (Cash Flow)
-        try:
-            enhanced_fund = EnhancedFundamentalsAnalyzer()
-            output['enhanced_fundamentals'] = enhanced_fund.analyze(symbol)
-        except Exception as e:
-            output['enhanced_fundamentals'] = {'error': str(e)}
+        # ====================================================================
+        # PARALLEL EXECUTION: Run all independent analysis steps concurrently
+        # This reduces total time from ~136s (sequential) to ~60s (parallel)
+        # ====================================================================
+        import threading
+        import queue as _queue
         
-        # Run Market Intelligence (Market Status, VIX, Regime, Sentiment)
-        try:
-            market_intel = MarketIntelligence()
-            output['market_context'] = market_intel.get_full_market_intelligence()
-        except Exception as e:
-            output['market_context'] = {'error': str(e)}
+        print(f"[{_time.time()-_pipeline_start:.1f}s] Starting parallel analysis (6 threads)...", file=sys.stderr, flush=True)
         
-        # Run StockGrid Analysis (Dark Pools, ARIMA, Factor Analysis)
-        if HAS_STOCKGRID:
+        # Thread-safe results dict
+        parallel_results = {}
+        parallel_lock = threading.Lock()
+        
+        def _safe_run(name, func):
+            """Run a function and store result thread-safely."""
             try:
-                stockgrid = StockGridIntegration()
-                output['stockgrid_analysis'] = stockgrid.get_full_stockgrid_analysis(symbol)
+                result = func()
+                with parallel_lock:
+                    parallel_results[name] = result
             except Exception as e:
-                output['stockgrid_analysis'] = {'error': str(e)}
-        else:
-            output['stockgrid_analysis'] = {'error': 'StockGrid integration not available'}
+                with parallel_lock:
+                    parallel_results[name] = {'error': str(e)}
         
-        # Run TAAPI.io Technical Indicators (backup/validation source)
+        # Define all parallel tasks
+        threads = []
+        
+        # 1. Enhanced Fundamentals (slowest: ~54s)
+        def _run_enhanced_fund():
+            ef = EnhancedFundamentalsAnalyzer()
+            return ef.analyze(symbol)
+        t = threading.Thread(target=_safe_run, args=('enhanced_fundamentals', _run_enhanced_fund), daemon=True)
+        threads.append(t)
+        
+        # 2. Market Intelligence (~14s)
+        def _run_market_intel():
+            mi = MarketIntelligence()
+            return mi.get_full_market_intelligence()
+        t = threading.Thread(target=_safe_run, args=('market_context', _run_market_intel), daemon=True)
+        threads.append(t)
+        
+        # 3. StockGrid (~15s)
+        if HAS_STOCKGRID:
+            def _run_stockgrid():
+                sg = StockGridIntegration()
+                return sg.get_full_stockgrid_analysis(symbol)
+            t = threading.Thread(target=_safe_run, args=('stockgrid_analysis', _run_stockgrid), daemon=True)
+            threads.append(t)
+        else:
+            parallel_results['stockgrid_analysis'] = {'error': 'StockGrid integration not available'}
+        
+        # 4. TAAPI (~6s for 6 indicators)
         if HAS_TAAPI:
-            try:
+            def _run_taapi():
                 taapi = TaapiClient()
                 taapi_result = {}
-                # Get key indicators from TAAPI for cross-validation
                 for indicator in ['rsi', 'macd', 'supertrend', 'adx', 'bbands', 'stoch']:
                     try:
                         ind_data = taapi.get_indicator(indicator, symbol, '1d')
@@ -610,58 +729,67 @@ def main():
                             taapi_result[indicator] = ind_data
                     except Exception as ind_e:
                         taapi_result[indicator] = {'error': str(ind_e)}
-                output['taapi_indicators'] = taapi_result
-            except Exception as e:
-                output['taapi_indicators'] = {'error': str(e)}
+                return taapi_result
+            t = threading.Thread(target=_safe_run, args=('taapi_indicators', _run_taapi), daemon=True)
+            threads.append(t)
         else:
-            output['taapi_indicators'] = {'error': 'TAAPI.io integration not available'}
+            parallel_results['taapi_indicators'] = {'error': 'TAAPI.io integration not available'}
         
-        # Run FinancialDatasets.ai Fundamental Data
+        # 5. FinancialDatasets (~4s)
         if HAS_FINANCIAL_DATASETS:
-            try:
+            def _run_fd():
                 fd_client = FinancialDatasetsClient()
                 fd_result = {}
-                # Get financial metrics
-                try:
-                    fd_result['financial_metrics'] = fd_client.get_financial_metrics(symbol)
-                except Exception as fm_e:
-                    fd_result['financial_metrics'] = {'error': str(fm_e)}
-                # Get income statement
-                try:
-                    fd_result['income_statement'] = fd_client.get_income_statement(symbol, period='annual', limit=2)
-                except Exception as is_e:
-                    fd_result['income_statement'] = {'error': str(is_e)}
-                # Get SEC filings (for insider activity context)
-                try:
-                    fd_result['sec_filings'] = fd_client.get_filings(symbol, limit=5)
-                except Exception as sf_e:
-                    fd_result['sec_filings'] = {'error': str(sf_e)}
-                # Get company facts
-                try:
-                    fd_result['company_facts'] = fd_client.get_company_facts(symbol)
-                except Exception as cf_e:
-                    fd_result['company_facts'] = {'error': str(cf_e)}
-                # Get price snapshot
-                try:
-                    fd_result['price_snapshot'] = fd_client.get_stock_price_snapshot(symbol)
-                except Exception as ps_e:
-                    fd_result['price_snapshot'] = {'error': str(ps_e)}
-                output['financialdatasets'] = fd_result
-            except Exception as e:
-                output['financialdatasets'] = {'error': str(e)}
+                for key, func in [
+                    ('financial_metrics', lambda: fd_client.get_financial_metrics(symbol)),
+                    ('income_statement', lambda: fd_client.get_income_statement(symbol, period='annual', limit=2)),
+                    ('sec_filings', lambda: fd_client.get_filings(symbol, limit=5)),
+                    ('company_facts', lambda: fd_client.get_company_facts(symbol)),
+                    ('price_snapshot', lambda: fd_client.get_stock_price_snapshot(symbol)),
+                ]:
+                    try:
+                        fd_result[key] = func()
+                    except Exception as e:
+                        fd_result[key] = {'error': str(e)}
+                return fd_result
+            t = threading.Thread(target=_safe_run, args=('financialdatasets', _run_fd), daemon=True)
+            threads.append(t)
         else:
-            output['financialdatasets'] = {'error': 'FinancialDatasets.ai integration not available'}
+            parallel_results['financialdatasets'] = {'error': 'FinancialDatasets.ai integration not available'}
         
-        # Run EXA AI Real-Time Web Intelligence & Candlestick Chart Analysis
+        # 6. EXA AI (~30s)
         try:
             from exa_client import ExaClient
-            exa = ExaClient()
-            output['exa_intelligence'] = exa.get_comprehensive_stock_intelligence(symbol)
+            def _run_exa():
+                exa = ExaClient()
+                return exa.get_comprehensive_stock_intelligence(symbol)
+            t = threading.Thread(target=_safe_run, args=('exa_intelligence', _run_exa), daemon=True)
+            threads.append(t)
         except ImportError:
-            output['exa_intelligence'] = {'error': 'EXA AI client not available'}
-        except Exception as e:
-            output['exa_intelligence'] = {'error': str(e)}
+            parallel_results['exa_intelligence'] = {'error': 'EXA AI client not available'}
         
+        # Start all threads
+        for t in threads:
+            t.start()
+        
+        # Wait for all threads with a global timeout of 60s
+        PARALLEL_TIMEOUT = 60  # seconds
+        deadline = _time.time() + PARALLEL_TIMEOUT
+        for t in threads:
+            remaining = max(0.1, deadline - _time.time())
+            t.join(timeout=remaining)
+        
+        # Collect results (use error for any that didn't finish)
+        for key in ['enhanced_fundamentals', 'market_context', 'stockgrid_analysis', 
+                     'taapi_indicators', 'financialdatasets', 'exa_intelligence']:
+            if key in parallel_results:
+                output[key] = parallel_results[key]
+            else:
+                output[key] = {'error': f'{key} timed out ({PARALLEL_TIMEOUT}s cap)'}
+        
+        print(f"[{_time.time()-_pipeline_start:.1f}s] Parallel analysis complete. Got: {[k for k in parallel_results.keys()]}", file=sys.stderr, flush=True)
+        
+        print(f"[{_time.time()-_pipeline_start:.1f}s] Starting Personal Recommendation...", file=sys.stderr, flush=True)
         # Generate Personal "If I Were Trading" Recommendation
         # This MUST run last because it synthesizes ALL other analysis data
         if HAS_PERSONAL_REC:
@@ -670,9 +798,11 @@ def main():
                 output['personal_recommendation'] = rec_engine.generate_recommendation(output)
             except Exception as e:
                 output['personal_recommendation'] = {'error': str(e)}
+                print(f"Personal recommendation failed for {symbol}: {e}", file=sys.stderr)
         else:
             output['personal_recommendation'] = {'error': 'Personal Recommendation Engine not available'}
         
+        print(f"[{_time.time()-_pipeline_start:.1f}s] Starting validation...", file=sys.stderr, flush=True)
         # PRODUCTION VALIDATION - Ensure all data is valid before returning
         validator = ProductionValidator()
         
@@ -694,7 +824,13 @@ def main():
         
         # Restore original stdout for JSON output
         sys.stdout = _original_stdout
-        print(safe_json_dumps(output, indent=2))
+        json_output = safe_json_dumps(output, indent=2)
+        print(json_output)
+        sys.stdout.flush()
+        
+        # Force exit to kill any lingering daemon threads (network requests etc.)
+        # Without this, the process hangs waiting for daemon threads to finish
+        os._exit(0)
         
     except Exception as e:
         import traceback
@@ -704,7 +840,8 @@ def main():
             "error": str(e),
             "traceback": traceback.format_exc()
         }))
-        sys.exit(1)
+        sys.stdout.flush()
+        os._exit(1)
 
 if __name__ == "__main__":
     main()

@@ -29,7 +29,7 @@ EXA_API_KEY = os.getenv(
     '22f9b221-4031-477e-9175-750c5fa6985b'
 )
 EXA_BASE_URL = "https://api.exa.ai"
-EXA_TIMEOUT = 30  # seconds
+EXA_TIMEOUT = 10  # seconds per API call - keep low to avoid blocking pipeline
 
 
 class ExaClient:
@@ -176,7 +176,7 @@ class ExaClient:
         try:
             candlestick_search = self.search(
                 query=f"{symbol} stock candlestick chart pattern analysis technical",
-                num_results=10,
+                num_results=5,
                 search_type="auto",
                 start_published_date=start_date,
                 include_text=[symbol]
@@ -195,7 +195,7 @@ class ExaClient:
         try:
             tech_search = self.search(
                 query=f"{symbol} technical analysis chart patterns support resistance moving average",
-                num_results=10,
+                num_results=5,
                 search_type="auto",
                 start_published_date=start_date,
                 include_text=[symbol]
@@ -215,7 +215,7 @@ class ExaClient:
         try:
             news_search = self.search(
                 query=f"{symbol} stock price action breakout breakdown trend",
-                num_results=8,
+                num_results=5,
                 category="news",
                 start_published_date=start_date,
                 include_text=[symbol]
@@ -233,7 +233,7 @@ class ExaClient:
         try:
             pattern_search = self.search(
                 query=f"{symbol} head and shoulders double top bottom cup handle flag pennant wedge triangle",
-                num_results=8,
+                num_results=5,
                 search_type="auto",
                 start_published_date=start_date,
                 include_text=[symbol]
@@ -269,7 +269,7 @@ class ExaClient:
         try:
             sentiment_search = self.search(
                 query=f"{symbol} stock analyst rating upgrade downgrade price target outlook",
-                num_results=10,
+                num_results=5,
                 category="news",
                 start_published_date=start_date,
                 include_text=[symbol]
@@ -332,7 +332,7 @@ class ExaClient:
         try:
             insider_search = self.search(
                 query=f"{symbol} insider trading buy sell SEC filing",
-                num_results=8,
+                num_results=5,
                 start_published_date=start_date,
                 include_text=[symbol]
             )
@@ -351,7 +351,7 @@ class ExaClient:
         try:
             dark_search = self.search(
                 query=f"{symbol} dark pool unusual options activity block trade flow",
-                num_results=8,
+                num_results=5,
                 start_published_date=start_date,
                 include_text=[symbol]
             )
