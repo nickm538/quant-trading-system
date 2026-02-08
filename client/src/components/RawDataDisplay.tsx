@@ -1231,10 +1231,15 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
                   <div className="mt-4">
                     <h5 className="font-semibold mb-2">Cash Flow Metrics</h5>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                      <DataItem label="Free Cash Flow" value={`$${safeFixed(analysis.enhanced_fundamentals.cash_flow.free_cash_flow / 1e9)}B`} />
-                      <DataItem label="FCF Yield" value={`${safeFixed(analysis.enhanced_fundamentals.cash_flow.fcf_yield_pct)}%`} />
-                      <DataItem label="FCF Margin" value={`${safeFixed(analysis.enhanced_fundamentals.cash_flow.fcf_margin_pct)}%`} />
-                      <DataItem label="Op Cash Flow" value={`$${safeFixed(analysis.enhanced_fundamentals.cash_flow.operating_cash_flow / 1e9)}B`} />
+                      <DataItem label="Free Cash Flow" value={analysis.enhanced_fundamentals.cash_flow.fcf_formatted || 'N/A'} />
+                      <DataItem label="Op Cash Flow" value={analysis.enhanced_fundamentals.cash_flow.ocf_formatted || 'N/A'} />
+                      <DataItem label="EBITDA" value={analysis.enhanced_fundamentals.cash_flow.ebitda_formatted || 'N/A'} />
+                      <DataItem label="FCF/OCF Ratio" value={analysis.enhanced_fundamentals.cash_flow.fcf_to_ocf_ratio != null ? safeFixed(analysis.enhanced_fundamentals.cash_flow.fcf_to_ocf_ratio) : 'N/A'} />
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2">
+                      <DataItem label="FCF Yield" value={analysis.enhanced_fundamentals.cash_flow.fcf_yield_pct != null ? `${safeFixed(analysis.enhanced_fundamentals.cash_flow.fcf_yield_pct)}%` : 'N/A'} />
+                      <DataItem label="FCF Margin" value={analysis.enhanced_fundamentals.cash_flow.fcf_margin_pct != null ? `${safeFixed(analysis.enhanced_fundamentals.cash_flow.fcf_margin_pct)}%` : 'N/A'} />
+                      <DataItem label="FCF Positive" value={analysis.enhanced_fundamentals.cash_flow.fcf_positive ? '✅ Yes' : '❌ No'} />
                     </div>
                   </div>
                 )}
@@ -1392,14 +1397,25 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
                       <DataItem label="Shares Outstanding" value={analysis.enhanced_fundamentals.share_structure.shares_outstanding_formatted || 'N/A'} />
                       <DataItem label="Float Shares" value={analysis.enhanced_fundamentals.share_structure.float_shares_formatted || 'N/A'} />
                       <DataItem label="Free Float %" value={analysis.enhanced_fundamentals.share_structure.free_float_pct ? `${safeFixed(analysis.enhanced_fundamentals.share_structure.free_float_pct)}%` : 'N/A'} />
-                      <DataItem label="Insider Ownership" value={analysis.enhanced_fundamentals.share_structure.insider_ownership_pct ? `${safeFixed(analysis.enhanced_fundamentals.share_structure.insider_ownership_pct)}%` : 'N/A'} />
+                      <DataItem label="Insider Ownership" value={analysis.enhanced_fundamentals.share_structure.insider_ownership_pct ? `${safeFixed(analysis.enhanced_fundamentals.share_structure.insider_ownership_pct)}%` : null} />
                     </div>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2">
-                      <DataItem label="Institutional %" value={analysis.enhanced_fundamentals.share_structure.institutional_ownership_pct ? `${safeFixed(analysis.enhanced_fundamentals.share_structure.institutional_ownership_pct)}%` : 'N/A'} />
-                      <DataItem label="Shares Short" value={analysis.enhanced_fundamentals.share_structure.shares_short_formatted || 'N/A'} />
-                      <DataItem label="Short % of Float" value={analysis.enhanced_fundamentals.share_structure.short_pct_of_float ? `${safeFixed(analysis.enhanced_fundamentals.share_structure.short_pct_of_float)}%` : 'N/A'} />
-                      <DataItem label="Short Ratio (Days)" value={analysis.enhanced_fundamentals.share_structure.short_ratio_days ? safeFixed(analysis.enhanced_fundamentals.share_structure.short_ratio_days) : 'N/A'} />
+                      <DataItem label="Institutional %" value={analysis.enhanced_fundamentals.share_structure.institutional_ownership_pct ? `${safeFixed(analysis.enhanced_fundamentals.share_structure.institutional_ownership_pct)}%` : null} />
+                      <DataItem label="Shares Short" value={analysis.enhanced_fundamentals.share_structure.shares_short ? analysis.enhanced_fundamentals.share_structure.shares_short_formatted : null} />
+                      <DataItem label="Short % of Float" value={analysis.enhanced_fundamentals.share_structure.short_pct_of_float ? `${safeFixed(analysis.enhanced_fundamentals.share_structure.short_pct_of_float)}%` : null} />
+                      <DataItem label="Short Ratio (Days)" value={analysis.enhanced_fundamentals.share_structure.short_ratio_days ? safeFixed(analysis.enhanced_fundamentals.share_structure.short_ratio_days) : null} />
                     </div>
+                    {/* Data availability notes */}
+                    {analysis.enhanced_fundamentals.share_structure.data_availability && (
+                      <div className="mt-2 space-y-1">
+                        {!analysis.enhanced_fundamentals.share_structure.insider_ownership_pct && (
+                          <p className="text-xs text-muted-foreground italic">Insider & institutional ownership data requires premium API tier (Finnhub/Polygon). Not available with current API keys.</p>
+                        )}
+                        {!analysis.enhanced_fundamentals.share_structure.shares_short && (
+                          <p className="text-xs text-muted-foreground italic">Short interest (FINRA bi-monthly report) requires premium data. Daily short volume from FINRA RegSHO is available in the Dark Pool tab.</p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
                 
@@ -2295,11 +2311,13 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
   );
 }
 
-function DataItem({ label, value }: { label: string; value: string | number }) {
+function DataItem({ label, value }: { label: string; value: string | number | null | undefined }) {
   return (
     <div className="p-3 bg-muted/30 rounded-lg">
       <div className="text-xs text-muted-foreground mb-1">{label}</div>
-      <div className="text-sm font-semibold">{value}</div>
+      <div className={`text-sm font-semibold ${value === null || value === undefined ? 'text-muted-foreground/50 italic' : ''}`}>
+        {value !== null && value !== undefined ? value : '—'}
+      </div>
     </div>
   );
 }

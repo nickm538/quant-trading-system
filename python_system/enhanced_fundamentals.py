@@ -138,6 +138,18 @@ class EnhancedFundamentalsAnalyzer:
                         if existing is None or existing == 0 or existing == 'Unknown':
                             info[key] = val
             
+            # === OVERLAY: Fill gaps with Finnhub metrics ===
+            finnhub_metric = {}
+            if finnhub_data and isinstance(finnhub_data, dict):
+                finnhub_metric = finnhub_data.get('metric', {})
+                # Dividend data from Finnhub
+                if not info.get('dividendYield') and finnhub_metric.get('dividendYieldIndicatedAnnual'):
+                    info['dividendYield'] = finnhub_metric['dividendYieldIndicatedAnnual'] / 100  # Convert to decimal
+                if not info.get('dividendRate') and finnhub_metric.get('dividendIndicatedAnnual'):
+                    info['dividendRate'] = finnhub_metric['dividendIndicatedAnnual']
+                if not info.get('payoutRatio') and finnhub_metric.get('payoutRatioTTM'):
+                    info['payoutRatio'] = finnhub_metric['payoutRatioTTM'] / 100  # Convert to decimal
+            
             # Basic info
             current_price = info.get('currentPrice') or info.get('regularMarketPrice', 0)
             market_cap = info.get('marketCap', 0)
@@ -387,12 +399,19 @@ class EnhancedFundamentalsAnalyzer:
                     'float_shares': float_shares,
                     'float_shares_formatted': self._format_large_number(float_shares),
                     'free_float_pct': round(free_float_pct, 2),
-                    'shares_short': shares_short,
-                    'shares_short_formatted': self._format_large_number(shares_short),
+                    'shares_short': shares_short if shares_short else None,
+                    'shares_short_formatted': self._format_large_number(shares_short) if shares_short else 'Not available (requires premium data)',
                     'short_ratio_days': round(short_ratio, 2) if short_ratio else None,
-                    'short_pct_of_float': round(shares_short / float_shares * 100, 2) if float_shares > 0 else None,
+                    'short_pct_of_float': round(shares_short / float_shares * 100, 2) if (float_shares > 0 and shares_short > 0) else None,
                     'insider_ownership_pct': round(insider_ownership * 100, 2) if insider_ownership else None,
-                    'institutional_ownership_pct': round(institutional_ownership * 100, 2) if institutional_ownership else None
+                    'institutional_ownership_pct': round(institutional_ownership * 100, 2) if institutional_ownership else None,
+                    'data_availability': {
+                        'shares_outstanding_source': 'FinancialDatasets/FMP/SEC' if shares_outstanding > 0 else 'unavailable',
+                        'float_shares_source': 'FMP/SEC' if float_shares > 0 else 'unavailable',
+                        'insider_note': 'Insider ownership requires Finnhub/Polygon premium tier' if not insider_ownership else 'available',
+                        'institutional_note': 'Institutional ownership requires Finnhub/Polygon premium tier' if not institutional_ownership else 'available',
+                        'short_interest_note': 'Short interest (FINRA bi-monthly) requires premium data. See Dark Pool tab for daily short volume from FINRA RegSHO.' if not shares_short else 'available'
+                    }
                 },
                 
                 # Analysis & Scores
@@ -466,46 +485,52 @@ class EnhancedFundamentalsAnalyzer:
         
         # Extract from financial_metrics (snapshot or first item if list)
         metrics = fd_metrics if isinstance(fd_metrics, dict) else {}
-        if 'financial_metrics' in metrics:
+        # FD API returns metrics under 'snapshot' key (dict) or 'financial_metrics' key (list)
+        m = None
+        if 'snapshot' in metrics and isinstance(metrics['snapshot'], dict):
+            m = metrics['snapshot']
+        elif 'financial_metrics' in metrics:
             m = metrics['financial_metrics']
             if isinstance(m, list) and len(m) > 0:
                 m = m[0]
-            if isinstance(m, dict):
-                # FinancialDatasets.ai uses full field names (e.g., 'price_to_earnings_ratio')
-                # Map to yfinance-compatible short names
-                info['trailingPE'] = m.get('price_to_earnings_ratio') or m.get('pe_ratio')
-                info['forwardPE'] = m.get('forward_pe_ratio')
-                info['priceToBook'] = m.get('price_to_book_ratio')
-                info['priceToSalesTrailing12Months'] = m.get('price_to_sales_ratio')
-                info['returnOnEquity'] = m.get('return_on_equity') or m.get('roe')
-                info['returnOnAssets'] = m.get('return_on_assets') or m.get('roa')
-                info['profitMargins'] = m.get('net_margin')
-                info['operatingMargins'] = m.get('operating_margin')
-                info['grossMargins'] = m.get('gross_margin')
-                info['debtToEquity'] = m.get('debt_to_equity')
-                info['currentRatio'] = m.get('current_ratio')
-                info['earningsGrowth'] = m.get('earnings_growth')
-                info['revenueGrowth'] = m.get('revenue_growth')
-                info['enterpriseValue'] = m.get('enterprise_value')
-                info['ebitda'] = m.get('ebitda')
-                info['freeCashflow'] = m.get('free_cash_flow')
-                info['operatingCashflow'] = m.get('operating_cash_flow')
-                info['totalRevenue'] = m.get('revenue')
-                info['totalDebt'] = m.get('total_debt')
-                info['totalCash'] = m.get('total_cash')
-                info['pegRatio'] = m.get('peg_ratio')
-                # Also map additional useful fields from FD API
-                info['returnOnInvestedCapital'] = m.get('return_on_invested_capital')
-                info['freeCashFlowYield'] = m.get('free_cash_flow_yield')
-                info['revenueGrowthRate'] = m.get('revenue_growth')
-                info['earningsGrowthRate'] = m.get('earnings_growth')
-                info['freeCashFlowGrowth'] = m.get('free_cash_flow_growth')
-                info['operatingIncomeGrowth'] = m.get('operating_income_growth')
-                info['ebitdaGrowth'] = m.get('ebitda_growth')
-                info['bookValueGrowth'] = m.get('book_value_growth')
-                info['epsGrowth'] = m.get('earnings_per_share_growth')
-                info['interestCoverage'] = m.get('interest_coverage')
-                info['enterpriseToEbitda'] = m.get('enterprise_value_to_ebitda_ratio') or m.get('ev_to_ebitda')
+        if isinstance(m, dict):
+            # FinancialDatasets.ai uses full field names (e.g., 'price_to_earnings_ratio')
+            # Map to yfinance-compatible short names
+            info['trailingPE'] = m.get('price_to_earnings_ratio') or m.get('pe_ratio')
+            info['forwardPE'] = m.get('forward_pe_ratio')
+            info['priceToBook'] = m.get('price_to_book_ratio')
+            info['priceToSalesTrailing12Months'] = m.get('price_to_sales_ratio')
+            info['returnOnEquity'] = m.get('return_on_equity') or m.get('roe')
+            info['returnOnAssets'] = m.get('return_on_assets') or m.get('roa')
+            info['profitMargins'] = m.get('net_margin')
+            info['operatingMargins'] = m.get('operating_margin')
+            info['grossMargins'] = m.get('gross_margin')
+            info['debtToEquity'] = m.get('debt_to_equity')
+            info['currentRatio'] = m.get('current_ratio')
+            info['earningsGrowth'] = m.get('earnings_growth')
+            info['revenueGrowth'] = m.get('revenue_growth')
+            info['enterpriseValue'] = m.get('enterprise_value')
+            info['ebitda'] = m.get('ebitda')
+            info['freeCashflow'] = m.get('free_cash_flow')
+            info['operatingCashflow'] = m.get('operating_cash_flow')
+            info['totalRevenue'] = m.get('revenue')
+            info['totalDebt'] = m.get('total_debt')
+            info['totalCash'] = m.get('total_cash')
+            info['pegRatio'] = m.get('peg_ratio')
+            info['payoutRatio'] = m.get('payout_ratio')
+            info['quickRatio'] = m.get('quick_ratio')
+            # Also map additional useful fields from FD API
+            info['returnOnInvestedCapital'] = m.get('return_on_invested_capital')
+            info['freeCashFlowYield'] = m.get('free_cash_flow_yield')
+            info['revenueGrowthRate'] = m.get('revenue_growth')
+            info['earningsGrowthRate'] = m.get('earnings_growth')
+            info['freeCashFlowGrowth'] = m.get('free_cash_flow_growth')
+            info['operatingIncomeGrowth'] = m.get('operating_income_growth')
+            info['ebitdaGrowth'] = m.get('ebitda_growth')
+            info['bookValueGrowth'] = m.get('book_value_growth')
+            info['epsGrowth'] = m.get('earnings_per_share_growth')
+            info['interestCoverage'] = m.get('interest_coverage')
+            info['enterpriseToEbitda'] = m.get('enterprise_value_to_ebitda_ratio') or m.get('ev_to_ebitda')
         elif isinstance(fd_metrics, dict):
             # Direct metrics dict (fallback path)
             m = fd_metrics
