@@ -1092,7 +1092,7 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
                         <li><strong>FCF Yield</strong> = FCF / Market Cap. Think of it as the "interest rate" you earn on your investment. A 5% FCF yield means the company generates 5 cents of free cash for every dollar of market value.</li>
                         <li><strong>FCF Margin</strong> = FCF / Revenue. Shows how efficiently the company converts sales into cash. Software companies often have 25-40% FCF margins; retailers might have 3-5%.</li>
                         <li><strong>P/E Ratio</strong> = Price / Earnings per share. The most common valuation metric. Compare to industry peers, not across sectors (tech P/E of 30 is different from utility P/E of 30).</li>
-                        <li><strong>PEG Ratio</strong> = P/E / Growth Rate. Adjusts valuation for growth. PEG < 1 = potentially undervalued. PEG > 2 = potentially overvalued.</li>
+                        <li><strong>PEG Ratio</strong> = P/E / Growth Rate. Adjusts valuation for growth. PEG {'<'} 1 = potentially undervalued. PEG {'>'} 2 = potentially overvalued.</li>
                         <li><strong>EV/EBITDA</strong> = Enterprise Value / EBITDA. Better than P/E for comparing companies with different debt levels. Lower = cheaper.</li>
                       </ul>
                     </div>
@@ -1113,7 +1113,7 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
                       <ul className="space-y-1 ml-3 list-disc">
                         <li>Always compare valuation metrics to <strong>industry peers</strong>, not the broad market. A P/E of 40 is cheap for a high-growth SaaS company but expensive for a bank.</li>
                         <li>Watch for <strong>declining FCF margins</strong> over multiple quarters — this often precedes earnings misses.</li>
-                        <li>High insider ownership (>10%) often aligns management incentives with shareholders.</li>
+                        <li>High insider ownership ({'>'}10%) often aligns management incentives with shareholders.</li>
                         <li>Short interest above 10% of float can create squeeze potential but also signals bearish institutional sentiment.</li>
                         <li>Revenue CAGR vs. FCF CAGR divergence: If revenue grows faster than FCF, the company may be sacrificing profitability for growth.</li>
                       </ul>
