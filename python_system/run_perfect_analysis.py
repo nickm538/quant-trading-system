@@ -100,6 +100,18 @@ except ImportError as e:
     HAS_TAAPI = False
     print(f"Warning: TAAPI.io integration not available: {e}", file=sys.stderr)
 try:
+    from polygon_data_provider import PolygonDataProvider
+    HAS_POLYGON_PROVIDER = True
+except ImportError as e:
+    HAS_POLYGON_PROVIDER = False
+    print(f"Warning: PolygonDataProvider not available: {e}", file=sys.stderr)
+try:
+    from taapi_cross_validator import TAAPICrossValidator
+    HAS_CROSS_VALIDATOR = True
+except ImportError as e:
+    HAS_CROSS_VALIDATOR = False
+    print(f"Warning: TAAPI Cross-Validator not available: {e}", file=sys.stderr)
+try:
     from financial_datasets_client import FinancialDatasetsClient
     HAS_FINANCIAL_DATASETS = True
 except ImportError as e:
@@ -168,6 +180,9 @@ def generate_monte_carlo_forecast(current_price, volatility, forecast_days=30, n
     }
 
 def main():
+    import time as _time
+    _pipeline_start = _time.time()
+    
     if len(sys.argv) < 2:
         print(json.dumps({"error": "Usage: run_perfect_analysis.py <symbol> [bankroll]"}))
         sys.exit(1)
@@ -176,6 +191,26 @@ def main():
     bankroll = float(sys.argv[2]) if len(sys.argv) > 2 else 1000.0  # Default $1000
     
     try:
+        # ====================================================================
+        # INITIALIZE SHARED DATA PROVIDER (Polygon.io)
+        # Fetches price data ONCE and distributes to all modules
+        # Eliminates redundant yfinance calls that cause hangs
+        # ====================================================================
+        polygon_provider = None
+        if HAS_POLYGON_PROVIDER:
+            try:
+                polygon_provider = PolygonDataProvider(symbol)
+                # Pre-fetch daily data to warm the cache
+                _prefetch_df = polygon_provider.get_daily_ohlcv(days=400)
+                if _prefetch_df is not None and len(_prefetch_df) > 50:
+                    print(f"PolygonDataProvider initialized: {len(_prefetch_df)} daily bars for {symbol}", file=sys.stderr, flush=True)
+                else:
+                    print(f"Warning: PolygonDataProvider returned insufficient data, falling back", file=sys.stderr, flush=True)
+                    polygon_provider = None
+            except Exception as pp_e:
+                print(f"Warning: PolygonDataProvider init failed: {pp_e}, falling back to yfinance", file=sys.stderr, flush=True)
+                polygon_provider = None
+        
         analyzer = PerfectProductionAnalyzer()
         result = analyzer.analyze_stock(symbol)
         
@@ -526,23 +561,31 @@ def main():
         }
         
         # Run Advanced Technicals (R2, Pivot, Fibonacci)
+        # Pass polygon_provider to avoid redundant yfinance calls
         try:
             adv_tech = AdvancedTechnicals()
-            output['advanced_technicals'] = adv_tech.analyze(symbol)
+            if polygon_provider:
+                polygon_df = polygon_provider.get_daily_ohlcv()
+                output['advanced_technicals'] = adv_tech.analyze(symbol, pre_fetched_df=polygon_df)
+            else:
+                output['advanced_technicals'] = adv_tech.analyze(symbol)
         except Exception as e:
             output['advanced_technicals'] = {'error': str(e)}
         
         # Run Candlestick Pattern Detection with Vision AI Enhancement
+        # Pass polygon_provider to avoid redundant yfinance calls
         try:
             candle_detector = CandlestickPatternDetector()
-            candlestick_result = candle_detector.analyze(symbol)
+            if polygon_provider:
+                polygon_df = polygon_provider.get_daily_ohlcv()
+                candlestick_result = candle_detector.analyze(symbol, pre_fetched_df=polygon_df)
+            else:
+                candlestick_result = candle_detector.analyze(symbol)
             
             # Enhance with Vision AI chart analysis if available
             # Use multiprocessing with timeout to prevent blocking the entire pipeline
             # Note: ThreadPoolExecutor's context manager blocks on exit waiting for threads,
             # so we use a threading.Thread with daemon=True instead
-            import time as _time
-            _pipeline_start = _time.time()
             print(f"[{_time.time()-_pipeline_start:.1f}s] Starting Vision AI...", file=sys.stderr, flush=True)
             if HAS_VISION:
                 try:
@@ -591,19 +634,29 @@ def main():
             # Add Golden/Death Cross analysis using Polygon daily data
             # (avoids calling yfinance which hangs in containerized environments)
             try:
-                # Fetch 1-year daily data from Polygon for SMA-50/200 calculation
-                from polygon import RESTClient as PolygonClient
-                from datetime import datetime, timedelta
-                poly_key = os.environ.get('POLYGON_API_KEY', '')
-                if poly_key:
-                    poly_client = PolygonClient(api_key=poly_key)
-                    end_date = datetime.now().strftime('%Y-%m-%d')
-                    start_date = (datetime.now() - timedelta(days=400)).strftime('%Y-%m-%d')  # 400 days to ensure 200+ trading days
-                    aggs = list(poly_client.list_aggs(symbol, 1, 'day', start_date, end_date, limit=500))
-                    close_series = pd.Series([a.close for a in aggs])
-                    print(f"  Golden Cross: Got {len(close_series)} daily bars from Polygon", file=sys.stderr, flush=True)
-                else:
-                    close_series = pd.Series([])
+                # Use polygon_provider's cached daily data if available, otherwise fetch fresh
+                close_series = pd.Series([])
+                if polygon_provider:
+                    gdc_df = polygon_provider.get_daily_ohlcv(days=400)
+                    if gdc_df is not None and len(gdc_df) > 0:
+                        close_series = gdc_df['Close'].reset_index(drop=True)
+                        print(f"  Golden Cross: Using {len(close_series)} cached daily bars from PolygonDataProvider", file=sys.stderr, flush=True)
+                
+                if len(close_series) < 200:
+                    # Fallback: fetch directly from Polygon
+                    try:
+                        from polygon import RESTClient as PolygonClient
+                        from datetime import datetime, timedelta
+                        poly_key = os.environ.get('POLYGON_API_KEY', '')
+                        if poly_key:
+                            poly_client = PolygonClient(api_key=poly_key)
+                            end_date = datetime.now().strftime('%Y-%m-%d')
+                            start_date = (datetime.now() - timedelta(days=400)).strftime('%Y-%m-%d')
+                            aggs = list(poly_client.list_aggs(symbol, 1, 'day', start_date, end_date, limit=500))
+                            close_series = pd.Series([a.close for a in aggs])
+                            print(f"  Golden Cross: Got {len(close_series)} daily bars from Polygon API", file=sys.stderr, flush=True)
+                    except Exception as poly_e:
+                        print(f"  Golden Cross: Polygon fallback failed: {poly_e}", file=sys.stderr, flush=True)
                 if len(close_series) >= 200:
                     sma_50 = close_series.rolling(window=50).mean()
                     sma_200 = close_series.rolling(window=200).mean()
@@ -694,8 +747,12 @@ def main():
         threads = []
         
         # 1. Enhanced Fundamentals (slowest: ~54s)
+        # Now uses FinancialDatasets.ai as primary, yfinance as fallback
         def _run_enhanced_fund():
             ef = EnhancedFundamentalsAnalyzer()
+            if polygon_provider:
+                ef_df = polygon_provider.get_daily_ohlcv()
+                return ef.analyze(symbol, pre_fetched_df=ef_df)
             return ef.analyze(symbol)
         t = threading.Thread(target=_safe_run, args=('enhanced_fundamentals', _run_enhanced_fund), daemon=True)
         threads.append(t)
@@ -788,6 +845,78 @@ def main():
                 output[key] = {'error': f'{key} timed out ({PARALLEL_TIMEOUT}s cap)'}
         
         print(f"[{_time.time()-_pipeline_start:.1f}s] Parallel analysis complete. Got: {[k for k in parallel_results.keys()]}", file=sys.stderr, flush=True)
+        
+        # ====================================================================
+        # TAAPI CROSS-VALIDATION CONFIDENCE LAYER
+        # Uses TAAPI.io as independent second opinion to validate local indicators
+        # Adjusts confidence multiplier based on agreement/disagreement
+        # ====================================================================
+        print(f"[{_time.time()-_pipeline_start:.1f}s] Running TAAPI cross-validation...", file=sys.stderr, flush=True)
+        if HAS_CROSS_VALIDATOR and output.get('taapi_indicators') and not output['taapi_indicators'].get('error'):
+            try:
+                cross_validator = TAAPICrossValidator()
+                
+                # Build local technicals dict from our calculated values
+                local_technicals = {
+                    'rsi': rsi,
+                    'macd': technical.get('macd', 0),
+                    'macd_signal': technical.get('macd_signal', 0),
+                    'adx': real_adx,
+                    'current_price': current_price,
+                    'sma_20': technical.get('sma_20', 0),
+                    'sma_50': technical.get('sma_50', 0),
+                    'signal': result['recommendation'],
+                }
+                
+                # Add Bollinger and Stochastic from advanced_technicals if available
+                adv = output.get('advanced_technicals', {})
+                if isinstance(adv, dict) and not adv.get('error'):
+                    bb = adv.get('bollinger_bands', {})
+                    if isinstance(bb, dict):
+                        local_technicals['bb_pct_b'] = bb.get('percent_b') or bb.get('pct_b')
+                    stoch = adv.get('stochastic', {})
+                    if isinstance(stoch, dict):
+                        local_technicals['stoch_k'] = stoch.get('k') or stoch.get('slowk')
+                
+                cross_result = cross_validator.cross_validate(symbol, local_technicals)
+                output['taapi_cross_validation'] = cross_result
+                
+                # Apply confidence multiplier to the overall confidence score
+                if cross_result.get('available') and cross_result.get('confidence_multiplier', 1.0) != 1.0:
+                    original_confidence = output['confidence']
+                    adjusted_confidence = max(0, min(100, original_confidence * cross_result['confidence_multiplier']))
+                    output['confidence'] = round(adjusted_confidence, 1)
+                    output['confidence_adjustment'] = {
+                        'original': original_confidence,
+                        'adjusted': round(adjusted_confidence, 1),
+                        'multiplier': cross_result['confidence_multiplier'],
+                        'reason': cross_result['summary']
+                    }
+                    print(f"  Cross-validation: confidence {original_confidence} -> {adjusted_confidence:.1f} (x{cross_result['confidence_multiplier']:.3f})", file=sys.stderr, flush=True)
+            except Exception as cv_e:
+                output['taapi_cross_validation'] = {'error': str(cv_e)}
+                print(f"  Cross-validation failed: {cv_e}", file=sys.stderr, flush=True)
+        else:
+            output['taapi_cross_validation'] = {'available': False, 'summary': 'TAAPI data not available for cross-validation'}
+        
+        # ====================================================================
+        # DATA SOURCE METADATA
+        # Track which data sources were used for transparency
+        # ====================================================================
+        output['data_sources'] = {
+            'price_data': 'Polygon.io' if polygon_provider else 'yfinance/Manus API Hub',
+            'technical_indicators': {
+                'primary': 'Local (TA-Lib)',
+                'cross_validation': 'TAAPI.io Pro' if output.get('taapi_cross_validation', {}).get('available') else 'Not available'
+            },
+            'fundamentals': {
+                'primary': 'FinancialDatasets.ai Pro' if output.get('financialdatasets') and not output['financialdatasets'].get('error') else 'yfinance/FMP/AlphaVantage',
+                'enhanced': 'FMP + AlphaVantage + Finnhub'
+            },
+            'real_time_intelligence': 'EXA AI' if output.get('exa_intelligence') and not output['exa_intelligence'].get('error') else 'Not available',
+            'dark_pools': 'StockGrid.io' if output.get('stockgrid_analysis') and not output['stockgrid_analysis'].get('error') else 'Not available',
+            'vision_chart': 'OpenRouter (Gemini Flash / Claude)' if output.get('candlestick_patterns', {}).get('vision_ai_analysis') else 'Not available'
+        }
         
         print(f"[{_time.time()-_pipeline_start:.1f}s] Starting Personal Recommendation...", file=sys.stderr, flush=True)
         # Generate Personal "If I Were Trading" Recommendation

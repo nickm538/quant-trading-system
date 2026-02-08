@@ -25,6 +25,18 @@ import requests
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 try:
+    from polygon_data_provider import PolygonDataProvider
+    HAS_POLYGON_PROVIDER = True
+except ImportError:
+    HAS_POLYGON_PROVIDER = False
+
+try:
+    from financial_datasets_client import FinancialDatasetsClient
+    HAS_FD_CLIENT = True
+except ImportError:
+    HAS_FD_CLIENT = False
+
+try:
     import yfinance as yf
 except ImportError:
     yf = None
@@ -57,34 +69,74 @@ class EnhancedFundamentalsAnalyzer:
             'Default': 20.0
         }
     
-    def analyze(self, symbol: str) -> Dict[str, Any]:
+    def analyze(self, symbol: str, pre_fetched_df=None) -> Dict[str, Any]:
         """
         Perform comprehensive fundamental analysis with cash flow focus.
         
         Args:
             symbol: Stock ticker symbol
+            pre_fetched_df: Optional pandas DataFrame with OHLCV data (from PolygonDataProvider).
             
         Returns:
             Dictionary containing all fundamental metrics and analysis
         """
         try:
-            # Fetch data from multiple sources
-            yf_data = self._fetch_yfinance_data(symbol)
+            # === PRIMARY SOURCE: FinancialDatasets.ai ===
+            fd_data = None
+            fd_metrics = None
+            fd_health = None
+            if HAS_FD_CLIENT:
+                try:
+                    fd_client = FinancialDatasetsClient()
+                    fd_data = fd_client.get_comprehensive_stock_data(symbol)
+                    fd_metrics = fd_client.get_financial_metrics_snapshot(symbol)
+                    fd_health = fd_client.get_financial_health(symbol)
+                    print(f"  \u2713 EnhancedFundamentals: FinancialDatasets.ai loaded", file=sys.stderr, flush=True)
+                except Exception as e:
+                    print(f"  EnhancedFundamentals: FinancialDatasets.ai failed: {e}", file=sys.stderr, flush=True)
+            
+            # === SECONDARY SOURCE: yfinance (skipped if FinancialDatasets sufficient) ===
+            yf_data = None
+            if fd_data and fd_metrics:
+                # FinancialDatasets succeeded - build yf-compatible data without calling yfinance
+                yf_data = self._build_yf_data_from_financialdatasets(fd_data, fd_metrics, fd_health, symbol)
+                print(f"  \u2713 EnhancedFundamentals: Skipping yfinance (FinancialDatasets sufficient)", file=sys.stderr, flush=True)
+            else:
+                # FinancialDatasets failed - fall back to yfinance
+                print(f"  EnhancedFundamentals: Falling back to yfinance...", file=sys.stderr, flush=True)
+                yf_data = self._fetch_yfinance_data(symbol)
+            
+            # === TERTIARY SOURCES: FMP, Finnhub, AlphaVantage ===
             fmp_data = self._fetch_fmp_data(symbol)
             finnhub_data = self._fetch_finnhub_data(symbol)
             fmp_key_metrics = self._fetch_fmp_key_metrics(symbol)
             fmp_ratios = self._fetch_fmp_ratios_ttm(symbol)
             av_data = self._fetch_alphavantage_overview(symbol)
             
-            if not yf_data:
+            # Build a unified info dict - FinancialDatasets first, then yfinance fills gaps
+            if not yf_data and not fd_data:
                 return {
                     'success': False,
                     'error': f'Unable to fetch data for {symbol}',
                     'symbol': symbol
                 }
             
+            # If yfinance failed but FinancialDatasets succeeded, build synthetic yf_data
+            if not yf_data and fd_data:
+                yf_data = self._build_yf_data_from_financialdatasets(fd_data, fd_metrics, fd_health, symbol)
+            
             # Extract key metrics
             info = yf_data.get('info', {})
+            
+            # === OVERLAY: Fill gaps in yfinance data with FinancialDatasets.ai ===
+            if yf_data and fd_data and yf_data.get('_source') != 'FinancialDatasets.ai':
+                fd_overlay = self._build_yf_data_from_financialdatasets(fd_data, fd_metrics, fd_health, symbol)
+                fd_info = fd_overlay.get('info', {})
+                for key, val in fd_info.items():
+                    if val is not None and val != 0 and val != 'Unknown':
+                        existing = info.get(key)
+                        if existing is None or existing == 0 or existing == 'Unknown':
+                            info[key] = val
             
             # Basic info
             current_price = info.get('currentPrice') or info.get('regularMarketPrice', 0)
@@ -367,6 +419,122 @@ class EnhancedFundamentalsAnalyzer:
             }
         except Exception:
             return None
+    
+    def _build_yf_data_from_financialdatasets(self, fd_data: Dict, fd_metrics: Dict, fd_health: Dict, symbol: str) -> Dict:
+        """
+        Build a yfinance-compatible data dict from FinancialDatasets.ai data.
+        This allows the rest of the analysis pipeline to work even when yfinance is down.
+        """
+        info = {}
+        
+        # Extract from company_facts
+        facts = fd_data.get('company_facts', {})
+        if isinstance(facts, dict):
+            info['longName'] = facts.get('name', symbol)
+            info['sector'] = facts.get('sector', 'Unknown')
+            info['industry'] = facts.get('industry', 'Unknown')
+            info['marketCap'] = facts.get('market_cap', 0)
+            info['sharesOutstanding'] = facts.get('weighted_average_shares', 0)
+        
+        # Extract from price_snapshot
+        price = fd_data.get('price_snapshot', {})
+        if isinstance(price, dict):
+            info['currentPrice'] = price.get('price', 0)
+            info['regularMarketPrice'] = price.get('price', 0)
+            info['regularMarketVolume'] = price.get('volume', 0)
+        
+        # Extract from financial_metrics (snapshot or first item if list)
+        metrics = fd_metrics if isinstance(fd_metrics, dict) else {}
+        if 'financial_metrics' in metrics:
+            m = metrics['financial_metrics']
+            if isinstance(m, list) and len(m) > 0:
+                m = m[0]
+            if isinstance(m, dict):
+                info['trailingPE'] = m.get('pe_ratio')
+                info['forwardPE'] = m.get('forward_pe_ratio')
+                info['priceToBook'] = m.get('price_to_book_ratio')
+                info['priceToSalesTrailing12Months'] = m.get('price_to_sales_ratio')
+                info['returnOnEquity'] = m.get('roe')
+                info['returnOnAssets'] = m.get('roa')
+                info['profitMargins'] = m.get('net_margin')
+                info['operatingMargins'] = m.get('operating_margin')
+                info['grossMargins'] = m.get('gross_margin')
+                info['debtToEquity'] = m.get('debt_to_equity')
+                info['currentRatio'] = m.get('current_ratio')
+                info['earningsGrowth'] = m.get('earnings_growth')
+                info['revenueGrowth'] = m.get('revenue_growth')
+                info['enterpriseValue'] = m.get('enterprise_value')
+                info['ebitda'] = m.get('ebitda')
+                info['freeCashflow'] = m.get('free_cash_flow')
+                info['operatingCashflow'] = m.get('operating_cash_flow')
+                info['totalRevenue'] = m.get('revenue')
+                info['totalDebt'] = m.get('total_debt')
+                info['totalCash'] = m.get('total_cash')
+                info['pegRatio'] = m.get('peg_ratio')
+        elif isinstance(fd_metrics, dict):
+            # Direct metrics dict
+            m = fd_metrics
+            info['trailingPE'] = m.get('pe_ratio')
+            info['returnOnEquity'] = m.get('roe')
+            info['returnOnAssets'] = m.get('roa')
+            info['profitMargins'] = m.get('net_margin')
+            info['operatingMargins'] = m.get('operating_margin')
+            info['grossMargins'] = m.get('gross_margin')
+            info['debtToEquity'] = m.get('debt_to_equity')
+            info['currentRatio'] = m.get('current_ratio')
+            info['freeCashflow'] = m.get('free_cash_flow')
+            info['operatingCashflow'] = m.get('operating_cash_flow')
+            info['ebitda'] = m.get('ebitda')
+            info['totalRevenue'] = m.get('revenue')
+        
+        # Extract from income_statement
+        income = fd_data.get('income_statement', {})
+        if isinstance(income, dict) and 'income_statements' in income:
+            stmts = income['income_statements']
+            if isinstance(stmts, list) and len(stmts) > 0:
+                stmt = stmts[0]
+                if not info.get('totalRevenue'):
+                    info['totalRevenue'] = stmt.get('revenue', 0)
+                if not info.get('ebitda'):
+                    info['ebitda'] = stmt.get('ebitda', 0)
+        
+        # Extract from cash_flow statement
+        cf = fd_data.get('cash_flow', {})
+        if isinstance(cf, dict) and 'cash_flow_statements' in cf:
+            stmts = cf['cash_flow_statements']
+            if isinstance(stmts, list) and len(stmts) > 0:
+                stmt = stmts[0]
+                if not info.get('freeCashflow'):
+                    info['freeCashflow'] = stmt.get('free_cash_flow', 0)
+                if not info.get('operatingCashflow'):
+                    info['operatingCashflow'] = stmt.get('operating_cash_flow', 0)
+        
+        # Extract from balance_sheet
+        bs = fd_data.get('balance_sheet', {})
+        if isinstance(bs, dict) and 'balance_sheets' in bs:
+            sheets = bs['balance_sheets']
+            if isinstance(sheets, list) and len(sheets) > 0:
+                sheet = sheets[0]
+                if not info.get('totalDebt'):
+                    info['totalDebt'] = sheet.get('total_debt', 0)
+                if not info.get('totalCash'):
+                    info['totalCash'] = sheet.get('cash_and_equivalents', 0)
+        
+        # Clean up None values to 0 for numeric fields
+        numeric_fields = ['marketCap', 'currentPrice', 'totalRevenue', 'ebitda',
+                         'freeCashflow', 'operatingCashflow', 'totalDebt', 'totalCash',
+                         'sharesOutstanding', 'enterpriseValue']
+        for f in numeric_fields:
+            if info.get(f) is None:
+                info[f] = 0
+        
+        return {
+            'info': info,
+            'financials': {},
+            'balance_sheet': {},
+            'cashflow': {},
+            '_source': 'FinancialDatasets.ai'
+        }
     
     def _fetch_fmp_data(self, symbol: str) -> Optional[Dict]:
         """Fetch data from Financial Modeling Prep."""

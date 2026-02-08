@@ -22,6 +22,12 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 try:
+    from polygon_data_provider import PolygonDataProvider
+    HAS_POLYGON_PROVIDER = True
+except ImportError:
+    HAS_POLYGON_PROVIDER = False
+
+try:
     import yfinance as yf
 except ImportError:
     yf = None
@@ -43,19 +49,23 @@ class AdvancedTechnicals:
     def __init__(self):
         self.finnhub_key = os.environ.get('KEY') or os.environ.get('FINNHUB_API_KEY') or 'd55b3ohr01qljfdeghm0d55b3ohr01qljfdeghm1'
     
-    def analyze(self, symbol: str) -> Dict[str, Any]:
+    def analyze(self, symbol: str, pre_fetched_df=None) -> Dict[str, Any]:
         """
         Perform comprehensive technical analysis with R2 scoring.
         
         Args:
             symbol: Stock ticker symbol
+            pre_fetched_df: Optional pandas DataFrame with OHLCV data (from PolygonDataProvider).
             
         Returns:
             Dictionary containing all technical analysis results
         """
         try:
-            # Fetch live data
-            data = self._fetch_ohlcv_data(symbol)
+            # Use pre-fetched data if available, otherwise fetch
+            if pre_fetched_df is not None and len(pre_fetched_df) > 20:
+                data = self._dataframe_to_dict(pre_fetched_df)
+            else:
+                data = self._fetch_ohlcv_data(symbol)
             if not data or len(data['close']) < 20:
                 return {
                     'success': False,
@@ -116,8 +126,36 @@ class AdvancedTechnicals:
                 'symbol': symbol
             }
     
+    def _dataframe_to_dict(self, df) -> Optional[Dict]:
+        """Convert a pandas DataFrame to our internal dict format."""
+        try:
+            if df is None or len(df) == 0:
+                return None
+            return {
+                'open': df['Open'].values.tolist(),
+                'high': df['High'].values.tolist(),
+                'low': df['Low'].values.tolist(),
+                'close': df['Close'].values.tolist(),
+                'volume': df['Volume'].values.tolist(),
+                'dates': [d.strftime('%Y-%m-%d') if hasattr(d, 'strftime') else str(d) for d in df.index]
+            }
+        except Exception:
+            return None
+    
     def _fetch_ohlcv_data(self, symbol: str, period: str = '3mo') -> Optional[Dict]:
-        """Fetch OHLCV data from Yahoo Finance."""
+        """Fetch OHLCV data. Primary: PolygonDataProvider. Fallback: yfinance."""
+        # Try PolygonDataProvider first
+        if HAS_POLYGON_PROVIDER:
+            try:
+                provider = PolygonDataProvider.get_instance(symbol)
+                df = provider.get_daily_ohlcv(days=90)
+                if df is not None and len(df) > 20:
+                    print(f"  \u2713 AdvancedTechnicals: Using Polygon data ({len(df)} bars)", file=sys.stderr, flush=True)
+                    return self._dataframe_to_dict(df)
+            except Exception as e:
+                print(f"  AdvancedTechnicals: Polygon failed: {e}", file=sys.stderr, flush=True)
+        
+        # Fallback to yfinance
         if yf is None:
             return None
             
@@ -128,14 +166,7 @@ class AdvancedTechnicals:
             if df.empty:
                 return None
             
-            return {
-                'open': df['Open'].values.tolist(),
-                'high': df['High'].values.tolist(),
-                'low': df['Low'].values.tolist(),
-                'close': df['Close'].values.tolist(),
-                'volume': df['Volume'].values.tolist(),
-                'dates': [d.strftime('%Y-%m-%d') for d in df.index]
-            }
+            return self._dataframe_to_dict(df)
         except Exception:
             return None
     
