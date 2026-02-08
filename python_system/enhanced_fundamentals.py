@@ -214,10 +214,27 @@ class EnhancedFundamentalsAnalyzer:
             insider_ownership = info.get('heldPercentInsiders', 0) or 0
             institutional_ownership = info.get('heldPercentInstitutions', 0) or 0
             
+            # FMP shares-float fallback (SEC-sourced, very reliable)
+            fmp_float_data = None
+            if shares_outstanding == 0 or float_shares == 0:
+                try:
+                    fmp_float_data = self._fetch_fmp_shares_float(symbol)
+                    if fmp_float_data:
+                        if shares_outstanding == 0 and fmp_float_data.get('outstandingShares'):
+                            shares_outstanding = fmp_float_data['outstandingShares']
+                        if float_shares == 0 and fmp_float_data.get('floatShares'):
+                            float_shares = fmp_float_data['floatShares']
+                except Exception:
+                    pass
+            
             # Calculate derived metrics
             
-            # Free Float percentage
-            free_float_pct = (float_shares / shares_outstanding * 100) if shares_outstanding > 0 else 0
+            # Free Float percentage - use FMP freeFloat if available, else calculate
+            free_float_pct = 0
+            if float_shares > 0 and shares_outstanding > 0:
+                free_float_pct = (float_shares / shares_outstanding * 100)
+            elif fmp_float_data and fmp_float_data.get('freeFloat'):
+                free_float_pct = fmp_float_data['freeFloat']
             
             # FCF Yield with FMP fallback
             fcf_yield = (free_cash_flow / market_cap * 100) if market_cap > 0 else 0
@@ -267,6 +284,9 @@ class EnhancedFundamentalsAnalyzer:
                 current_ratio, debt_to_equity, free_cash_flow,
                 earnings_growth, revenue_growth
             )
+            
+            # Altman Z-Score calculation
+            altman_z = self._calculate_altman_z_score(info, market_cap, total_revenue, ebitda)
             
             # Liquidity Analysis
             liquidity_analysis = self._analyze_liquidity(
@@ -379,6 +399,7 @@ class EnhancedFundamentalsAnalyzer:
                 'garp_analysis': garp_analysis,
                 'sector_comparison': sector_comparison,
                 'quality_score': quality_score,
+                'altman_z_score': altman_z,
                 'liquidity_analysis': liquidity_analysis,
                 'value_assessment': value_assessment,
                 
@@ -525,7 +546,12 @@ class EnhancedFundamentalsAnalyzer:
                 if not info.get('freeCashflow'):
                     info['freeCashflow'] = stmt.get('free_cash_flow', 0)
                 if not info.get('operatingCashflow'):
-                    info['operatingCashflow'] = stmt.get('operating_cash_flow', 0)
+                    info['operatingCashflow'] = stmt.get('net_cash_flow_from_operations') or stmt.get('operating_cash_flow', 0)
+                # Also extract capex and other useful cash flow items
+                if not info.get('capitalExpenditure'):
+                    info['capitalExpenditure'] = stmt.get('capital_expenditure', 0)
+                if not info.get('shareBasedCompensation'):
+                    info['shareBasedCompensation'] = stmt.get('share_based_compensation', 0)
         
         # Extract from balance_sheet
         bs = fd_data.get('balance_sheet', {})
@@ -537,6 +563,33 @@ class EnhancedFundamentalsAnalyzer:
                     info['totalDebt'] = sheet.get('total_debt', 0)
                 if not info.get('totalCash'):
                     info['totalCash'] = sheet.get('cash_and_equivalents', 0)
+                # Extract shares outstanding from balance sheet
+                if not info.get('sharesOutstanding') or info.get('sharesOutstanding', 0) == 0:
+                    info['sharesOutstanding'] = sheet.get('outstanding_shares', 0)
+                # Extract additional balance sheet items for Altman Z-Score and other calculations
+                if not info.get('totalAssets') or info.get('totalAssets', 0) == 0:
+                    info['totalAssets'] = sheet.get('total_assets', 0)
+                if not info.get('currentAssets') or info.get('currentAssets', 0) == 0:
+                    info['currentAssets'] = sheet.get('current_assets', 0)
+                if not info.get('currentLiabilities') or info.get('currentLiabilities', 0) == 0:
+                    info['currentLiabilities'] = sheet.get('current_liabilities', 0)
+                if not info.get('retainedEarnings'):
+                    info['retainedEarnings'] = sheet.get('retained_earnings', 0)
+                if not info.get('shareholdersEquity') or info.get('shareholdersEquity', 0) == 0:
+                    info['shareholdersEquity'] = sheet.get('shareholders_equity', 0)
+                if not info.get('totalLiabilities') or info.get('totalLiabilities', 0) == 0:
+                    info['totalLiabilities'] = sheet.get('total_liabilities', 0)
+                if not info.get('currentRatio') or info.get('currentRatio', 0) == 0:
+                    current_assets = sheet.get('current_assets', 0)
+                    current_liabilities = sheet.get('current_liabilities', 0)
+                    if current_liabilities and current_liabilities > 0:
+                        info['currentRatio'] = current_assets / current_liabilities
+                if not info.get('quickRatio') or info.get('quickRatio', 0) == 0:
+                    current_assets = sheet.get('current_assets', 0)
+                    inventory = sheet.get('inventory', 0)
+                    current_liabilities = sheet.get('current_liabilities', 0)
+                    if current_liabilities and current_liabilities > 0:
+                        info['quickRatio'] = (current_assets - inventory) / current_liabilities
         
         # Clean up None values to 0 for numeric fields
         numeric_fields = ['marketCap', 'currentPrice', 'totalRevenue', 'ebitda',
@@ -597,6 +650,19 @@ class EnhancedFundamentalsAnalyzer:
             if response.status_code == 200:
                 data = response.json()
                 return data[0] if data else None
+        except Exception:
+            pass
+        return None
+    
+    def _fetch_fmp_shares_float(self, symbol: str) -> Optional[Dict]:
+        """Fetch shares float data from FMP stable API (SEC-sourced)."""
+        try:
+            url = f'https://financialmodelingprep.com/stable/shares-float?symbol={symbol}&apikey={self.fmp_key}'
+            response = requests.get(url, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                if isinstance(data, list) and len(data) > 0:
+                    return data[0]
         except Exception:
             pass
         return None
@@ -849,6 +915,65 @@ class EnhancedFundamentalsAnalyzer:
             'interpretation': interpretation,
             'factors': factors
         }
+    
+    def _calculate_altman_z_score(self, info: Dict, market_cap: float, revenue: float, ebitda: float) -> Dict:
+        """Calculate the Altman Z-Score for bankruptcy risk assessment.
+        
+        Z-Score = 1.2*X1 + 1.4*X2 + 3.3*X3 + 0.6*X4 + 1.0*X5
+        X1 = Working Capital / Total Assets
+        X2 = Retained Earnings / Total Assets
+        X3 = EBIT / Total Assets (using EBITDA as proxy)
+        X4 = Market Cap / Total Liabilities
+        X5 = Revenue / Total Assets
+        
+        Z > 2.99: Safe zone
+        1.81 < Z < 2.99: Grey zone
+        Z < 1.81: Distress zone
+        """
+        try:
+            total_assets = info.get('totalAssets', 0) or 0
+            current_assets = info.get('currentAssets', 0) or 0
+            current_liabilities = info.get('currentLiabilities', 0) or 0
+            retained_earnings = info.get('retainedEarnings', 0) or 0
+            total_liabilities = info.get('totalLiabilities', 0) or 0
+            
+            if total_assets <= 0:
+                return {'score': None, 'rating': 'N/A', 'interpretation': 'Insufficient data for Z-Score calculation'}
+            
+            working_capital = current_assets - current_liabilities
+            
+            x1 = working_capital / total_assets
+            x2 = retained_earnings / total_assets
+            x3 = (ebitda / total_assets) if ebitda else 0  # EBITDA as proxy for EBIT
+            x4 = (market_cap / total_liabilities) if total_liabilities > 0 else 10  # Cap at 10 if no liabilities
+            x5 = (revenue / total_assets) if revenue else 0
+            
+            z_score = 1.2 * x1 + 1.4 * x2 + 3.3 * x3 + 0.6 * x4 + 1.0 * x5
+            
+            if z_score > 2.99:
+                rating = 'SAFE'
+                interpretation = f'Z-Score {z_score:.2f} > 2.99: Company is in the safe zone with low bankruptcy risk'
+            elif z_score > 1.81:
+                rating = 'GREY'
+                interpretation = f'Z-Score {z_score:.2f} in grey zone (1.81-2.99): Moderate risk, needs monitoring'
+            else:
+                rating = 'DISTRESS'
+                interpretation = f'Z-Score {z_score:.2f} < 1.81: Company is in the distress zone with elevated bankruptcy risk'
+            
+            return {
+                'score': round(z_score, 2),
+                'rating': rating,
+                'interpretation': interpretation,
+                'components': {
+                    'x1_working_capital_ratio': round(x1, 4),
+                    'x2_retained_earnings_ratio': round(x2, 4),
+                    'x3_ebit_ratio': round(x3, 4),
+                    'x4_market_equity_ratio': round(x4, 4),
+                    'x5_asset_turnover': round(x5, 4)
+                }
+            }
+        except Exception as e:
+            return {'score': None, 'rating': 'N/A', 'interpretation': f'Z-Score calculation failed: {str(e)}'}
     
     def _analyze_liquidity(self, current_ratio, quick_ratio, fcf, ocf, total_debt, market_cap) -> Dict:
         """Analyze company liquidity and financial flexibility."""

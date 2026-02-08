@@ -60,26 +60,259 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
           </TabsList>
 
           <TabsContent value="technical" className="space-y-4">
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              <DataItem label="Technical Score" value={`${safeFixed(technical.technical_score)}/100`} />
-              <DataItem label="Momentum Score" value={`${safeFixed(technical.momentum_score)}/100`} />
-              <DataItem label="Trend Score" value={`${safeFixed(technical.trend_score)}/100`} />
-              <DataItem label="Volatility Score" value={`${safeFixed(technical.volatility_score)}/100`} />
-              <DataItem label="RSI (14)" value={safeFixed(technical.rsi)} />
-              <DataItem label="MACD" value={safeFixed(technical.macd, 4)} />
-              <DataItem label="ADX" value={safeFixed(technical.adx)} />
-              <DataItem label="Current Volatility" value={`${safeFixed(technical.current_volatility * 100)}%`} />
+            {/* Composite Scores */}
+            <div>
+              <h4 className="font-semibold mb-2 text-cyan-900 dark:text-cyan-100">Composite Scores</h4>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                <DataItem label="Technical Score" value={`${safeFixed(technical.technical_score)}/100`} />
+                <DataItem label="Momentum Score" value={`${safeFixed(technical.momentum_score)}/100`} />
+                <DataItem label="Trend Score" value={`${safeFixed(technical.trend_score)}/100`} />
+                <DataItem label="Volatility Score" value={`${safeFixed(technical.volatility_score)}/100`} />
+              </div>
             </div>
-            
-            <div className="mt-4 p-4 bg-muted/20 rounded-lg">
-              <h4 className="font-semibold mb-2">Calculation Formula:</h4>
-              <code className="text-xs block">
-                Technical Score = (Momentum + Trend + Volatility) / 3<br/>
-                Momentum = 100 - |RSI - 50| (optimal at RSI=50)<br/>
-                Trend = Based on SMA crossovers and ADX strength<br/>
-                Volatility = 100 - (Historical Vol * 100)
-              </code>
+
+            {/* Comprehensive Technical Score */}
+            {analysis.comprehensive_technicals?.intelligent_score && (
+              <div className="mt-4">
+                <h4 className="font-semibold mb-2 text-cyan-900 dark:text-cyan-100">Comprehensive Technical Rating</h4>
+                <div className="p-3 rounded-lg border" style={{borderColor: analysis.comprehensive_technicals.intelligent_score.color === 'red' ? '#ef4444' : analysis.comprehensive_technicals.intelligent_score.color === 'green' ? '#22c55e' : '#eab308'}}>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-lg font-bold" style={{color: analysis.comprehensive_technicals.intelligent_score.color === 'red' ? '#ef4444' : analysis.comprehensive_technicals.intelligent_score.color === 'green' ? '#22c55e' : '#eab308'}}>
+                      {analysis.comprehensive_technicals.intelligent_score.score}/100 — {analysis.comprehensive_technicals.intelligent_score.rating?.replace(/_/g, ' ')}
+                    </span>
+                    <span className="text-sm text-muted-foreground">
+                      {analysis.comprehensive_technicals.intelligent_score.bullish_count} Bullish · {analysis.comprehensive_technicals.intelligent_score.bearish_count} Bearish · {analysis.comprehensive_technicals.intelligent_score.neutral_count} Neutral
+                    </span>
+                  </div>
+                  {analysis.comprehensive_technicals.intelligent_score.bullish_signals?.length > 0 && (
+                    <div className="text-xs text-green-600 dark:text-green-400 mb-1">
+                      <span className="font-medium">Bullish: </span>{analysis.comprehensive_technicals.intelligent_score.bullish_signals.join(' · ')}
+                    </div>
+                  )}
+                  {analysis.comprehensive_technicals.intelligent_score.bearish_signals?.length > 0 && (
+                    <div className="text-xs text-red-600 dark:text-red-400">
+                      <span className="font-medium">Bearish: </span>{analysis.comprehensive_technicals.intelligent_score.bearish_signals.join(' · ')}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Core Indicators */}
+            <div className="mt-4">
+              <h4 className="font-semibold mb-2 text-cyan-900 dark:text-cyan-100">Core Indicators</h4>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                <DataItem label="RSI (14)" value={safeFixed(technical.rsi)} />
+                <DataItem label="MACD" value={safeFixed(technical.macd, 4)} />
+                <DataItem label="MACD Signal" value={safeFixed(analysis.technical_indicators?.macd_signal, 4)} />
+                <DataItem label="ADX" value={safeFixed(technical.adx)} />
+                <DataItem label="ATR" value={`$${safeFixed(analysis.technical_indicators?.atr)}`} />
+                <DataItem label="ATR %" value={analysis.technical_indicators?.atr_pct ? `${safeFixed(analysis.technical_indicators.atr_pct * 100)}%` : 'N/A'} />
+                <DataItem label="Current Volatility" value={`${safeFixed(technical.current_volatility * 100)}%`} />
+                <DataItem label="ROC (10)" value={safeFixed(analysis.technical_indicators?.roc)} />
+              </div>
             </div>
+
+            {/* Moving Averages */}
+            <div className="mt-4">
+              <h4 className="font-semibold mb-2 text-cyan-900 dark:text-cyan-100">Moving Averages</h4>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                <DataItem label="SMA 20" value={`$${safeFixed(analysis.technical_indicators?.sma_20)}`} />
+                <DataItem label="SMA 50" value={`$${safeFixed(analysis.technical_indicators?.sma_50)}`} />
+                <DataItem label="SMA 200" value={`$${safeFixed(analysis.technical_indicators?.sma_200)}`} />
+                <DataItem label="VWAP" value={`$${safeFixed(analysis.technical_indicators?.vwap)}`} />
+              </div>
+              {analysis.comprehensive_technicals?.golden_death_cross && (
+                <div className="mt-2 p-2 bg-muted/30 rounded text-sm">
+                  <span className={`font-semibold ${analysis.comprehensive_technicals.golden_death_cross.golden_cross ? 'text-green-600' : analysis.comprehensive_technicals.golden_death_cross.death_cross ? 'text-red-600' : 'text-muted-foreground'}`}>
+                    {analysis.comprehensive_technicals.golden_death_cross.signal?.replace(/_/g, ' ') || 'No Cross'}
+                  </span>
+                  {analysis.comprehensive_technicals.golden_death_cross.days_since_cross && (
+                    <span className="text-xs text-muted-foreground ml-2">({analysis.comprehensive_technicals.golden_death_cross.days_since_cross} days ago)</span>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Bollinger Bands */}
+            <div className="mt-4">
+              <h4 className="font-semibold mb-2 text-cyan-900 dark:text-cyan-100">Bollinger Bands</h4>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                <DataItem label="Upper Band" value={`$${safeFixed(analysis.technical_indicators?.bb_upper)}`} />
+                <DataItem label="Middle Band" value={`$${safeFixed(analysis.technical_indicators?.bb_middle)}`} />
+                <DataItem label="Lower Band" value={`$${safeFixed(analysis.technical_indicators?.bb_lower)}`} />
+                <DataItem label="VWAP Distance" value={analysis.technical_indicators?.vwap_distance ? `${safeFixed(analysis.technical_indicators.vwap_distance * 100)}%` : 'N/A'} />
+              </div>
+            </div>
+
+            {/* Momentum Oscillators from comprehensive_technicals */}
+            {analysis.comprehensive_technicals && (
+              <div className="mt-4">
+                <h4 className="font-semibold mb-2 text-cyan-900 dark:text-cyan-100">Momentum Oscillators</h4>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                  {analysis.comprehensive_technicals.stochastic_rsi && (
+                    <>
+                      <DataItem label="Stoch RSI %K" value={safeFixed(analysis.comprehensive_technicals.stochastic_rsi.stoch_rsi_k)} />
+                      <DataItem label="Stoch RSI %D" value={safeFixed(analysis.comprehensive_technicals.stochastic_rsi.stoch_rsi_d)} />
+                    </>
+                  )}
+                  {analysis.comprehensive_technicals.williams_r && (
+                    <DataItem label="Williams %R" value={safeFixed(analysis.comprehensive_technicals.williams_r.williams_r)} />
+                  )}
+                  {analysis.comprehensive_technicals.cci && (
+                    <DataItem label="CCI (20)" value={safeFixed(analysis.comprehensive_technicals.cci.cci)} />
+                  )}
+                  {analysis.comprehensive_technicals.trix && (
+                    <>
+                      <DataItem label="TRIX" value={safeFixed(analysis.comprehensive_technicals.trix.trix, 4)} />
+                      <DataItem label="TRIX Signal" value={safeFixed(analysis.comprehensive_technicals.trix.trix_signal, 4)} />
+                    </>
+                  )}
+                  <DataItem label="MFI (14)" value={safeFixed(analysis.technical_indicators?.mfi || analysis.comprehensive_technicals.mfi?.mfi)} />
+                </div>
+                {/* Signal badges */}
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {analysis.comprehensive_technicals.stochastic_rsi?.signal && (
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${analysis.comprehensive_technicals.stochastic_rsi.signal === 'OVERSOLD' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : analysis.comprehensive_technicals.stochastic_rsi.signal === 'OVERBOUGHT' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'}`}>
+                      StochRSI: {analysis.comprehensive_technicals.stochastic_rsi.signal}
+                    </span>
+                  )}
+                  {analysis.comprehensive_technicals.williams_r?.signal && (
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${analysis.comprehensive_technicals.williams_r.signal === 'OVERSOLD' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : analysis.comprehensive_technicals.williams_r.signal === 'OVERBOUGHT' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'}`}>
+                      Williams: {analysis.comprehensive_technicals.williams_r.signal}
+                    </span>
+                  )}
+                  {analysis.comprehensive_technicals.cci?.signal && (
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${analysis.comprehensive_technicals.cci.signal.includes('OVERSOLD') ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : analysis.comprehensive_technicals.cci.signal.includes('OVERBOUGHT') ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'}`}>
+                      CCI: {analysis.comprehensive_technicals.cci.signal}
+                    </span>
+                  )}
+                  {analysis.comprehensive_technicals.mfi?.signal && (
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${analysis.comprehensive_technicals.mfi.signal === 'BULLISH' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : analysis.comprehensive_technicals.mfi.signal === 'BEARISH' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'}`}>
+                      MFI: {analysis.comprehensive_technicals.mfi.signal}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Trend Indicators from comprehensive_technicals */}
+            {analysis.comprehensive_technicals && (
+              <div className="mt-4">
+                <h4 className="font-semibold mb-2 text-cyan-900 dark:text-cyan-100">Trend Indicators</h4>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                  {analysis.comprehensive_technicals.aroon && (
+                    <>
+                      <DataItem label="Aroon Up" value={safeFixed(analysis.comprehensive_technicals.aroon.aroon_up)} />
+                      <DataItem label="Aroon Down" value={safeFixed(analysis.comprehensive_technicals.aroon.aroon_down)} />
+                      <DataItem label="Aroon Osc" value={safeFixed(analysis.comprehensive_technicals.aroon.aroon_oscillator)} />
+                    </>
+                  )}
+                  {analysis.comprehensive_technicals.dmi && (
+                    <>
+                      <DataItem label="+DI" value={safeFixed(analysis.comprehensive_technicals.dmi.plus_di)} />
+                      <DataItem label="-DI" value={safeFixed(analysis.comprehensive_technicals.dmi.minus_di)} />
+                      <DataItem label="DMI ADX" value={safeFixed(analysis.comprehensive_technicals.dmi.adx)} />
+                    </>
+                  )}
+                </div>
+                {/* Signal badges */}
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {analysis.comprehensive_technicals.aroon?.signal && (
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${analysis.comprehensive_technicals.aroon.signal === 'BULLISH' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : analysis.comprehensive_technicals.aroon.signal === 'BEARISH' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'}`}>
+                      Aroon: {analysis.comprehensive_technicals.aroon.signal}
+                    </span>
+                  )}
+                  {analysis.comprehensive_technicals.dmi?.signal && (
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${analysis.comprehensive_technicals.dmi.signal.includes('BULLISH') ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : analysis.comprehensive_technicals.dmi.signal.includes('BEARISH') ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'}`}>
+                      DMI: {analysis.comprehensive_technicals.dmi.signal?.replace(/_/g, ' ')}
+                    </span>
+                  )}
+                  {analysis.comprehensive_technicals.dmi?.trend_strength && (
+                    <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                      Trend: {analysis.comprehensive_technicals.dmi.trend_strength}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Ichimoku Cloud */}
+            {analysis.comprehensive_technicals?.ichimoku && (
+              <div className="mt-4">
+                <h4 className="font-semibold mb-2 text-cyan-900 dark:text-cyan-100">Ichimoku Cloud</h4>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                  <DataItem label="Tenkan-sen" value={`$${safeFixed(analysis.comprehensive_technicals.ichimoku.tenkan_sen)}`} />
+                  <DataItem label="Kijun-sen" value={`$${safeFixed(analysis.comprehensive_technicals.ichimoku.kijun_sen)}`} />
+                  <DataItem label="Cloud Top" value={`$${safeFixed(analysis.comprehensive_technicals.ichimoku.cloud_top)}`} />
+                  <DataItem label="Cloud Bottom" value={`$${safeFixed(analysis.comprehensive_technicals.ichimoku.cloud_bottom)}`} />
+                </div>
+                <div className="mt-2 flex flex-wrap gap-1">
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${analysis.comprehensive_technicals.ichimoku.trend === 'BULLISH' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'}`}>
+                    {analysis.comprehensive_technicals.ichimoku.price_position?.replace(/_/g, ' ')}
+                  </span>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${analysis.comprehensive_technicals.ichimoku.cloud_bullish ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'}`}>
+                    Cloud: {analysis.comprehensive_technicals.ichimoku.cloud_bullish ? 'Bullish' : 'Bearish'}
+                  </span>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${analysis.comprehensive_technicals.ichimoku.tk_cross === 'BULLISH' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'}`}>
+                    TK Cross: {analysis.comprehensive_technicals.ichimoku.tk_cross}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Volume Indicators */}
+            {analysis.comprehensive_technicals?.obv && (
+              <div className="mt-4">
+                <h4 className="font-semibold mb-2 text-cyan-900 dark:text-cyan-100">Volume Indicators</h4>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                  <DataItem label="OBV" value={analysis.comprehensive_technicals.obv.obv ? (analysis.comprehensive_technicals.obv.obv > 1e6 ? `${safeFixed(analysis.comprehensive_technicals.obv.obv / 1e6)}M` : safeFixed(analysis.comprehensive_technicals.obv.obv, 0)) : 'N/A'} />
+                  <DataItem label="OBV Trend" value={analysis.comprehensive_technicals.obv.obv_trend || 'N/A'} />
+                  <DataItem label="OBV Divergence" value={analysis.comprehensive_technicals.obv.divergence || 'NONE'} />
+                  {analysis.comprehensive_technicals.vwap && (
+                    <DataItem label="VWAP Dev %" value={`${safeFixed(analysis.comprehensive_technicals.vwap.deviation_pct)}%`} />
+                  )}
+                </div>
+                <div className="mt-2 flex flex-wrap gap-1">
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${analysis.comprehensive_technicals.obv.signal === 'RISING' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : analysis.comprehensive_technicals.obv.signal === 'FALLING' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'}`}>
+                    OBV: {analysis.comprehensive_technicals.obv.signal}
+                  </span>
+                  {analysis.comprehensive_technicals.vwap?.signal && (
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${analysis.comprehensive_technicals.vwap.signal.includes('ABOVE') ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'}`}>
+                      VWAP: {analysis.comprehensive_technicals.vwap.signal?.replace(/_/g, ' ')}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* TTM Squeeze */}
+            {analysis.technical_indicators?.ttm_squeeze_state !== undefined && (
+              <div className="mt-4">
+                <h4 className="font-semibold mb-2 text-cyan-900 dark:text-cyan-100">TTM Squeeze</h4>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                  <DataItem label="Squeeze Active" value={analysis.technical_indicators.ttm_squeeze_state ? '🔴 YES' : '🟢 NO'} />
+                  <DataItem label="Momentum" value={safeFixed(analysis.technical_indicators.ttm_squeeze_momentum, 4)} />
+                  <DataItem label="Signal" value={analysis.technical_indicators.ttm_squeeze_signal?.toUpperCase() || 'N/A'} />
+                  <DataItem label="Score Impact" value={safeFixed(analysis.technical_indicators.ttm_squeeze_score)} />
+                </div>
+              </div>
+            )}
+
+            {/* Candlestick Patterns from comprehensive_technicals */}
+            {analysis.comprehensive_technicals?.candlestick?.patterns?.length > 0 && (
+              <div className="mt-4">
+                <h4 className="font-semibold mb-2 text-cyan-900 dark:text-cyan-100">Candlestick Patterns Detected</h4>
+                <div className="space-y-1">
+                  {analysis.comprehensive_technicals.candlestick.patterns.map((p: any, i: number) => (
+                    <div key={i} className={`text-sm p-2 rounded ${p.type?.includes('BULLISH') ? 'bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-300' : 'bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-300'}`}>
+                      <span className="font-medium">{p.name?.replace(/_/g, ' ')}</span>
+                      <span className="text-xs ml-2">({p.type?.replace(/_/g, ' ')}) — Strength: {p.strength}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </TabsContent>
 
           {/* Pivot Points & Fibonacci - R2 moved to ML/Quant page */}
@@ -774,14 +1007,20 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
                   </div>
                 )}
                 
-                {analysis.enhanced_fundamentals.financial_health && (
+                {analysis.enhanced_fundamentals.debt_liquidity && (
                   <div className="mt-4">
-                    <h5 className="font-semibold mb-2">Financial Health</h5>
+                    <h5 className="font-semibold mb-2">Financial Health & Debt</h5>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                      <DataItem label="Altman Z-Score" value={safeFixed(analysis.enhanced_fundamentals.financial_health.altman_z_score)} />
-                      <DataItem label="Z-Score Rating" value={analysis.enhanced_fundamentals.financial_health.z_score_rating || 'N/A'} />
-                      <DataItem label="Debt/Equity" value={safeFixed(analysis.enhanced_fundamentals.financial_health.debt_to_equity)} />
-                      <DataItem label="Interest Coverage" value={safeFixed(analysis.enhanced_fundamentals.financial_health.interest_coverage)} />
+                      <DataItem label="Total Debt" value={analysis.enhanced_fundamentals.debt_liquidity.total_debt_formatted || 'N/A'} />
+                      <DataItem label="Total Cash" value={analysis.enhanced_fundamentals.debt_liquidity.total_cash_formatted || 'N/A'} />
+                      <DataItem label="Net Debt" value={analysis.enhanced_fundamentals.debt_liquidity.net_debt_formatted || 'N/A'} />
+                      <DataItem label="Debt/Equity" value={safeFixed(analysis.enhanced_fundamentals.debt_liquidity.debt_to_equity)} />
+                      <DataItem label="Current Ratio" value={safeFixed(analysis.enhanced_fundamentals.debt_liquidity.current_ratio)} />
+                      <DataItem label="Quick Ratio" value={safeFixed(analysis.enhanced_fundamentals.debt_liquidity.quick_ratio)} />
+                      <DataItem label="Interest Coverage" value={safeFixed(analysis.enhanced_fundamentals.debt_liquidity.interest_coverage)} />
+                      {analysis.enhanced_fundamentals.altman_z_score?.score && (
+                        <DataItem label="Altman Z-Score" value={`${safeFixed(analysis.enhanced_fundamentals.altman_z_score.score)} (${analysis.enhanced_fundamentals.altman_z_score.rating})`} />
+                      )}
                     </div>
                   </div>
                 )}

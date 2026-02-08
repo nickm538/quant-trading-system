@@ -83,6 +83,11 @@ from candlestick_patterns import CandlestickPatternDetector
 from enhanced_fundamentals import EnhancedFundamentalsAnalyzer
 from market_intelligence import MarketIntelligence
 try:
+    from comprehensive_technicals_v2 import ComprehensiveTechnicalAnalyzer
+    HAS_COMPREHENSIVE_TECH = True
+except ImportError:
+    HAS_COMPREHENSIVE_TECH = False
+try:
     from stockgrid_integration import StockGridIntegration
     HAS_STOCKGRID = True
 except ImportError as e:
@@ -557,8 +562,17 @@ def main():
             'taapi_indicators': None,  # TAAPI.io technical indicators (backup/validation)
             'financialdatasets': None,  # FinancialDatasets.ai fundamental data
             'exa_intelligence': None,  # EXA AI real-time web search & candlestick chart analysis
+            'comprehensive_technicals': None,  # Stochastic RSI, Ichimoku, Williams %R, CCI, TRIX, Aroon, DMI, OBV, MFI, VWAP
             'personal_recommendation': None  # "If I Were Trading" recommendation
         }
+        
+        # Run Comprehensive Technical Analysis (Stochastic RSI, Ichimoku, Williams %R, CCI, etc.)
+        if HAS_COMPREHENSIVE_TECH:
+            try:
+                comp_tech = ComprehensiveTechnicalAnalyzer()
+                output['comprehensive_technicals'] = comp_tech.analyze(symbol)
+            except Exception as e:
+                output['comprehensive_technicals'] = {'error': str(e)}
         
         # Run Advanced Technicals (R2, Pivot, Fibonacci)
         # Pass polygon_provider to avoid redundant yfinance calls
