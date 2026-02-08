@@ -2278,6 +2278,11 @@ One comprehensive paragraph that synthesizes EVERYTHING above - BOTH MACRO AND M
             # Prepare messages for GPT (use v3 prompts if available)
             if is_nuke:
                 # NUKE MODE - Use enhanced system context (legendary grade v3)
+                # Build dynamic date/time context for OpenRouter fallback
+                from datetime import datetime as _dt2
+                _now2 = _dt2.now()
+                _day2 = _now2.strftime('%A')
+                _dynamic_ctx = f"""CURRENT CONTEXT: {_now2.strftime('%B %d, %Y %I:%M %p')} ET ({_day2}). Consider: Fed policy, economic data, geopolitical tensions, earnings season, sector rotation. LIVE system with REAL money."""
                 messages = [
                     {
                         "role": "system",
@@ -2289,11 +2294,15 @@ One comprehensive paragraph that synthesizes EVERYTHING above - BOTH MACRO AND M
                     },
                     {
                         "role": "system", 
-                        "content": f"REAL-TIME MARKET DATA FOR NUKE ANALYSIS:\n{context}"
+                        "content": f"{_dynamic_ctx}\n\nREAL-TIME MARKET DATA FOR NUKE ANALYSIS:\n{context}"
                     }
                 ]
             else:
                 # Normal mode (legendary grade v3)
+                from datetime import datetime as _dt3
+                _now3 = _dt3.now()
+                _day3 = _now3.strftime('%A')
+                _dynamic_ctx3 = f"""CURRENT CONTEXT: {_now3.strftime('%B %d, %Y %I:%M %p')} ET ({_day3}). Consider: Fed policy, economic data, geopolitical tensions, earnings season, sector rotation. LIVE system with REAL money."""
                 messages = [
                     {
                         "role": "system",
@@ -2301,7 +2310,7 @@ One comprehensive paragraph that synthesizes EVERYTHING above - BOTH MACRO AND M
                     },
                     {
                         "role": "system", 
-                        "content": f"REAL-TIME MARKET DATA:\n{context}"
+                        "content": f"{_dynamic_ctx3}\n\nREAL-TIME MARKET DATA:\n{context}"
                     }
                 ]
             
@@ -2333,10 +2342,38 @@ One comprehensive paragraph that synthesizes EVERYTHING above - BOTH MACRO AND M
             # === PRIMARY: Use Gemini 2.5 Pro via Multi-Model Orchestrator ===
             if self.multi_model:
                 try:
-                    # Combine system prompts
-                    system_prompt = self.system_context
+                    # Build dynamic date/time/geopolitical context
+                    from datetime import datetime as _dt
+                    _now = _dt.now()
+                    _day = _now.strftime('%A')
+                    _mkt_open = _now.replace(hour=9, minute=30, second=0)
+                    _mkt_close = _now.replace(hour=16, minute=0, second=0)
+                    _is_weekday = _now.weekday() < 5
+                    _is_mkt = _is_weekday and _mkt_open <= _now <= _mkt_close
+                    _pre_mkt = _is_weekday and _now.replace(hour=4, minute=0) <= _now < _mkt_open
+                    _after_hrs = _is_weekday and _mkt_close < _now <= _now.replace(hour=20, minute=0)
+                    if _is_mkt:
+                        _mkt_status = 'MARKET IS OPEN (regular trading hours 9:30 AM - 4:00 PM ET)'
+                    elif _pre_mkt:
+                        _mkt_status = 'PRE-MARKET SESSION (4:00 AM - 9:30 AM ET)'
+                    elif _after_hrs:
+                        _mkt_status = 'AFTER-HOURS SESSION (4:00 PM - 8:00 PM ET)'
+                    elif not _is_weekday:
+                        _mkt_status = 'MARKET IS CLOSED (weekend)'
+                    else:
+                        _mkt_status = 'MARKET IS CLOSED (outside trading hours)'
+                    _friday_flag = '\nFRIDAY AFTERNOON — end-of-week positioning, theta decay acceleration, potential low-volume moves.' if _day == 'Friday' and _now.hour >= 14 else ''
+                    _dynamic_context = f"""\n\nCURRENT CONTEXT (factor this into ALL analysis):
+- Date: {_now.strftime('%B %d, %Y')} ({_day})
+- Time: {_now.strftime('%I:%M %p')} ET
+- {_mkt_status}{_friday_flag}
+- Consider: Fed policy stance, recent economic data, geopolitical tensions (trade policy, tariffs, conflicts), earnings season timing, sector rotation.
+- This is a LIVE trading system with REAL money. Be precise, specific, and honest about uncertainty."""
+                    
+                    # Combine system prompts with dynamic context
+                    system_prompt = self.system_context + _dynamic_context
                     if is_nuke:
-                        system_prompt = f"{self.system_context}\n\n{self.nuke_context}"
+                        system_prompt = f"{self.system_context}\n\n{self.nuke_context}{_dynamic_context}"
                     
                     gemini_result = self.multi_model.analyze(
                         user_message=enhanced_message,
@@ -2617,7 +2654,7 @@ Be specific and quantitative. Reference exact price levels when visible."""
             gemini_api_key = os.environ.get('GEMINI_API_KEY', '')
             
             # Use Gemini 2.5 Pro for vision (superior multimodal capabilities)
-            vision_model = "google/gemini-2.5-pro-preview-06-05"
+            vision_model = "google/gemini-2.5-pro-preview"
             
             # Try Gemini first, fallback to OpenRouter GPT-4o if needed
             headers = {

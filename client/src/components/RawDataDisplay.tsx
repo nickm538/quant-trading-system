@@ -1361,11 +1361,22 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
                   <div className="mt-4">
                     <h5 className="font-semibold mb-2">💰 Dividend Information</h5>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                      <DataItem label="Dividend Yield" value={`${safeFixed(analysis.enhanced_fundamentals.dividends.dividend_yield_pct)}%`} />
-                      <DataItem label="Annual Dividend" value={analysis.enhanced_fundamentals.dividends.annual_dividend ? `$${safeFixed(analysis.enhanced_fundamentals.dividends.annual_dividend)}` : 'N/A'} />
-                      <DataItem label="Payout Ratio" value={`${safeFixed(analysis.enhanced_fundamentals.dividends.payout_ratio_pct)}%`} />
-                      <DataItem label="5Y Div Growth" value={analysis.enhanced_fundamentals.dividends.dividend_growth_5yr ? `${safeFixed(analysis.enhanced_fundamentals.dividends.dividend_growth_5yr)}%` : 'N/A'} />
+                      <DataItem label="Dividend Yield (TTM)" value={analysis.enhanced_fundamentals.dividends.dividend_yield_pct ? `${safeFixed(analysis.enhanced_fundamentals.dividends.dividend_yield_pct)}%` : 'N/A'} />
+                      <DataItem label="Annual Dividend/Share" value={analysis.enhanced_fundamentals.dividends.annual_dividend != null ? `$${safeFixed(analysis.enhanced_fundamentals.dividends.annual_dividend)}` : 'N/A'} />
+                      <DataItem label="Payout Ratio" value={analysis.enhanced_fundamentals.dividends.payout_ratio_pct ? `${safeFixed(analysis.enhanced_fundamentals.dividends.payout_ratio_pct)}%` : 'N/A'} />
+                      <DataItem label="Ex-Dividend Date" value={analysis.enhanced_fundamentals.dividends.ex_dividend_date || 'N/A'} />
                     </div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2">
+                      <DataItem label="3Y Div Growth" value={analysis.enhanced_fundamentals.dividends.dividend_growth_3yr != null ? `${safeFixed(analysis.enhanced_fundamentals.dividends.dividend_growth_3yr)}%` : 'N/A'} />
+                      <DataItem label="5Y Div Growth" value={analysis.enhanced_fundamentals.dividends.dividend_growth_5yr != null ? `${safeFixed(analysis.enhanced_fundamentals.dividends.dividend_growth_5yr)}%` : 'N/A'} />
+                      <DataItem label="Est. Dividend" value={analysis.enhanced_fundamentals.dividends.dividend_est_per_share != null ? `$${safeFixed(analysis.enhanced_fundamentals.dividends.dividend_est_per_share)}` : 'N/A'} />
+                      <DataItem label="Est. Yield" value={analysis.enhanced_fundamentals.dividends.dividend_est_yield_pct != null ? `${safeFixed(analysis.enhanced_fundamentals.dividends.dividend_est_yield_pct)}%` : 'N/A'} />
+                    </div>
+                    {analysis.enhanced_fundamentals.dividends.dividend_history?.length > 0 && (
+                      <div className="mt-2 text-xs">
+                        <p className="text-muted-foreground">Recent Payments: {analysis.enhanced_fundamentals.dividends.dividend_history.slice(0, 4).map((d: any) => `${d.date}: $${d.dividend?.toFixed(2) || 'N/A'}`).join(' • ')}</p>
+                      </div>
+                    )}
                   </div>
                 )}
                 
@@ -1394,27 +1405,40 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
                   <div className="mt-4">
                     <h5 className="font-semibold mb-2">📊 Share Structure & Free Float</h5>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                      <DataItem label="Shares Outstanding" value={analysis.enhanced_fundamentals.share_structure.shares_outstanding_formatted || 'N/A'} />
-                      <DataItem label="Float Shares" value={analysis.enhanced_fundamentals.share_structure.float_shares_formatted || 'N/A'} />
+                      <DataItem label="Shares Outstanding" value={analysis.enhanced_fundamentals.share_structure.shares_outstanding_formatted?.replace('$', '') || 'N/A'} />
+                      <DataItem label="Float Shares" value={analysis.enhanced_fundamentals.share_structure.float_shares_formatted?.replace('$', '') || 'N/A'} />
                       <DataItem label="Free Float %" value={analysis.enhanced_fundamentals.share_structure.free_float_pct ? `${safeFixed(analysis.enhanced_fundamentals.share_structure.free_float_pct)}%` : 'N/A'} />
-                      <DataItem label="Insider Ownership" value={analysis.enhanced_fundamentals.share_structure.insider_ownership_pct ? `${safeFixed(analysis.enhanced_fundamentals.share_structure.insider_ownership_pct)}%` : null} />
+                      <DataItem label="Insider Ownership" value={analysis.enhanced_fundamentals.share_structure.insider_ownership_pct != null ? `${safeFixed(analysis.enhanced_fundamentals.share_structure.insider_ownership_pct)}%` : 'N/A'} />
                     </div>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2">
-                      <DataItem label="Institutional %" value={analysis.enhanced_fundamentals.share_structure.institutional_ownership_pct ? `${safeFixed(analysis.enhanced_fundamentals.share_structure.institutional_ownership_pct)}%` : null} />
-                      <DataItem label="Shares Short" value={analysis.enhanced_fundamentals.share_structure.shares_short ? analysis.enhanced_fundamentals.share_structure.shares_short_formatted : null} />
-                      <DataItem label="Short % of Float" value={analysis.enhanced_fundamentals.share_structure.short_pct_of_float ? `${safeFixed(analysis.enhanced_fundamentals.share_structure.short_pct_of_float)}%` : null} />
-                      <DataItem label="Short Ratio (Days)" value={analysis.enhanced_fundamentals.share_structure.short_ratio_days ? safeFixed(analysis.enhanced_fundamentals.share_structure.short_ratio_days) : null} />
+                      <DataItem label="Institutional %" value={analysis.enhanced_fundamentals.share_structure.institutional_ownership_pct != null ? `${safeFixed(analysis.enhanced_fundamentals.share_structure.institutional_ownership_pct)}%` : 'N/A'} />
+                      <DataItem label="Shares Short" value={analysis.enhanced_fundamentals.share_structure.shares_short_formatted?.replace('$', '') || 'N/A'} />
+                      <DataItem label="Short % of Float" value={analysis.enhanced_fundamentals.share_structure.short_pct_of_float != null ? `${safeFixed(analysis.enhanced_fundamentals.share_structure.short_pct_of_float)}%` : 'N/A'} />
+                      <DataItem label="Short Ratio (Days)" value={analysis.enhanced_fundamentals.share_structure.short_ratio_days != null ? safeFixed(analysis.enhanced_fundamentals.share_structure.short_ratio_days) : 'N/A'} />
                     </div>
-                    {/* Data availability notes */}
-                    {analysis.enhanced_fundamentals.share_structure.data_availability && (
-                      <div className="mt-2 space-y-1">
-                        {!analysis.enhanced_fundamentals.share_structure.insider_ownership_pct && (
-                          <p className="text-xs text-muted-foreground italic">Insider & institutional ownership data requires premium API tier (Finnhub/Polygon). Not available with current API keys.</p>
-                        )}
-                        {!analysis.enhanced_fundamentals.share_structure.shares_short && (
-                          <p className="text-xs text-muted-foreground italic">Short interest (FINRA bi-monthly report) requires premium data. Daily short volume from FINRA RegSHO is available in the Dark Pool tab.</p>
-                        )}
+                    {/* Insider & Institutional Activity */}
+                    {(analysis.enhanced_fundamentals.share_structure.insider_transactions_pct != null || analysis.enhanced_fundamentals.share_structure.institutional_transactions_pct != null) && (
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2">
+                        <DataItem 
+                          label="Insider Transactions" 
+                          value={analysis.enhanced_fundamentals.share_structure.insider_transactions_pct != null 
+                            ? <span className={analysis.enhanced_fundamentals.share_structure.insider_transactions_pct > 0 ? 'text-green-500' : analysis.enhanced_fundamentals.share_structure.insider_transactions_pct < 0 ? 'text-red-500' : ''}>
+                                {analysis.enhanced_fundamentals.share_structure.insider_transactions_pct > 0 ? '+' : ''}{safeFixed(analysis.enhanced_fundamentals.share_structure.insider_transactions_pct)}%
+                              </span>
+                            : 'N/A'} 
+                        />
+                        <DataItem 
+                          label="Institutional Transactions" 
+                          value={analysis.enhanced_fundamentals.share_structure.institutional_transactions_pct != null 
+                            ? <span className={analysis.enhanced_fundamentals.share_structure.institutional_transactions_pct > 0 ? 'text-green-500' : analysis.enhanced_fundamentals.share_structure.institutional_transactions_pct < 0 ? 'text-red-500' : ''}>
+                                {analysis.enhanced_fundamentals.share_structure.institutional_transactions_pct > 0 ? '+' : ''}{safeFixed(analysis.enhanced_fundamentals.share_structure.institutional_transactions_pct)}%
+                              </span>
+                            : 'N/A'} 
+                        />
                       </div>
+                    )}
+                    {analysis.enhanced_fundamentals.share_structure.data_source && (
+                      <p className="text-xs text-muted-foreground mt-2">Source: {analysis.enhanced_fundamentals.share_structure.data_source === 'finviz' ? 'Finviz (scraped)' : analysis.enhanced_fundamentals.share_structure.data_source}</p>
                     )}
                   </div>
                 )}

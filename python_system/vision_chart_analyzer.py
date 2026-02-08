@@ -307,7 +307,7 @@ class VisionChartAnalyzer:
 
         if self.openrouter_key:
             openrouter_models = [
-                ('google/gemini-2.0-flash-001', 'Gemini 2.0 Flash'),
+                ('google/gemini-2.5-pro-preview', 'Gemini 2.5 Pro'),
                 ('anthropic/claude-sonnet-4', 'Claude Sonnet 4'),
                 ('anthropic/claude-3.5-sonnet', 'Claude 3.5 Sonnet'),
             ]
@@ -329,7 +329,7 @@ class VisionChartAnalyzer:
             try:
                 result = self._analyze_with_sdk(symbol, image_data, prompt)
                 if result and result.get('trend', {}).get('direction') != 'UNKNOWN':
-                    result['ai_model'] = 'Gemini 2.0 Flash (Direct)'
+                    result['ai_model'] = 'Gemini 2.5 Pro (Direct)'
                     return result
             except Exception as e:
                 last_error = str(e)
@@ -342,7 +342,7 @@ class VisionChartAnalyzer:
         image_part = types.Part.from_bytes(data=image_data, mime_type="image/png")
 
         response = self.client.models.generate_content(
-            model="gemini-2.0-flash",
+            model="gemini-2.5-pro",
             contents=[prompt, image_part],
             config=types.GenerateContentConfig(
                 temperature=0.1,
@@ -406,8 +406,25 @@ class VisionChartAnalyzer:
 
     def _get_analysis_prompt(self, symbol: str, context: str = '') -> str:
         """Get the expert trading prompt for chart analysis."""
+        from datetime import datetime
+        now = datetime.now()
+        day_of_week = now.strftime('%A')
+        market_open = now.replace(hour=9, minute=30, second=0)
+        market_close = now.replace(hour=16, minute=0, second=0)
+        is_weekday = now.weekday() < 5
+        is_market_hours = is_weekday and market_open <= now <= market_close
+        if is_market_hours:
+            market_status = 'MARKET IS OPEN'
+        elif not is_weekday:
+            market_status = 'MARKET CLOSED (weekend)'
+        else:
+            market_status = 'MARKET CLOSED'
+        friday_flag = '\nFRIDAY AFTERNOON — end-of-week positioning, theta decay acceleration, potential low-volume moves.' if day_of_week == 'Friday' and now.hour >= 14 else ''
         return f"""You are a world-class technical analyst and candlestick pattern expert.
 Analyze this stock chart for {symbol} with extreme precision and detail.
+
+CURRENT DATE/TIME: {now.strftime('%B %d, %Y %I:%M %p')} ET ({day_of_week})
+MARKET STATUS: {market_status}{friday_flag}
 
 CHART CONTEXT: {context}
 

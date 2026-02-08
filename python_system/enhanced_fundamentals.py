@@ -150,6 +150,36 @@ class EnhancedFundamentalsAnalyzer:
                 if not info.get('payoutRatio') and finnhub_metric.get('payoutRatioTTM'):
                     info['payoutRatio'] = finnhub_metric['payoutRatioTTM'] / 100  # Convert to decimal
             
+            # === OVERLAY: Finviz scraper for share structure, dividends, short interest ===
+            finviz_data = {}
+            try:
+                from finviz_scraper import FinvizScraper
+                fv = FinvizScraper()
+                fv_result = fv.get_share_structure(symbol)
+                if fv_result.get('success'):
+                    finviz_data = fv_result
+                    print(f"  \u2713 EnhancedFundamentals: Finviz scraper loaded", file=sys.stderr, flush=True)
+                    # Fill share structure gaps
+                    if not info.get('heldPercentInsiders') and fv_result.get('insider_ownership') is not None:
+                        info['heldPercentInsiders'] = fv_result['insider_ownership'] / 100  # Convert pct to decimal
+                    if not info.get('heldPercentInstitutions') and fv_result.get('institutional_ownership') is not None:
+                        info['heldPercentInstitutions'] = fv_result['institutional_ownership'] / 100
+                    if not info.get('sharesShort') and fv_result.get('short_interest') is not None:
+                        info['sharesShort'] = fv_result['short_interest']
+                    if not info.get('shortRatio') and fv_result.get('short_ratio') is not None:
+                        info['shortRatio'] = fv_result['short_ratio']
+                    if not info.get('shortFloat') and fv_result.get('short_float_pct') is not None:
+                        info['shortFloat'] = fv_result['short_float_pct'] / 100  # Convert pct to decimal
+                    # Fill dividend gaps
+                    if not info.get('dividendYield') and fv_result.get('dividend_yield_pct') is not None:
+                        info['dividendYield'] = fv_result['dividend_yield_pct'] / 100
+                    if not info.get('dividendRate') and fv_result.get('dividend_per_share') is not None:
+                        info['dividendRate'] = fv_result['dividend_per_share']
+                else:
+                    print(f"  EnhancedFundamentals: Finviz scraper failed: {fv_result.get('error')}", file=sys.stderr, flush=True)
+            except Exception as e:
+                print(f"  EnhancedFundamentals: Finviz scraper error: {e}", file=sys.stderr, flush=True)
+            
             # Basic info
             current_price = info.get('currentPrice') or info.get('regularMarketPrice', 0)
             market_cap = info.get('marketCap', 0)
@@ -314,7 +344,7 @@ class EnhancedFundamentalsAnalyzer:
             
             # NEW: Enhanced data fetching
             earnings_data = self._fetch_earnings_data(symbol)
-            dividend_data = self._fetch_dividend_data(symbol, info)
+            dividend_data = self._fetch_dividend_data(symbol, info, finviz_data)
             insider_data = self._fetch_insider_transactions(symbol)
             analyst_data = self._fetch_analyst_ratings(symbol)
             financial_trends = self._fetch_financial_trends(symbol)
@@ -400,18 +430,14 @@ class EnhancedFundamentalsAnalyzer:
                     'float_shares_formatted': self._format_large_number(float_shares),
                     'free_float_pct': round(free_float_pct, 2),
                     'shares_short': shares_short if shares_short else None,
-                    'shares_short_formatted': self._format_large_number(shares_short) if shares_short else 'Not available (requires premium data)',
+                    'shares_short_formatted': self._format_large_number(shares_short) if shares_short else None,
                     'short_ratio_days': round(short_ratio, 2) if short_ratio else None,
-                    'short_pct_of_float': round(shares_short / float_shares * 100, 2) if (float_shares > 0 and shares_short > 0) else None,
+                    'short_pct_of_float': round(shares_short / float_shares * 100, 2) if (float_shares > 0 and shares_short > 0) else (finviz_data.get('short_float_pct') if finviz_data.get('short_float_pct') else None),
                     'insider_ownership_pct': round(insider_ownership * 100, 2) if insider_ownership else None,
                     'institutional_ownership_pct': round(institutional_ownership * 100, 2) if institutional_ownership else None,
-                    'data_availability': {
-                        'shares_outstanding_source': 'FinancialDatasets/FMP/SEC' if shares_outstanding > 0 else 'unavailable',
-                        'float_shares_source': 'FMP/SEC' if float_shares > 0 else 'unavailable',
-                        'insider_note': 'Insider ownership requires Finnhub/Polygon premium tier' if not insider_ownership else 'available',
-                        'institutional_note': 'Institutional ownership requires Finnhub/Polygon premium tier' if not institutional_ownership else 'available',
-                        'short_interest_note': 'Short interest (FINRA bi-monthly) requires premium data. See Dark Pool tab for daily short volume from FINRA RegSHO.' if not shares_short else 'available'
-                    }
+                    'insider_transactions_pct': finviz_data.get('insider_transactions_pct'),
+                    'institutional_transactions_pct': finviz_data.get('institutional_transactions_pct'),
+                    'data_source': 'finviz' if finviz_data.get('success') else ('yfinance' if yf_data and yf_data.get('_source') != 'FinancialDatasets.ai' else 'financialdatasets'),
                 },
                 
                 # Analysis & Scores
@@ -1268,10 +1294,12 @@ class EnhancedFundamentalsAnalyzer:
         
         return earnings_data
     
-    def _fetch_dividend_data(self, symbol: str, info: Dict) -> Dict:
+    def _fetch_dividend_data(self, symbol: str, info: Dict, finviz_data: Dict = None) -> Dict:
         """
         Fetch comprehensive dividend data.
+        Uses info dict (from FD/yfinance), FMP history, AlphaVantage fallback, and Finviz scraper.
         """
+        finviz_data = finviz_data or {}
         dividend_data = {
             'dividend_yield_pct': None,
             'annual_dividend': None,
@@ -1279,6 +1307,9 @@ class EnhancedFundamentalsAnalyzer:
             'ex_dividend_date': None,
             'dividend_date': None,
             'dividend_growth_5yr': None,
+            'dividend_growth_3yr': None,
+            'dividend_est_per_share': None,
+            'dividend_est_yield_pct': None,
             'consecutive_years': None,
             'dividend_history': []
         }
@@ -1334,6 +1365,27 @@ class EnhancedFundamentalsAnalyzer:
                             older = sum(float(h.get('amount', 0)) for h in history[16:20])
                             if older > 0:
                                 dividend_data['dividend_growth_5yr'] = round((recent / older - 1) * 100, 2)
+        except Exception:
+            pass
+        
+        # === FINVIZ FALLBACK: Fill any remaining gaps ===
+        try:
+            if finviz_data.get('success'):
+                if not dividend_data['dividend_yield_pct'] and finviz_data.get('dividend_yield_pct') is not None:
+                    dividend_data['dividend_yield_pct'] = finviz_data['dividend_yield_pct']
+                if not dividend_data['annual_dividend'] and finviz_data.get('dividend_per_share') is not None:
+                    dividend_data['annual_dividend'] = finviz_data['dividend_per_share']
+                if not dividend_data['payout_ratio_pct'] and finviz_data.get('payout_ratio_pct') is not None:
+                    dividend_data['payout_ratio_pct'] = finviz_data['payout_ratio_pct']
+                if not dividend_data['ex_dividend_date'] and finviz_data.get('dividend_ex_date'):
+                    dividend_data['ex_dividend_date'] = finviz_data['dividend_ex_date']
+                if not dividend_data['dividend_growth_5yr'] and finviz_data.get('dividend_growth_5y_pct') is not None:
+                    dividend_data['dividend_growth_5yr'] = finviz_data['dividend_growth_5y_pct']
+                if not dividend_data['dividend_growth_3yr'] and finviz_data.get('dividend_growth_3y_pct') is not None:
+                    dividend_data['dividend_growth_3yr'] = finviz_data['dividend_growth_3y_pct']
+                # Finviz-exclusive fields
+                dividend_data['dividend_est_per_share'] = finviz_data.get('dividend_est_per_share')
+                dividend_data['dividend_est_yield_pct'] = finviz_data.get('dividend_est_yield_pct')
         except Exception:
             pass
         
