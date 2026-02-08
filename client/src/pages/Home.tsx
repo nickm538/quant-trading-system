@@ -23,6 +23,7 @@ import { DarkPoolScanner } from "@/components/DarkPoolScanner";
 import { TTMSqueezeScanner } from "@/components/TTMSqueezeScanner";
 import { OptionsFlowScanner } from "@/components/OptionsFlowScanner";
 import { BreakoutDetector } from "@/components/BreakoutDetector";
+import { PersonalRecommendation } from "@/components/PersonalRecommendation";
 import { Eye, Circle, BarChart3 as BarChartIcon, Rocket } from "lucide-react";
 
 export default function Home() {
@@ -391,6 +392,15 @@ export default function Home() {
 
                 {/* Expert Reasoning */}
                 <ExpertReasoningDisplay analysis={analysis} />
+
+                {/* Personal Recommendation — "If I Were Trading" */}
+                {analysis.personal_recommendation && !analysis.personal_recommendation.error && (
+                  <PersonalRecommendation
+                    recommendation={analysis.personal_recommendation}
+                    symbol={analysis.symbol || symbol}
+                    currentPrice={analysis.current_price || 0}
+                  />
+                )}
 
                 {/* Position Details */}
                 <Card>

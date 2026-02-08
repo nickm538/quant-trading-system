@@ -618,12 +618,12 @@ def main():
                     
                     vision_thread = threading.Thread(target=_run_vision_thread, args=(symbol, vision_queue), daemon=True)
                     vision_thread.start()
-                    vision_thread.join(timeout=45)  # Hard 45s cap
+                    vision_thread.join(timeout=90)  # Hard 90s cap (multi-timeframe: daily + intraday)
                     
                     if not vision_queue.empty():
                         vision_result = vision_queue.get_nowait()
                     else:
-                        vision_result = {'success': False, 'error': 'Vision AI timed out (45s cap)'}
+                        vision_result = {'success': False, 'error': 'Vision AI timed out (90s cap)'}
                         print(f"Vision AI timed out for {symbol}, continuing without it", file=sys.stderr)
                     
                     if vision_result.get('success'):
@@ -638,7 +638,13 @@ def main():
                             'overall_bias': vision_result.get('overall_bias', 'NEUTRAL'),
                             'key_observations': vision_result.get('key_observations', []),
                             'chart_source': vision_result.get('chart_source', 'Finviz'),
-                            'ai_model': vision_result.get('ai_model', 'Vision AI')
+                            'ai_model': vision_result.get('ai_model', 'Vision AI'),
+                            # Multi-timeframe data (new)
+                            'multi_timeframe': vision_result.get('multi_timeframe', {}),
+                            'intraday_summary': vision_result.get('intraday_summary', {}),
+                            'timeframes_analyzed': vision_result.get('timeframes_analyzed', []),
+                            'timeframe_alignment': vision_result.get('timeframe_alignment', ''),
+                            'timeframe_alignment_note': vision_result.get('timeframe_alignment_note', ''),
                         }
                     elif vision_result.get('error'):
                         candlestick_result['vision_ai_error'] = vision_result['error']

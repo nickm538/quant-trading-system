@@ -778,7 +778,116 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
                         {analysis.candlestick_patterns.vision_ai_analysis.chart_source} + {analysis.candlestick_patterns.vision_ai_analysis.ai_model}
                       </span>
                     </div>
-                    <p className="text-xs text-purple-700 dark:text-purple-300 mb-3">AI visually analyzes the Finviz chart image like a human trader would. May detect different patterns than algorithmic analysis due to different timeframes and visual interpretation.</p>
+                    <p className="text-xs text-purple-700 dark:text-purple-300 mb-3">AI visually analyzes chart images like a human trader would. Now analyzes MULTIPLE timeframes: Daily (Finviz), 5-Minute Intraday (Polygon.io), and Weekly (Finviz).</p>
+                    
+                    {/* Multi-Timeframe Alignment Banner */}
+                    {analysis.candlestick_patterns.vision_ai_analysis.timeframe_alignment && (
+                      <div className={`mb-4 p-3 rounded-lg border ${
+                        analysis.candlestick_patterns.vision_ai_analysis.timeframe_alignment === 'ALL_BULLISH' ? 'bg-green-50 dark:bg-green-950 border-green-300 dark:border-green-700' :
+                        analysis.candlestick_patterns.vision_ai_analysis.timeframe_alignment === 'ALL_BEARISH' ? 'bg-red-50 dark:bg-red-950 border-red-300 dark:border-red-700' :
+                        analysis.candlestick_patterns.vision_ai_analysis.timeframe_alignment === 'CONFLICTING' ? 'bg-amber-50 dark:bg-amber-950 border-amber-300 dark:border-amber-700' :
+                        'bg-gray-50 dark:bg-gray-900 border-gray-300'
+                      }`}>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span>{analysis.candlestick_patterns.vision_ai_analysis.timeframe_alignment === 'ALL_BULLISH' ? '✅' : analysis.candlestick_patterns.vision_ai_analysis.timeframe_alignment === 'ALL_BEARISH' ? '🔴' : analysis.candlestick_patterns.vision_ai_analysis.timeframe_alignment === 'CONFLICTING' ? '⚠️' : 'ℹ️'}</span>
+                          <span className="font-semibold text-sm">Multi-Timeframe Alignment: {analysis.candlestick_patterns.vision_ai_analysis.timeframe_alignment?.replace(/_/g, ' ')}</span>
+                          <span className="text-xs text-muted-foreground ml-2">({(analysis.candlestick_patterns.vision_ai_analysis.timeframes_analyzed || []).join(', ')})</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground">{analysis.candlestick_patterns.vision_ai_analysis.timeframe_alignment_note}</p>
+                      </div>
+                    )}
+                    
+                    {/* Intraday Summary (5-min Polygon data) */}
+                    {analysis.candlestick_patterns.vision_ai_analysis.intraday_summary && (
+                      <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span>📊</span>
+                          <h6 className="font-semibold text-blue-900 dark:text-blue-100 text-sm">5-Minute Intraday Snapshot (Polygon.io)</h6>
+                        </div>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                          <div>
+                            <span className="text-muted-foreground text-xs">Current: </span>
+                            <span className="font-semibold">${analysis.candlestick_patterns.vision_ai_analysis.intraday_summary.current_price}</span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground text-xs">VWAP: </span>
+                            <span className={`font-semibold ${
+                              analysis.candlestick_patterns.vision_ai_analysis.intraday_summary.vwap_signal === 'ABOVE_VWAP' ? 'text-green-600' : 'text-red-600'
+                            }`}>${analysis.candlestick_patterns.vision_ai_analysis.intraday_summary.vwap}</span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground text-xs">EMA 9/21: </span>
+                            <span className={`font-semibold ${
+                              analysis.candlestick_patterns.vision_ai_analysis.intraday_summary.ema_signal === 'BULLISH' ? 'text-green-600' : 
+                              analysis.candlestick_patterns.vision_ai_analysis.intraday_summary.ema_signal === 'BEARISH' ? 'text-red-600' : 'text-yellow-600'
+                            }`}>{analysis.candlestick_patterns.vision_ai_analysis.intraday_summary.ema_signal}</span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground text-xs">Intraday Trend: </span>
+                            <span className={`font-semibold ${
+                              analysis.candlestick_patterns.vision_ai_analysis.intraday_summary.intraday_trend === 'UPTREND' ? 'text-green-600' : 
+                              analysis.candlestick_patterns.vision_ai_analysis.intraday_summary.intraday_trend === 'DOWNTREND' ? 'text-red-600' : 'text-yellow-600'
+                            }`}>{analysis.candlestick_patterns.vision_ai_analysis.intraday_summary.intraday_trend}</span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground text-xs">Session Change: </span>
+                            <span className={`font-semibold ${(analysis.candlestick_patterns.vision_ai_analysis.intraday_summary.change_pct || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                              {(analysis.candlestick_patterns.vision_ai_analysis.intraday_summary.change_pct || 0) >= 0 ? '+' : ''}{analysis.candlestick_patterns.vision_ai_analysis.intraday_summary.change_pct}%
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground text-xs">Range: </span>
+                            <span className="font-semibold">{analysis.candlestick_patterns.vision_ai_analysis.intraday_summary.range_pct}%</span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground text-xs">Volume Trend: </span>
+                            <span className="font-semibold">{analysis.candlestick_patterns.vision_ai_analysis.intraday_summary.volume_trend}</span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground text-xs">Bars: </span>
+                            <span className="font-semibold">{analysis.candlestick_patterns.vision_ai_analysis.intraday_summary.bars}</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Per-Timeframe Breakdowns */}
+                    {analysis.candlestick_patterns.vision_ai_analysis.multi_timeframe && Object.keys(analysis.candlestick_patterns.vision_ai_analysis.multi_timeframe).length > 1 && (
+                      <div className="mb-4">
+                        <h6 className="font-medium text-sm mb-2">Per-Timeframe Vision AI Readings</h6>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {Object.entries(analysis.candlestick_patterns.vision_ai_analysis.multi_timeframe).map(([tfKey, tfData]: [string, any]) => (
+                            <div key={tfKey} className={`p-3 rounded-lg border ${
+                              (tfData.overall_bias || '').toUpperCase().includes('BULL') ? 'bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800' :
+                              (tfData.overall_bias || '').toUpperCase().includes('BEAR') ? 'bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800' :
+                              'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-800'
+                            }`}>
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="font-semibold text-sm">{tfData.label || tfKey}</span>
+                                <span className={`text-xs font-bold px-2 py-0.5 rounded ${
+                                  (tfData.overall_bias || '').toUpperCase().includes('BULL') ? 'bg-green-200 dark:bg-green-800 text-green-800 dark:text-green-200' :
+                                  (tfData.overall_bias || '').toUpperCase().includes('BEAR') ? 'bg-red-200 dark:bg-red-800 text-red-800 dark:text-red-200' :
+                                  'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200'
+                                }`}>{tfData.overall_bias || 'N/A'}</span>
+                              </div>
+                              <div className="text-xs space-y-1 text-muted-foreground">
+                                <div>Source: {tfData.source}</div>
+                                <div>Trend: {tfData.trend?.direction || 'N/A'} ({tfData.trend?.strength || 'N/A'})</div>
+                                {tfData.recommendation?.signal && (
+                                  <div>Signal: <span className={`font-semibold ${
+                                    tfData.recommendation.signal === 'BUY' ? 'text-green-600' :
+                                    tfData.recommendation.signal === 'SELL' ? 'text-red-600' : 'text-yellow-600'
+                                  }`}>{tfData.recommendation.signal}</span> ({tfData.recommendation.confidence}% conf)</div>
+                                )}
+                                {tfData.candlestick_patterns?.length > 0 && (
+                                  <div>Patterns: {tfData.candlestick_patterns.slice(0, 3).map((p: any) => p.name).join(', ')}{tfData.candlestick_patterns.length > 3 ? ` +${tfData.candlestick_patterns.length - 3} more` : ''}</div>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                       <DataItem label="AI Bias" value={analysis.candlestick_patterns.vision_ai_analysis.overall_bias || 'N/A'} />
