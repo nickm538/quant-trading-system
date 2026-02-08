@@ -93,6 +93,24 @@ try:
     HAS_VISION = True
 except ImportError:
     HAS_VISION = False
+try:
+    from taapi_client import TaapiClient
+    HAS_TAAPI = True
+except ImportError as e:
+    HAS_TAAPI = False
+    print(f"Warning: TAAPI.io integration not available: {e}", file=sys.stderr)
+try:
+    from financial_datasets_client import FinancialDatasetsClient
+    HAS_FINANCIAL_DATASETS = True
+except ImportError as e:
+    HAS_FINANCIAL_DATASETS = False
+    print(f"Warning: FinancialDatasets.ai integration not available: {e}", file=sys.stderr)
+try:
+    from personal_recommendation import PersonalRecommendationEngine
+    HAS_PERSONAL_REC = True
+except ImportError as e:
+    HAS_PERSONAL_REC = False
+    print(f"Warning: Personal Recommendation Engine not available: {e}", file=sys.stderr)
 
 def generate_monte_carlo_forecast(current_price, volatility, forecast_days=30, num_simulations=20000, fat_tail_df=5.0):
     """
@@ -500,7 +518,11 @@ def main():
             'candlestick_patterns': None,
             'enhanced_fundamentals': None,
             'market_context': None,  # Market status, VIX, regime, sentiment
-            'stockgrid_analysis': None  # Dark pools, ARIMA, factor analysis from StockGrid.io
+            'stockgrid_analysis': None,  # Dark pools, ARIMA, factor analysis from StockGrid.io
+            'taapi_indicators': None,  # TAAPI.io technical indicators (backup/validation)
+            'financialdatasets': None,  # FinancialDatasets.ai fundamental data
+            'exa_intelligence': None,  # EXA AI real-time web search & candlestick chart analysis
+            'personal_recommendation': None  # "If I Were Trading" recommendation
         }
         
         # Run Advanced Technicals (R2, Pivot, Fibonacci)
@@ -574,6 +596,82 @@ def main():
                 output['stockgrid_analysis'] = {'error': str(e)}
         else:
             output['stockgrid_analysis'] = {'error': 'StockGrid integration not available'}
+        
+        # Run TAAPI.io Technical Indicators (backup/validation source)
+        if HAS_TAAPI:
+            try:
+                taapi = TaapiClient()
+                taapi_result = {}
+                # Get key indicators from TAAPI for cross-validation
+                for indicator in ['rsi', 'macd', 'supertrend', 'adx', 'bbands', 'stoch']:
+                    try:
+                        ind_data = taapi.get_indicator(indicator, symbol, '1d')
+                        if ind_data and not ind_data.get('error'):
+                            taapi_result[indicator] = ind_data
+                    except Exception as ind_e:
+                        taapi_result[indicator] = {'error': str(ind_e)}
+                output['taapi_indicators'] = taapi_result
+            except Exception as e:
+                output['taapi_indicators'] = {'error': str(e)}
+        else:
+            output['taapi_indicators'] = {'error': 'TAAPI.io integration not available'}
+        
+        # Run FinancialDatasets.ai Fundamental Data
+        if HAS_FINANCIAL_DATASETS:
+            try:
+                fd_client = FinancialDatasetsClient()
+                fd_result = {}
+                # Get financial metrics
+                try:
+                    fd_result['financial_metrics'] = fd_client.get_financial_metrics(symbol)
+                except Exception as fm_e:
+                    fd_result['financial_metrics'] = {'error': str(fm_e)}
+                # Get income statement
+                try:
+                    fd_result['income_statement'] = fd_client.get_income_statement(symbol, period='annual', limit=2)
+                except Exception as is_e:
+                    fd_result['income_statement'] = {'error': str(is_e)}
+                # Get SEC filings (for insider activity context)
+                try:
+                    fd_result['sec_filings'] = fd_client.get_filings(symbol, limit=5)
+                except Exception as sf_e:
+                    fd_result['sec_filings'] = {'error': str(sf_e)}
+                # Get company facts
+                try:
+                    fd_result['company_facts'] = fd_client.get_company_facts(symbol)
+                except Exception as cf_e:
+                    fd_result['company_facts'] = {'error': str(cf_e)}
+                # Get price snapshot
+                try:
+                    fd_result['price_snapshot'] = fd_client.get_stock_price_snapshot(symbol)
+                except Exception as ps_e:
+                    fd_result['price_snapshot'] = {'error': str(ps_e)}
+                output['financialdatasets'] = fd_result
+            except Exception as e:
+                output['financialdatasets'] = {'error': str(e)}
+        else:
+            output['financialdatasets'] = {'error': 'FinancialDatasets.ai integration not available'}
+        
+        # Run EXA AI Real-Time Web Intelligence & Candlestick Chart Analysis
+        try:
+            from exa_client import ExaClient
+            exa = ExaClient()
+            output['exa_intelligence'] = exa.get_comprehensive_stock_intelligence(symbol)
+        except ImportError:
+            output['exa_intelligence'] = {'error': 'EXA AI client not available'}
+        except Exception as e:
+            output['exa_intelligence'] = {'error': str(e)}
+        
+        # Generate Personal "If I Were Trading" Recommendation
+        # This MUST run last because it synthesizes ALL other analysis data
+        if HAS_PERSONAL_REC:
+            try:
+                rec_engine = PersonalRecommendationEngine()
+                output['personal_recommendation'] = rec_engine.generate_recommendation(output)
+            except Exception as e:
+                output['personal_recommendation'] = {'error': str(e)}
+        else:
+            output['personal_recommendation'] = {'error': 'Personal Recommendation Engine not available'}
         
         # PRODUCTION VALIDATION - Ensure all data is valid before returning
         validator = ProductionValidator()

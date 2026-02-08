@@ -13,3 +13,4 @@ mysql-connector-python
 websocket-client==1.7.0
 google-genai>=0.3.0
 statsmodels
+exa-py>=2.0.0

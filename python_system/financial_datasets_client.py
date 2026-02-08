@@ -41,7 +41,7 @@ class FinancialDatasetsClient:
     
     def __init__(self, api_key: str = None):
         """Initialize the client with API key."""
-        self.api_key = api_key or os.environ.get('FINANCIAL_DATASETS_API_KEY', '')
+        self.api_key = api_key or os.environ.get('FINANCIAL_DATASETS_API_KEY', '9ca0e09f-df95-4310-b763-7d7c67d5b6c5')
         self.headers = {
             "X-API-KEY": self.api_key,
             "Content-Type": "application/json"

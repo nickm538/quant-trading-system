@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 # TAAPI.io API configuration
 TAAPI_API_KEY = os.getenv(
     'TAAPI_API_KEY',
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjbHVlIjoiNjkyYjA3OWM4MDZmZjE2NTFlNGZjOTVhIiwiaWF0IjoxNzY0NjEzODYxLCJleHAiOjMzMjY5MDc3ODYxfQ.Qi2NBgjXnhFx46C3L0RshuBp7srZ9xKqg0MsOYyZJM0'
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjbHVlIjoiNjkyYjA3OWM4MDZmZjE2NTFlNGZjOTVhIiwiaWF0IjoxNzcwNTYwODE1LCJleHAiOjMzMjc1MDI0ODE1fQ.piNOUR4OeJbxrHyFTJoF6ClGQjjoHrFXy_wfdKdn4B8'
 )
 TAAPI_BASE_URL = "https://api.taapi.io"
 TAAPI_TIMEOUT = 10  # seconds
