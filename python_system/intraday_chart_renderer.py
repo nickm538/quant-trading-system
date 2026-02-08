@@ -91,9 +91,18 @@ class IntradayChartRenderer:
         end_date = datetime.now()
         start_date = end_date - timedelta(days=config['days_back'])
 
-        # For weekends/holidays, extend lookback
-        if end_date.weekday() >= 5:  # Saturday or Sunday
-            start_date = end_date - timedelta(days=config['days_back'] + 3)
+        # For weekends/holidays, extend lookback to ensure we get the most recent trading day
+        # Saturday(5) or Sunday(6): extend by 3 days
+        # Monday: extend by 5 days (covers potential Friday holiday + weekend)
+        # Any day: add extra buffer for market holidays (e.g., MLK Day, Presidents Day)
+        weekday = end_date.weekday()
+        if weekday >= 5:  # Saturday or Sunday
+            start_date = end_date - timedelta(days=config['days_back'] + 5)
+        elif weekday == 0:  # Monday - might need Friday data if Monday is holiday
+            start_date = end_date - timedelta(days=config['days_back'] + 4)
+        else:
+            # Add 2-day buffer for mid-week holidays
+            start_date = end_date - timedelta(days=config['days_back'] + 2)
 
         try:
             aggs = list(self.client.list_aggs(
@@ -371,6 +380,9 @@ class IntradayChartRenderer:
             'vwap_signal': vwap_signal,
             'volume_trend': volume_trend,
             'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S EST'),
+            'data_date': df.index[-1].strftime('%Y-%m-%d'),
+            'data_day': df.index[-1].strftime('%A'),
+            'is_live': df.index[-1].date() == datetime.now().date(),
         }
 
 

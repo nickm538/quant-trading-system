@@ -800,9 +800,20 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
                     {/* Intraday Summary (5-min Polygon data) */}
                     {analysis.candlestick_patterns.vision_ai_analysis.intraday_summary && (
                       <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
-                        <div className="flex items-center gap-2 mb-2">
+                        <div className="flex items-center gap-2 mb-2 flex-wrap">
                           <span>📊</span>
                           <h6 className="font-semibold text-blue-900 dark:text-blue-100 text-sm">5-Minute Intraday Snapshot (Polygon.io)</h6>
+                          {analysis.candlestick_patterns.vision_ai_analysis.intraday_summary.data_date && (
+                            <span className={`text-xs px-2 py-0.5 rounded-full ${
+                              analysis.candlestick_patterns.vision_ai_analysis.intraday_summary.is_live 
+                                ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300' 
+                                : 'bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300'
+                            }`}>
+                              {analysis.candlestick_patterns.vision_ai_analysis.intraday_summary.is_live 
+                                ? '🟢 Live' 
+                                : `📅 Data from ${analysis.candlestick_patterns.vision_ai_analysis.intraday_summary.data_day} ${analysis.candlestick_patterns.vision_ai_analysis.intraday_summary.data_date} (market closed)`}
+                            </span>
+                          )}
                         </div>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
                           <div>

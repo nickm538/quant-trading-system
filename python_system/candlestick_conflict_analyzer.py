@@ -163,7 +163,7 @@ class CandlestickConflictAnalyzer:
                     'consensus_trend': exa_syn.get('consensus_trend', 'N/A'),
                     'expert_consensus': exa_syn.get('expert_consensus', 'N/A'),
                     'key_levels': exa_syn.get('key_levels', []),
-                    'sources_analyzed': exa_syn.get('sources_analyzed', 0),
+                    'sources_analyzed': exa_syn.get('total_sources_analyzed', 0),
                 },
                 'method_description': 'Neural web search across financial sites (TradingView, SeekingAlpha, Finviz, etc.)',
             }
