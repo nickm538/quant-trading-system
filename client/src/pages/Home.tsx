@@ -418,28 +418,49 @@ export default function Home() {
                         <div className="text-lg font-semibold text-red-500">${analysis.stop_loss?.toFixed(2)}</div>
                       </div>
                       <div className="p-4 bg-muted/30 rounded-lg">
-                        <div className="text-xs text-muted-foreground mb-1">Dollar Risk</div>
-                        <div className="text-lg font-semibold text-red-500">${analysis.risk_assessment?.potential_loss_pct?.toFixed(2)}</div>
-                      </div>
-                      <div className="p-4 bg-muted/30 rounded-lg">
-                        <div className="text-xs text-muted-foreground mb-1">Dollar Reward</div>
-                        <div className="text-lg font-semibold text-green-500">${analysis.risk_assessment?.potential_gain_pct?.toFixed(2)}</div>
+                        <div className="text-xs text-muted-foreground mb-1">Target Price</div>
+                        <div className="text-lg font-semibold text-green-500">${analysis.target_price?.toFixed(2)}</div>
                       </div>
                       <div className="p-4 bg-muted/30 rounded-lg">
                         <div className="text-xs text-muted-foreground mb-1">Risk/Reward</div>
                         <div className="text-lg font-semibold">1:{analysis.risk_assessment?.risk_reward_ratio?.toFixed(2)}</div>
                       </div>
                       <div className="p-4 bg-muted/30 rounded-lg">
+                        <div className="text-xs text-muted-foreground mb-1">Shares</div>
+                        <div className="text-lg font-semibold">{analysis.position_sizing?.shares ?? analysis.position_size ?? 0}</div>
+                      </div>
+                      <div className="p-4 bg-muted/30 rounded-lg">
                         <div className="text-xs text-muted-foreground mb-1">Position Value</div>
-                        <div className="text-lg font-semibold">${(analysis.current_price * analysis.position_size)?.toFixed(2)}</div>
+                        <div className="text-lg font-semibold">${(analysis.position_sizing?.position_value ?? (analysis.current_price * analysis.position_size))?.toFixed(2)}</div>
+                      </div>
+                      <div className="p-4 bg-muted/30 rounded-lg">
+                        <div className="text-xs text-muted-foreground mb-1">Dollar Risk (per position)</div>
+                        <div className="text-lg font-semibold text-red-500">${analysis.position_sizing?.dollar_risk?.toFixed(2) ?? '0.00'}</div>
+                        <div className="text-xs text-muted-foreground">{analysis.risk_assessment?.potential_loss_pct?.toFixed(2)}% from entry</div>
+                      </div>
+                      <div className="p-4 bg-muted/30 rounded-lg">
+                        <div className="text-xs text-muted-foreground mb-1">Dollar Reward (per position)</div>
+                        <div className="text-lg font-semibold text-green-500">${analysis.position_sizing?.dollar_reward?.toFixed(2) ?? '0.00'}</div>
+                        <div className="text-xs text-muted-foreground">{analysis.risk_assessment?.potential_gain_pct?.toFixed(2)}% from entry</div>
+                      </div>
+                      <div className="p-4 bg-muted/30 rounded-lg">
+                        <div className="text-xs text-muted-foreground mb-1">% of Bankroll</div>
+                        <div className="text-lg font-semibold">{((analysis.position_sizing?.position_size_pct ?? 0) * 100)?.toFixed(1)}%</div>
+                        <div className="text-xs text-muted-foreground">Bankroll: ${analysis.bankroll?.toLocaleString()}</div>
+                      </div>
+                      <div className="p-4 bg-muted/30 rounded-lg">
+                        <div className="text-xs text-muted-foreground mb-1">Risk % of Bankroll</div>
+                        <div className="text-lg font-semibold text-red-500">{((analysis.position_sizing?.risk_pct_of_bankroll ?? 0) * 100)?.toFixed(2)}%</div>
                       </div>
                       <div className="p-4 bg-muted/30 rounded-lg">
                         <div className="text-xs text-muted-foreground mb-1">VaR (95%)</div>
                         <div className="text-lg font-semibold text-red-500">{(analysis.stochastic_analysis?.var_95 * 100)?.toFixed(2)}%</div>
+                        <div className="text-xs text-muted-foreground">Max loss in 95% of scenarios</div>
                       </div>
                       <div className="p-4 bg-muted/30 rounded-lg">
                         <div className="text-xs text-muted-foreground mb-1">CVaR (95%)</div>
                         <div className="text-lg font-semibold text-red-500">{(analysis.stochastic_analysis?.cvar_95 * 100)?.toFixed(2)}%</div>
+                        <div className="text-xs text-muted-foreground">Avg loss in worst 5% of scenarios</div>
                       </div>
                     </div>
                   </CardContent>
