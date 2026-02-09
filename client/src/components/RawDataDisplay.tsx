@@ -13,6 +13,63 @@ const safeFixed = (value: any, decimals: number = 2): string => {
   return num.toFixed(decimals);
 };
 
+// Dynamic interpretation helpers
+const interpretFCF = (fcf: number | null, fcfYield: number | null): string => {
+  if (fcf === null || fcf === undefined) return '📉 No data available';
+  const fcfB = fcf / 1_000_000_000;
+  if (fcf > 500_000_000) {
+    return `✅ Excellent - $${fcfB.toFixed(1)}B FCF${fcfYield ? ` (Yield: ${fcfYield.toFixed(1)}%)` : ''}`;
+  } else if (fcf > 0 && fcfYield && fcfYield > 5) {
+    return `✅ Positive FCF with strong ${fcfYield.toFixed(1)}% yield`;
+  } else if (fcf > 0) {
+    return `✅ Positive FCF${fcfYield ? ` (Yield: ${fcfYield.toFixed(1)}%)` : ''}`;
+  } else {
+    return '⚠️ Negative - company is consuming cash';
+  }
+};
+
+const interpretOCF = (ocf: number | null): string => {
+  if (ocf === null || ocf === undefined) return '📉 No data available';
+  const ocfB = ocf / 1_000_000_000;
+  if (ocf > 1_000_000_000) {
+    return `✅ Excellent - generating over $${ocfB.toFixed(1)}B in operating cash`;
+  } else if (ocf > 0) {
+    return '✅ Positive - company generates cash from operations';
+  } else {
+    return '⚠️ Negative - burning cash in operations';
+  }
+};
+
+const interpretRSI = (rsi: number | null): string => {
+  if (rsi === null || rsi === undefined) return '';
+  if (rsi < 30) return `💎 Oversold (${rsi.toFixed(1)}) - potential bounce setup`;
+  if (rsi < 40) return `📊 Bearish (${rsi.toFixed(1)}) - caution in downtrends`;
+  if (rsi < 50) return `📊 Neutral-Bearish (${rsi.toFixed(1)})`;
+  if (rsi < 60) return `✅ Neutral-Bullish (${rsi.toFixed(1)}) - healthy range`;
+  if (rsi < 70) return `✅ Bullish (${rsi.toFixed(1)}) - strong momentum`;
+  if (rsi < 80) return `🔴 Overbought (${rsi.toFixed(1)}) - watch for divergence`;
+  return `🔴 Extremely Overbought (${rsi.toFixed(1)}) - take profits`;
+};
+
+const interpretMACD = (macd: number | null, signal: number | null): string => {
+  if (macd === null || signal === null) return '';
+  const hist = macd - signal;
+  if (macd > signal && hist > 0.5) return `✅ Strong Bullish - momentum accelerating`;
+  if (macd > signal) return `✅ Bullish - MACD above signal`;
+  if (macd < signal && hist < -0.5) return `🔴 Strong Bearish - downside accelerating`;
+  if (macd < signal) return `🔴 Bearish - MACD below signal`;
+  return `📊 Neutral - no clear momentum`;
+};
+
+const interpretADX = (adx: number | null): string => {
+  if (adx === null || adx === undefined) return '';
+  if (adx > 50) return `🔥 Extreme Trend (${adx.toFixed(1)}) - very strong`;
+  if (adx > 40) return `✅ Very Strong Trend (${adx.toFixed(1)})`;
+  if (adx > 25) return `✅ Strong Trend (${adx.toFixed(1)})`;
+  if (adx > 20) return `📊 Emerging Trend (${adx.toFixed(1)})`;
+  return `⚠️ No Trend (${adx.toFixed(1)}) - choppy/range-bound`;
+}
+
 export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
   const technical = analysis.technical_analysis || {};
   const stochastic = analysis.stochastic_analysis || {};
@@ -141,10 +198,19 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
             <div className="mt-4">
               <h4 className="font-semibold mb-2 text-cyan-900 dark:text-cyan-100">Core Indicators</h4>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                <DataItem label="RSI (14)" value={safeFixed(technical.rsi)} />
-                <DataItem label="MACD" value={safeFixed(technical.macd, 4)} />
+                <div>
+                  <DataItem label="RSI (14)" value={safeFixed(technical.rsi)} />
+                  <p className="text-xs text-muted-foreground mt-1">{interpretRSI(technical.rsi)}</p>
+                </div>
+                <div>
+                  <DataItem label="MACD" value={safeFixed(technical.macd, 4)} />
+                  <p className="text-xs text-muted-foreground mt-1">{interpretMACD(technical.macd, analysis.technical_indicators?.macd_signal)}</p>
+                </div>
                 <DataItem label="MACD Signal" value={safeFixed(analysis.technical_indicators?.macd_signal, 4)} />
-                <DataItem label="ADX" value={safeFixed(technical.adx)} />
+                <div>
+                  <DataItem label="ADX" value={safeFixed(technical.adx)} />
+                  <p className="text-xs text-muted-foreground mt-1">{interpretADX(technical.adx)}</p>
+                </div>
                 <DataItem label="ATR" value={`$${safeFixed(analysis.technical_indicators?.atr)}`} />
                 <DataItem label="ATR %" value={analysis.technical_indicators?.atr_pct ? `${safeFixed(analysis.technical_indicators.atr_pct * 100)}%` : 'N/A'} />
                 <DataItem label="Current Volatility" value={`${safeFixed(technical.current_volatility * 100)}%`} />
@@ -1216,7 +1282,23 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
               <p className="text-sm text-emerald-800 dark:text-emerald-200">
                 Deep fundamental analysis including PE, PEG, GARP scoring, FCF, EBITDA/EV, Free Float, and Liquidity metrics.
               </p>
+              <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-300 mt-2">
+                📅 Period: TTM (Trailing Twelve Months)
+              </p>
             </div>
+            
+            {/* User Education Expander */}
+            <details className="mb-4 p-3 bg-muted/30 rounded-lg border border-border/50">
+              <summary className="cursor-pointer font-semibold text-sm">📚 What do these metrics mean?</summary>
+              <div className="mt-3 space-y-2 text-xs text-muted-foreground">
+                <p><strong>Operating Cash Flow (OCF):</strong> Cash generated from normal business operations. Positive = company generates cash from its core business.</p>
+                <p><strong>Free Cash Flow (FCF):</strong> Cash left after operations and capital expenditures. This is "true" cash available for dividends, buybacks, or growth.</p>
+                <p><strong>FCF Yield:</strong> FCF as % of market cap. >5% = excellent, 3-5% = good, <3% = low. Higher = better value.</p>
+                <p><strong>FCF Margin:</strong> FCF as % of revenue. >15% = excellent efficiency. Shows how much revenue becomes free cash.</p>
+                <p><strong>FCF/OCF Ratio:</strong> % of operating cash that becomes free cash. >0.8 = good, <0.5 = high capex needs.</p>
+                <p><strong>CF to Debt:</strong> Years of cash flow needed to pay off all debt. <3 years = healthy, >5 years = concerning leverage.</p>
+              </div>
+            </details>
             
             {analysis.enhanced_fundamentals ? (
               <div className="space-y-4">
@@ -1231,8 +1313,14 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
                   <div className="mt-4">
                     <h5 className="font-semibold mb-2">Cash Flow Metrics</h5>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                      <DataItem label="Free Cash Flow" value={analysis.enhanced_fundamentals.cash_flow.fcf_formatted || 'N/A'} />
-                      <DataItem label="Op Cash Flow" value={analysis.enhanced_fundamentals.cash_flow.ocf_formatted || 'N/A'} />
+                      <div>
+                        <DataItem label="Free Cash Flow" value={analysis.enhanced_fundamentals.cash_flow.fcf_formatted || 'N/A'} />
+                        <p className="text-xs text-muted-foreground mt-1">{interpretFCF(analysis.enhanced_fundamentals.cash_flow.free_cash_flow, analysis.enhanced_fundamentals.cash_flow.fcf_yield_pct)}</p>
+                      </div>
+                      <div>
+                        <DataItem label="Op Cash Flow" value={analysis.enhanced_fundamentals.cash_flow.ocf_formatted || 'N/A'} />
+                        <p className="text-xs text-muted-foreground mt-1">{interpretOCF(analysis.enhanced_fundamentals.cash_flow.operating_cash_flow)}</p>
+                      </div>
                       <DataItem label="EBITDA" value={analysis.enhanced_fundamentals.cash_flow.ebitda_formatted || 'N/A'} />
                       <DataItem label="FCF/OCF Ratio" value={analysis.enhanced_fundamentals.cash_flow.fcf_to_ocf_ratio != null ? safeFixed(analysis.enhanced_fundamentals.cash_flow.fcf_to_ocf_ratio) : 'N/A'} />
                     </div>
