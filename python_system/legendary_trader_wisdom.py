@@ -361,10 +361,11 @@ class LegendaryTraderWisdom:
 
         vix = self._safe(mc, 'vix', default={})
         if isinstance(vix, dict):
-            vix_level = vix.get('level', 0)
-            vix_change = vix.get('change_pct', 0)
+            # 'vix' key has the numeric value, 'level' is a string label like 'ELEVATED'
+            vix_level = float(vix.get('vix', 0) or 0)
+            vix_change = float(vix.get('change_percent', vix.get('change_pct', 0)) or 0)
         else:
-            vix_level = 0
+            vix_level = float(vix) if isinstance(vix, (int, float)) else 0
             vix_change = 0
 
         # Sentiment (Soros looks for gaps between sentiment and reality)
