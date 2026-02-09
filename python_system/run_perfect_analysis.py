@@ -185,9 +185,38 @@ def generate_monte_carlo_forecast(current_price, volatility, forecast_days=30, n
         'cvar_95_price': float(cvar_95_price)
     }
 
+# Global reference to partial output for safety timeout
+_partial_output = None
+_output_lock = None
+
+def _pipeline_timeout_handler(signum, frame):
+    """Safety handler: output whatever we have before the process gets killed."""
+    global _partial_output
+    sys.stdout = _original_stdout
+    if _partial_output:
+        _partial_output['pipeline_timeout'] = True
+        _partial_output['pipeline_timeout_note'] = 'Pipeline hit safety timeout (270s). Partial results returned.'
+        print(safe_json_dumps(_partial_output, indent=2))
+    else:
+        print(safe_json_dumps({
+            'error': 'Pipeline safety timeout (270s) - no partial results available',
+            'pipeline_timeout': True
+        }))
+    sys.stdout.flush()
+    os._exit(2)
+
 def main():
     import time as _time
+    import signal
     _pipeline_start = _time.time()
+    
+    # Set a safety alarm at 270s (before the 300s exec timeout kills us)
+    # This ensures we ALWAYS output JSON, even if the pipeline hangs
+    try:
+        signal.signal(signal.SIGALRM, _pipeline_timeout_handler)
+        signal.alarm(270)  # 270s safety timeout
+    except (AttributeError, OSError):
+        pass  # SIGALRM not available on Windows
     
     if len(sys.argv) < 2:
         print(json.dumps({"error": "Usage: run_perfect_analysis.py <symbol> [bankroll]"}))
@@ -567,6 +596,10 @@ def main():
             'personal_recommendation': None  # "If I Were Trading" recommendation
         }
         
+        # Set partial output for safety timeout handler
+        global _partial_output
+        _partial_output = output
+        
         # Run Comprehensive Technical Analysis (Stochastic RSI, Ichimoku, Williams %R, CCI, etc.)
         if HAS_COMPREHENSIVE_TECH:
             try:
@@ -618,12 +651,12 @@ def main():
                     
                     vision_thread = threading.Thread(target=_run_vision_thread, args=(symbol, vision_queue), daemon=True)
                     vision_thread.start()
-                    vision_thread.join(timeout=90)  # Hard 90s cap (multi-timeframe: daily + intraday)
+                    vision_thread.join(timeout=45)  # Hard 45s cap (reduced from 90s to prevent pipeline timeout)
                     
                     if not vision_queue.empty():
                         vision_result = vision_queue.get_nowait()
                     else:
-                        vision_result = {'success': False, 'error': 'Vision AI timed out (90s cap)'}
+                        vision_result = {'success': False, 'error': 'Vision AI timed out (45s cap)'}
                         print(f"Vision AI timed out for {symbol}, continuing without it", file=sys.stderr)
                     
                     if vision_result.get('success'):
@@ -850,8 +883,9 @@ def main():
         for t in threads:
             t.start()
         
-        # Wait for all threads with a global timeout of 60s
-        PARALLEL_TIMEOUT = 60  # seconds
+        # Wait for all threads with a global timeout of 90s
+        # Enhanced fundamentals can take 57-69s with all API fallbacks
+        PARALLEL_TIMEOUT = 90  # seconds
         deadline = _time.time() + PARALLEL_TIMEOUT
         for t in threads:
             remaining = max(0.1, deadline - _time.time())
@@ -1094,6 +1128,12 @@ def main():
             output['validation_status'] = 'FAILED'
         else:
             output['validation_status'] = 'PASSED'
+        
+        # Cancel the safety alarm - we made it in time
+        try:
+            signal.alarm(0)
+        except Exception:
+            pass
         
         # Restore original stdout for JSON output
         sys.stdout = _original_stdout

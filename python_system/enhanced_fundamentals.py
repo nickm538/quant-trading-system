@@ -1469,9 +1469,22 @@ class EnhancedFundamentalsAnalyzer:
         
         try:
             # PRIMARY SOURCE: yfinance (most reliable for target prices)
+            # Wrapped with 15s timeout to prevent hanging
             try:
-                ticker = yf.Ticker(symbol)
-                info = ticker.info
+                import threading
+                import queue as _queue
+                yf_info_q = _queue.Queue()
+                def _fetch_yf_info():
+                    try:
+                        t = yf.Ticker(symbol)
+                        yf_info_q.put(t.info)
+                    except Exception:
+                        yf_info_q.put({})
+                yf_t = threading.Thread(target=_fetch_yf_info, daemon=True)
+                yf_t.start()
+                yf_t.join(timeout=15)  # 15s cap for yfinance
+                
+                info = yf_info_q.get_nowait() if not yf_info_q.empty() else {}
                 
                 # Get target prices from yfinance
                 if info.get('targetMeanPrice'):
@@ -1648,7 +1661,42 @@ class EnhancedFundamentalsAnalyzer:
             if not yf:
                 return trends
             
-            ticker = yf.Ticker(symbol)
+            # Wrap yfinance calls with a 20s timeout to prevent hanging
+            import threading
+            import queue as _queue
+            yf_data_q = _queue.Queue()
+            def _fetch_yf_trends():
+                try:
+                    t = yf.Ticker(symbol)
+                    yf_data_q.put({
+                        'income_stmt': t.income_stmt,
+                        'cashflow': t.cashflow,
+                        'history': t.history(period='10y')
+                    })
+                except Exception as e:
+                    yf_data_q.put({'error': str(e)})
+            yf_thread = threading.Thread(target=_fetch_yf_trends, daemon=True)
+            yf_thread.start()
+            yf_thread.join(timeout=20)  # 20s cap for yfinance
+            
+            if yf_data_q.empty():
+                print(f"  _fetch_financial_trends: yfinance timed out (20s), using fallbacks only", file=sys.stderr, flush=True)
+                # Skip to FMP/AlphaVantage/FD fallbacks below
+                raise Exception('yfinance timeout')
+            
+            yf_trends_data = yf_data_q.get_nowait()
+            if 'error' in yf_trends_data:
+                raise Exception(yf_trends_data['error'])
+            
+            # Use a mock ticker object that returns cached data
+            class _CachedTicker:
+                def __init__(self, data):
+                    self.income_stmt = data.get('income_stmt')
+                    self.cashflow = data.get('cashflow')
+                    self._history = data.get('history')
+                def history(self, **kwargs):
+                    return self._history
+            ticker = _CachedTicker(yf_trends_data)
             
             # Get income statement for revenue and earnings
             try:

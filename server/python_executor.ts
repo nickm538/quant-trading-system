@@ -77,7 +77,7 @@ export async function analyzeStock(params: StockAnalysisParams): Promise<StockAn
   try {
     const result = await execAsync(command, {
       maxBuffer: 10 * 1024 * 1024, // 10MB buffer
-      timeout: 180000, // 3 minute timeout
+      timeout: 300000, // 5 minute timeout (pipeline needs ~150-200s for complex stocks)
       env: {
         ...process.env,
         PYTHONPATH: '',
