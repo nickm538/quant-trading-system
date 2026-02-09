@@ -43,6 +43,130 @@ class ComprehensiveTechnicalAnalyzer:
     
     # ==================== MOMENTUM INDICATORS ====================
     
+    def calculate_rsi_fast(self, close: pd.Series, period: int = 9) -> Dict[str, Any]:
+        """
+        Fast RSI (9-day) for momentum trading.
+        More responsive to price changes than 14-day RSI.
+        """
+        delta = close.diff()
+        gain = delta.where(delta > 0, 0).rolling(window=period).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
+        rs = gain / loss.replace(0, 1e-10)
+        rsi = 100 - (100 / (1 + rs))
+        
+        current_rsi = float(rsi.iloc[-1]) if not pd.isna(rsi.iloc[-1]) else 50
+        
+        # Signal interpretation
+        if current_rsi > 75:
+            signal = 'EXTREMELY_OVERBOUGHT'
+            explanation = f'Fast RSI at {current_rsi:.1f} - Extremely overbought. Strong reversal risk.'
+        elif current_rsi > 65:
+            signal = 'OVERBOUGHT'
+            explanation = f'Fast RSI at {current_rsi:.1f} - Overbought. Consider taking profits.'
+        elif current_rsi < 25:
+            signal = 'EXTREMELY_OVERSOLD'
+            explanation = f'Fast RSI at {current_rsi:.1f} - Extremely oversold. Strong bounce potential.'
+        elif current_rsi < 35:
+            signal = 'OVERSOLD'
+            explanation = f'Fast RSI at {current_rsi:.1f} - Oversold. Consider entry.'
+        else:
+            signal = 'NEUTRAL'
+            explanation = f'Fast RSI at {current_rsi:.1f} - Neutral momentum.'
+        
+        return {
+            'value': round(current_rsi, 2),
+            'signal': signal,
+            'explanation': explanation,
+            'period': period
+        }
+    
+    def calculate_macd_fast(self, close: pd.Series) -> Dict[str, Any]:
+        """
+        Fast MACD (8-17-9) for momentum trading.
+        More responsive than standard MACD (12-26-9).
+        """
+        ema_fast = close.ewm(span=8, adjust=False).mean()
+        ema_slow = close.ewm(span=17, adjust=False).mean()
+        macd_line = ema_fast - ema_slow
+        signal_line = macd_line.ewm(span=9, adjust=False).mean()
+        histogram = macd_line - signal_line
+        
+        current_macd = float(macd_line.iloc[-1]) if not pd.isna(macd_line.iloc[-1]) else 0
+        current_signal = float(signal_line.iloc[-1]) if not pd.isna(signal_line.iloc[-1]) else 0
+        current_hist = float(histogram.iloc[-1]) if not pd.isna(histogram.iloc[-1]) else 0
+        prev_hist = float(histogram.iloc[-2]) if len(histogram) > 1 and not pd.isna(histogram.iloc[-2]) else current_hist
+        
+        # Signal interpretation
+        if current_macd > current_signal and prev_hist < 0 and current_hist > 0:
+            signal = 'BULLISH_CROSSOVER'
+            explanation = 'Fast MACD crossed above signal - Strong bullish momentum building.'
+        elif current_macd < current_signal and prev_hist > 0 and current_hist < 0:
+            signal = 'BEARISH_CROSSOVER'
+            explanation = 'Fast MACD crossed below signal - Strong bearish momentum building.'
+        elif current_hist > 0 and current_hist > prev_hist:
+            signal = 'BULLISH_ACCELERATION'
+            explanation = 'Fast MACD histogram expanding - Momentum accelerating upward.'
+        elif current_hist < 0 and current_hist < prev_hist:
+            signal = 'BEARISH_ACCELERATION'
+            explanation = 'Fast MACD histogram expanding - Momentum accelerating downward.'
+        elif current_hist > 0 and current_hist < prev_hist:
+            signal = 'BULLISH_FADING'
+            explanation = 'Fast MACD histogram contracting - Upward momentum fading.'
+        elif current_hist < 0 and current_hist > prev_hist:
+            signal = 'BEARISH_FADING'
+            explanation = 'Fast MACD histogram contracting - Downward momentum fading.'
+        else:
+            signal = 'NEUTRAL'
+            explanation = 'Fast MACD neutral - No clear momentum direction.'
+        
+        return {
+            'macd': round(current_macd, 4),
+            'signal': round(current_signal, 4),
+            'histogram': round(current_hist, 4),
+            'signal_type': signal,
+            'explanation': explanation,
+            'params': '8-17-9'
+        }
+    
+    def calculate_bb_percent_b(self, close: pd.Series, period: int = 20, std_dev: float = 2.0) -> Dict[str, Any]:
+        """
+        Bollinger Band %B - Position within bands.
+        %B > 1 = Above upper band (overbought)
+        %B = 0.5 = At middle band
+        %B < 0 = Below lower band (oversold)
+        """
+        sma = close.rolling(window=period).mean()
+        std = close.rolling(window=period).std()
+        upper_band = sma + (std * std_dev)
+        lower_band = sma - (std * std_dev)
+        percent_b = (close - lower_band) / (upper_band - lower_band)
+        
+        current_pb = float(percent_b.iloc[-1]) if not pd.isna(percent_b.iloc[-1]) else 0.5
+        
+        # Signal interpretation
+        if current_pb > 1.0:
+            signal = 'BREAKOUT_ABOVE'
+            explanation = f'%B at {current_pb:.2f} - Price broke above upper band. Strong momentum but overbought.'
+        elif current_pb > 0.8:
+            signal = 'OVERBOUGHT'
+            explanation = f'%B at {current_pb:.2f} - Near upper band. Overbought conditions.'
+        elif current_pb < 0.0:
+            signal = 'BREAKDOWN_BELOW'
+            explanation = f'%B at {current_pb:.2f} - Price broke below lower band. Weak momentum but oversold.'
+        elif current_pb < 0.2:
+            signal = 'OVERSOLD'
+            explanation = f'%B at {current_pb:.2f} - Near lower band. Oversold conditions.'
+        else:
+            signal = 'NEUTRAL'
+            explanation = f'%B at {current_pb:.2f} - Price within normal range.'
+        
+        return {
+            'percent_b': round(current_pb, 3),
+            'signal': signal,
+            'explanation': explanation,
+            'period': period
+        }
+    
     def calculate_stochastic_rsi(self, close: pd.Series, rsi_period: int = 14, 
                                   stoch_period: int = 14, k_smooth: int = 3, 
                                   d_smooth: int = 3) -> Dict[str, Any]:
@@ -814,8 +938,11 @@ The 50-day SMA (${current_50:.2f}) is {distance_pct:.1f}% below the 200-day SMA 
         bearish_signals = []
         neutral_signals = []
         
-        # Scoring weights
+        # Scoring weights (fast indicators weighted higher for momentum trading)
         weights = {
+            'rsi_fast_9': 12,           # Fast RSI - high weight for momentum
+            'macd_fast_8_17_9': 12,     # Fast MACD - high weight for momentum
+            'bb_percent_b': 10,         # BB %B - breakout detection
             'ichimoku': 15,
             'golden_death_cross': 12,
             'stochastic_rsi': 10,
@@ -837,6 +964,10 @@ The 50-day SMA (${current_50:.2f}) is {distance_pct:.1f}% below the 200-day SMA 
             
             signal = data['signal']
             weight = weights.get(indicator, 5)
+            
+            # Ensure signal is a string before checking membership
+            if not isinstance(signal, str):
+                continue
             
             if 'BULLISH' in signal or signal in ['OVERSOLD', 'ABOVE_VWAP', 'RISING']:
                 score += weight
@@ -922,6 +1053,11 @@ The 50-day SMA (${current_50:.2f}) is {distance_pct:.1f}% below the 200-day SMA 
                 'symbol': symbol,
                 'timestamp': datetime.now().isoformat(),
                 'current_price': float(close.iloc[-1]),
+                
+                # Fast Momentum Indicators (for medium-high risk/reward trading)
+                'rsi_fast_9': self.calculate_rsi_fast(close, period=9),
+                'macd_fast_8_17_9': self.calculate_macd_fast(close),
+                'bb_percent_b': self.calculate_bb_percent_b(close),
                 
                 # Momentum
                 'stochastic_rsi': self.calculate_stochastic_rsi(close),

@@ -38,6 +38,16 @@ class TechnicalIndicators:
         return rsi
     
     @staticmethod
+    def calculate_rsi_fast(prices: pd.Series, period: int = 9) -> pd.Series:
+        """Fast RSI (9-day) for momentum trading - REAL calculation"""
+        delta = prices.diff()
+        gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
+        rs = gain / loss
+        rsi = 100 - (100 / (1 + rs))
+        return rsi
+    
+    @staticmethod
     def calculate_stochastic(high: pd.Series, low: pd.Series, close: pd.Series, 
                             k_period: int = 14, d_period: int = 3) -> Tuple[pd.Series, pd.Series]:
         """Stochastic Oscillator - REAL calculation"""
@@ -53,6 +63,19 @@ class TechnicalIndicators:
     def calculate_macd(prices: pd.Series, fast: int = 12, slow: int = 26, 
                       signal: int = 9) -> Tuple[pd.Series, pd.Series, pd.Series]:
         """MACD - REAL calculation"""
+        ema_fast = prices.ewm(span=fast, adjust=False).mean()
+        ema_slow = prices.ewm(span=slow, adjust=False).mean()
+        
+        macd_line = ema_fast - ema_slow
+        signal_line = macd_line.ewm(span=signal, adjust=False).mean()
+        histogram = macd_line - signal_line
+        
+        return macd_line, signal_line, histogram
+    
+    @staticmethod
+    def calculate_macd_fast(prices: pd.Series, fast: int = 8, slow: int = 17, 
+                           signal: int = 9) -> Tuple[pd.Series, pd.Series, pd.Series]:
+        """Fast MACD (8-17-9) for momentum trading - REAL calculation"""
         ema_fast = prices.ewm(span=fast, adjust=False).mean()
         ema_slow = prices.ewm(span=slow, adjust=False).mean()
         
@@ -233,6 +256,18 @@ class TechnicalIndicators:
         lower_band = sma - (std * std_dev)
         
         return upper_band, sma, lower_band
+    
+    @staticmethod
+    def calculate_bb_percent_b(prices: pd.Series, period: int = 20, 
+                               std_dev: float = 2.0) -> pd.Series:
+        """Bollinger Band %B - Position within bands (0-1 scale) - REAL calculation
+        %B > 1 = Above upper band (overbought)
+        %B = 0.5 = At middle band
+        %B < 0 = Below lower band (oversold)
+        """
+        upper_band, sma, lower_band = TechnicalIndicators.calculate_bollinger_bands(prices, period, std_dev)
+        percent_b = (prices - lower_band) / (upper_band - lower_band)
+        return percent_b
     
     @staticmethod
     def calculate_atr(high: pd.Series, low: pd.Series, close: pd.Series, 

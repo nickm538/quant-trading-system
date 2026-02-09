@@ -349,6 +349,9 @@ class EnhancedFundamentalsAnalyzer:
             analyst_data = self._fetch_analyst_ratings(symbol)
             financial_trends = self._fetch_financial_trends(symbol)
             
+            # MOMENTUM TRADING: Fetch MRQ metrics for growth inflection detection
+            mrq_metrics = self._fetch_mrq_metrics(symbol)
+            
             return {
                 'success': True,
                 'symbol': symbol.upper(),
@@ -392,11 +395,21 @@ class EnhancedFundamentalsAnalyzer:
                     'fcf_growing': None  # Would need historical data
                 },
                 
-                # Growth Metrics
+                # Growth Metrics (TTM = Trailing Twelve Months, YoY = Year-over-Year, QoQ = Quarter-over-Quarter, MRQ = Most Recent Quarter)
                 'growth': {
-                    'earnings_growth_pct': round(earnings_growth * 100, 2) if earnings_growth else None,
-                    'revenue_growth_pct': round(revenue_growth * 100, 2) if revenue_growth else None,
-                    'earnings_quarterly_growth_pct': round(earnings_quarterly_growth * 100, 2) if earnings_quarterly_growth else None
+                    # TTM Growth (annual)
+                    'earnings_growth_pct': round(earnings_growth * 100, 2) if earnings_growth else None,  # TTM YoY
+                    'revenue_growth_pct': round(revenue_growth * 100, 2) if revenue_growth else None,  # TTM YoY
+                    'earnings_quarterly_growth_pct': round(earnings_quarterly_growth * 100, 2) if earnings_quarterly_growth else None,  # YoY
+                    
+                    # MRQ Growth (for momentum trading - catches inflections early)
+                    'mrq_revenue': mrq_metrics.get('mrq_revenue'),
+                    'mrq_earnings': mrq_metrics.get('mrq_earnings'),
+                    'qoq_revenue_growth_pct': round(mrq_metrics.get('qoq_revenue_growth', 0) * 100, 2) if mrq_metrics.get('qoq_revenue_growth') else None,  # Sequential QoQ
+                    'qoq_earnings_growth_pct': round(mrq_metrics.get('qoq_earnings_growth', 0) * 100, 2) if mrq_metrics.get('qoq_earnings_growth') else None,  # Sequential QoQ
+                    'yoy_q_revenue_growth_pct': round(mrq_metrics.get('yoy_q_revenue_growth', 0) * 100, 2) if mrq_metrics.get('yoy_q_revenue_growth') else None,  # Quarterly YoY
+                    'yoy_q_earnings_growth_pct': round(mrq_metrics.get('yoy_q_earnings_growth', 0) * 100, 2) if mrq_metrics.get('yoy_q_earnings_growth') else None,  # Quarterly YoY
+                    'revenue_acceleration_pct': round(mrq_metrics.get('revenue_acceleration', 0) * 100, 2) if mrq_metrics.get('revenue_acceleration') else None  # Is growth accelerating?
                 },
                 
                 # Profitability
@@ -740,6 +753,79 @@ class EnhancedFundamentalsAnalyzer:
             return float(value)
         except (ValueError, TypeError):
             return None
+    
+    def _fetch_mrq_metrics(self, symbol: str) -> Dict:
+        """
+        Fetch Most Recent Quarter (MRQ) metrics for growth inflection detection.
+        Returns earnings surprise %, revenue acceleration, and QoQ growth.
+        """
+        try:
+            # Create ticker object
+            ticker_obj = yf.Ticker(symbol)
+            
+            # Get quarterly income statement
+            quarterly_income = ticker_obj.quarterly_income_stmt
+            if quarterly_income is None or quarterly_income.empty:
+                return {}
+            
+            # Extract MRQ and previous quarter revenue
+            if 'Total Revenue' in quarterly_income.index:
+                revenue_row = quarterly_income.loc['Total Revenue']
+                if len(revenue_row) >= 2:
+                    mrq_revenue = revenue_row.iloc[0]  # Most recent quarter
+                    prev_q_revenue = revenue_row.iloc[1]  # Previous quarter
+                    yoy_q_revenue = revenue_row.iloc[4] if len(revenue_row) >= 5 else None  # Year-ago quarter
+                    
+                    # Calculate QoQ revenue growth
+                    qoq_revenue_growth = ((mrq_revenue - prev_q_revenue) / prev_q_revenue) if prev_q_revenue else None
+                    
+                    # Calculate YoY quarterly revenue growth
+                    yoy_q_revenue_growth = ((mrq_revenue - yoy_q_revenue) / yoy_q_revenue) if yoy_q_revenue else None
+                else:
+                    mrq_revenue = prev_q_revenue = qoq_revenue_growth = yoy_q_revenue_growth = None
+            else:
+                mrq_revenue = prev_q_revenue = qoq_revenue_growth = yoy_q_revenue_growth = None
+            
+            # Extract MRQ and previous quarter net income (earnings)
+            if 'Net Income' in quarterly_income.index:
+                earnings_row = quarterly_income.loc['Net Income']
+                if len(earnings_row) >= 2:
+                    mrq_earnings = earnings_row.iloc[0]
+                    prev_q_earnings = earnings_row.iloc[1]
+                    yoy_q_earnings = earnings_row.iloc[4] if len(earnings_row) >= 5 else None
+                    
+                    # Calculate QoQ earnings growth
+                    qoq_earnings_growth = ((mrq_earnings - prev_q_earnings) / prev_q_earnings) if prev_q_earnings else None
+                    
+                    # Calculate YoY quarterly earnings growth
+                    yoy_q_earnings_growth = ((mrq_earnings - yoy_q_earnings) / yoy_q_earnings) if yoy_q_earnings else None
+                else:
+                    mrq_earnings = prev_q_earnings = qoq_earnings_growth = yoy_q_earnings_growth = None
+            else:
+                mrq_earnings = prev_q_earnings = qoq_earnings_growth = yoy_q_earnings_growth = None
+            
+            # Calculate revenue acceleration (is QoQ growth accelerating?)
+            # Compare current QoQ vs previous QoQ
+            if len(revenue_row) >= 3 and qoq_revenue_growth is not None:
+                prev_prev_q_revenue = revenue_row.iloc[2]
+                prev_qoq_growth = ((prev_q_revenue - prev_prev_q_revenue) / prev_prev_q_revenue) if prev_prev_q_revenue else None
+                revenue_acceleration = qoq_revenue_growth - prev_qoq_growth if prev_qoq_growth is not None else None
+            else:
+                revenue_acceleration = None
+            
+            return {
+                'mrq_revenue': mrq_revenue,
+                'mrq_earnings': mrq_earnings,
+                'qoq_revenue_growth': qoq_revenue_growth,
+                'qoq_earnings_growth': qoq_earnings_growth,
+                'yoy_q_revenue_growth': yoy_q_revenue_growth,
+                'yoy_q_earnings_growth': yoy_q_earnings_growth,
+                'revenue_acceleration': revenue_acceleration
+            }
+            
+        except Exception as e:
+            print(f"⚠ Error fetching MRQ metrics: {str(e)}")
+            return {}
     
     def _analyze_garp(self, pe: float, peg: float, earnings_growth: float, revenue_growth: float, sector: str) -> Dict:
         """

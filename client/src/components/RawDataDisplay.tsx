@@ -156,6 +156,12 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
           </TabsList>
 
           <TabsContent value="technical" className="space-y-4">
+            {/* Data Range Info */}
+            <div className="mb-4 p-3 bg-cyan-50 dark:bg-cyan-950 rounded-lg border border-cyan-200 dark:border-cyan-800">
+              <p className="text-xs font-semibold text-cyan-700 dark:text-cyan-300">
+                📊 Data Range: 400 trading days (~16 months) from Polygon.io | All indicators calculated on daily OHLCV data
+              </p>
+            </div>
             {/* Composite Scores */}
             <div>
               <h4 className="font-semibold mb-2 text-cyan-900 dark:text-cyan-100">Composite Scores</h4>
@@ -250,10 +256,46 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
               </div>
             </div>
 
+            {/* Fast Momentum Indicators (for medium-high risk/reward trading) */}
+            {analysis.comprehensive_technicals && (analysis.comprehensive_technicals.rsi_fast_9 || analysis.comprehensive_technicals.macd_fast_8_17_9 || analysis.comprehensive_technicals.bb_percent_b) && (
+              <div className="mt-4 p-3 rounded-lg bg-gradient-to-r from-purple-500/10 to-blue-500/10 border border-purple-500/30">
+                <h4 className="font-semibold mb-2 text-purple-900 dark:text-purple-100">⚡ Fast Momentum Indicators (Optimized for Momentum Trading)</h4>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                  {analysis.comprehensive_technicals.rsi_fast_9 && (
+                    <div className="space-y-1">
+                      <DataItem label="Fast RSI (9-day)" value={safeFixed(analysis.comprehensive_technicals.rsi_fast_9.value)} />
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${analysis.comprehensive_technicals.rsi_fast_9.signal?.includes('OVERSOLD') ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : analysis.comprehensive_technicals.rsi_fast_9.signal?.includes('OVERBOUGHT') ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'}`}>
+                        {analysis.comprehensive_technicals.rsi_fast_9.signal}
+                      </span>
+                      <p className="text-xs text-muted-foreground mt-1">{analysis.comprehensive_technicals.rsi_fast_9.explanation}</p>
+                    </div>
+                  )}
+                  {analysis.comprehensive_technicals.macd_fast_8_17_9 && (
+                    <div className="space-y-1">
+                      <DataItem label="Fast MACD (8-17-9)" value={safeFixed(analysis.comprehensive_technicals.macd_fast_8_17_9.histogram, 4)} />
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${analysis.comprehensive_technicals.macd_fast_8_17_9.signal_type?.includes('BULLISH') ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : analysis.comprehensive_technicals.macd_fast_8_17_9.signal_type?.includes('BEARISH') ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'}`}>
+                        {analysis.comprehensive_technicals.macd_fast_8_17_9.signal_type}
+                      </span>
+                      <p className="text-xs text-muted-foreground mt-1">{analysis.comprehensive_technicals.macd_fast_8_17_9.explanation}</p>
+                    </div>
+                  )}
+                  {analysis.comprehensive_technicals.bb_percent_b && (
+                    <div className="space-y-1">
+                      <DataItem label="BB %B (20-day)" value={safeFixed(analysis.comprehensive_technicals.bb_percent_b.percent_b, 3)} />
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${analysis.comprehensive_technicals.bb_percent_b.signal?.includes('BREAKOUT') || analysis.comprehensive_technicals.bb_percent_b.signal?.includes('OVERSOLD') ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : analysis.comprehensive_technicals.bb_percent_b.signal?.includes('OVERBOUGHT') || analysis.comprehensive_technicals.bb_percent_b.signal?.includes('BREAKDOWN') ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'}`}>
+                        {analysis.comprehensive_technicals.bb_percent_b.signal}
+                      </span>
+                      <p className="text-xs text-muted-foreground mt-1">{analysis.comprehensive_technicals.bb_percent_b.explanation}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Momentum Oscillators from comprehensive_technicals */}
             {analysis.comprehensive_technicals && (
               <div className="mt-4">
-                <h4 className="font-semibold mb-2 text-cyan-900 dark:text-cyan-100">Momentum Oscillators</h4>
+                <h4 className="font-semibold mb-2 text-cyan-900 dark:text-cyan-100">Standard Momentum Oscillators (14-day period)</h4>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                   {analysis.comprehensive_technicals.stochastic_rsi && (
                     <>
@@ -1303,10 +1345,22 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
             {analysis.enhanced_fundamentals ? (
               <div className="space-y-4">
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <DataItem label="P/E Ratio" value={safeFixed(analysis.enhanced_fundamentals.valuation?.pe_ratio)} />
-                  <DataItem label="Forward P/E" value={safeFixed(analysis.enhanced_fundamentals.valuation?.forward_pe)} />
-                  <DataItem label="PEG Ratio" value={safeFixed(analysis.enhanced_fundamentals.valuation?.peg_ratio)} />
-                  <DataItem label="EV/EBITDA" value={safeFixed(analysis.enhanced_fundamentals.valuation?.ev_to_ebitda)} />
+                  <div>
+                    <DataItem label="P/E Ratio" value={safeFixed(analysis.enhanced_fundamentals.valuation?.pe_ratio)} />
+                    <p className="text-xs text-muted-foreground mt-1">TTM (Trailing 12M)</p>
+                  </div>
+                  <div>
+                    <DataItem label="Forward P/E" value={safeFixed(analysis.enhanced_fundamentals.valuation?.forward_pe)} />
+                    <p className="text-xs text-muted-foreground mt-1">Next 12M Est.</p>
+                  </div>
+                  <div>
+                    <DataItem label="PEG Ratio" value={safeFixed(analysis.enhanced_fundamentals.valuation?.peg_ratio)} />
+                    <p className="text-xs text-muted-foreground mt-1">TTM P/E / Growth</p>
+                  </div>
+                  <div>
+                    <DataItem label="EV/EBITDA" value={safeFixed(analysis.enhanced_fundamentals.valuation?.ev_to_ebitda)} />
+                    <p className="text-xs text-muted-foreground mt-1">TTM EBITDA</p>
+                  </div>
                 </div>
                 
                 {analysis.enhanced_fundamentals.cash_flow && (
@@ -1334,7 +1388,7 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
                 
                 {analysis.enhanced_fundamentals.profitability && (
                   <div className="mt-4">
-                    <h5 className="font-semibold mb-2">Profitability Metrics</h5>
+                    <h5 className="font-semibold mb-2">Profitability Metrics <span className="text-xs font-normal text-muted-foreground">(TTM)</span></h5>
                     <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
                       <DataItem label="Gross Margin" value={analysis.enhanced_fundamentals.profitability.gross_margin_pct != null ? `${safeFixed(analysis.enhanced_fundamentals.profitability.gross_margin_pct)}%` : 'N/A'} />
                       <DataItem label="Operating Margin" value={analysis.enhanced_fundamentals.profitability.operating_margin_pct != null ? `${safeFixed(analysis.enhanced_fundamentals.profitability.operating_margin_pct)}%` : 'N/A'} />
@@ -1346,14 +1400,54 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
                 )}
                 
                 {analysis.enhanced_fundamentals.growth && (
-                  <div className="mt-4">
-                    <h5 className="font-semibold mb-2">Growth Metrics</h5>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                      <DataItem label="Earnings Growth" value={analysis.enhanced_fundamentals.growth.earnings_growth_pct != null ? `${safeFixed(analysis.enhanced_fundamentals.growth.earnings_growth_pct)}%` : 'N/A'} />
-                      <DataItem label="Revenue Growth" value={analysis.enhanced_fundamentals.growth.revenue_growth_pct != null ? `${safeFixed(analysis.enhanced_fundamentals.growth.revenue_growth_pct)}%` : 'N/A'} />
-                      <DataItem label="Quarterly Earnings Growth" value={analysis.enhanced_fundamentals.growth.earnings_quarterly_growth_pct != null ? `${safeFixed(analysis.enhanced_fundamentals.growth.earnings_quarterly_growth_pct)}%` : 'N/A'} />
+                  <>
+                    <div className="mt-4">
+                      <h5 className="font-semibold mb-2">Growth Metrics (TTM - Trailing Twelve Months)</h5>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                        <div>
+                          <DataItem label="Earnings Growth (TTM)" value={analysis.enhanced_fundamentals.growth.earnings_growth_pct != null ? `${safeFixed(analysis.enhanced_fundamentals.growth.earnings_growth_pct)}%` : 'N/A'} />
+                          <p className="text-xs text-muted-foreground mt-1">YoY (Year-over-Year)</p>
+                        </div>
+                        <div>
+                          <DataItem label="Revenue Growth (TTM)" value={analysis.enhanced_fundamentals.growth.revenue_growth_pct != null ? `${safeFixed(analysis.enhanced_fundamentals.growth.revenue_growth_pct)}%` : 'N/A'} />
+                          <p className="text-xs text-muted-foreground mt-1">YoY (Year-over-Year)</p>
+                        </div>
+                        <div>
+                          <DataItem label="Quarterly Earnings Growth" value={analysis.enhanced_fundamentals.growth.earnings_quarterly_growth_pct != null ? `${safeFixed(analysis.enhanced_fundamentals.growth.earnings_quarterly_growth_pct)}%` : 'N/A'} />
+                          <p className="text-xs text-muted-foreground mt-1">YoY (Quarterly YoY)</p>
+                        </div>
+                      </div>
                     </div>
-                  </div>
+                    
+                    {/* MRQ Growth Metrics (for momentum trading - catches inflections early) */}
+                    {(analysis.enhanced_fundamentals.growth.qoq_revenue_growth_pct != null || analysis.enhanced_fundamentals.growth.qoq_earnings_growth_pct != null || analysis.enhanced_fundamentals.growth.revenue_acceleration_pct != null) && (
+                      <div className="mt-4 p-3 rounded-lg bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/30">
+                        <h5 className="font-semibold mb-2 text-green-900 dark:text-green-100">⚡ MRQ Growth Metrics (Most Recent Quarter - Early Inflection Detection)</h5>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                          <div>
+                            <DataItem label="QoQ Revenue Growth" value={analysis.enhanced_fundamentals.growth.qoq_revenue_growth_pct != null ? `${safeFixed(analysis.enhanced_fundamentals.growth.qoq_revenue_growth_pct)}%` : 'N/A'} />
+                            <p className="text-xs text-muted-foreground mt-1">Sequential (Q vs Q-1)</p>
+                          </div>
+                          <div>
+                            <DataItem label="QoQ Earnings Growth" value={analysis.enhanced_fundamentals.growth.qoq_earnings_growth_pct != null ? `${safeFixed(analysis.enhanced_fundamentals.growth.qoq_earnings_growth_pct)}%` : 'N/A'} />
+                            <p className="text-xs text-muted-foreground mt-1">Sequential (Q vs Q-1)</p>
+                          </div>
+                          <div>
+                            <DataItem label="Revenue Acceleration" value={analysis.enhanced_fundamentals.growth.revenue_acceleration_pct != null ? `${safeFixed(analysis.enhanced_fundamentals.growth.revenue_acceleration_pct)}%` : 'N/A'} />
+                            <p className="text-xs text-muted-foreground mt-1">{analysis.enhanced_fundamentals.growth.revenue_acceleration_pct && analysis.enhanced_fundamentals.growth.revenue_acceleration_pct > 0 ? '⬆️ Accelerating' : analysis.enhanced_fundamentals.growth.revenue_acceleration_pct && analysis.enhanced_fundamentals.growth.revenue_acceleration_pct < 0 ? '⬇️ Decelerating' : 'Stable'}</p>
+                          </div>
+                          <div>
+                            <DataItem label="YoY Q Revenue Growth" value={analysis.enhanced_fundamentals.growth.yoy_q_revenue_growth_pct != null ? `${safeFixed(analysis.enhanced_fundamentals.growth.yoy_q_revenue_growth_pct)}%` : 'N/A'} />
+                            <p className="text-xs text-muted-foreground mt-1">MRQ vs Year-Ago Quarter</p>
+                          </div>
+                          <div>
+                            <DataItem label="YoY Q Earnings Growth" value={analysis.enhanced_fundamentals.growth.yoy_q_earnings_growth_pct != null ? `${safeFixed(analysis.enhanced_fundamentals.growth.yoy_q_earnings_growth_pct)}%` : 'N/A'} />
+                            <p className="text-xs text-muted-foreground mt-1">MRQ vs Year-Ago Quarter</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
                 
                 {analysis.enhanced_fundamentals.garp_analysis && (
