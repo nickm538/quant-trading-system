@@ -1293,10 +1293,10 @@ export function RawDataDisplay({ analysis }: RawDataDisplayProps) {
               <div className="mt-3 space-y-2 text-xs text-muted-foreground">
                 <p><strong>Operating Cash Flow (OCF):</strong> Cash generated from normal business operations. Positive = company generates cash from its core business.</p>
                 <p><strong>Free Cash Flow (FCF):</strong> Cash left after operations and capital expenditures. This is "true" cash available for dividends, buybacks, or growth.</p>
-                <p><strong>FCF Yield:</strong> FCF as % of market cap. >5% = excellent, 3-5% = good, <3% = low. Higher = better value.</p>
-                <p><strong>FCF Margin:</strong> FCF as % of revenue. >15% = excellent efficiency. Shows how much revenue becomes free cash.</p>
-                <p><strong>FCF/OCF Ratio:</strong> % of operating cash that becomes free cash. >0.8 = good, <0.5 = high capex needs.</p>
-                <p><strong>CF to Debt:</strong> Years of cash flow needed to pay off all debt. <3 years = healthy, >5 years = concerning leverage.</p>
+                <p><strong>FCF Yield:</strong> FCF as % of market cap. &gt;5% = excellent, 3-5% = good, &lt;3% = low. Higher = better value.</p>
+                <p><strong>FCF Margin:</strong> FCF as % of revenue. &gt;15% = excellent efficiency. Shows how much revenue becomes free cash.</p>
+                <p><strong>FCF/OCF Ratio:</strong> % of operating cash that becomes free cash. &gt;0.8 = good, &lt;0.5 = high capex needs.</p>
+                <p><strong>CF to Debt:</strong> Years of cash flow needed to pay off all debt. &lt;3 years = healthy, &gt;5 years = concerning leverage.</p>
               </div>
             </details>
             
