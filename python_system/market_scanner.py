@@ -392,8 +392,8 @@ class MarketScanner:
         shuffled_universe = list(universe)
         random.shuffle(shuffled_universe)
         
-        # Use a larger sample size for better coverage (1000 tickers)
-        sample_size = min(1000, len(shuffled_universe))
+        # Use a larger sample size for better coverage (2000 tickers for thoroughness)
+        sample_size = min(2000, len(shuffled_universe))
         sample = shuffled_universe[:sample_size]
         
         print(f"Scanning {sample_size} randomly sampled tickers from {len(universe)} total with criteria: {criteria}", file=sys.stderr)
@@ -420,18 +420,42 @@ class MarketScanner:
                         results.append(score)
                         print(f"Found: {ticker} (score: {score['total_score']:.1f})", file=sys.stderr)
                         
-                        # Early exit if we have enough results
-                        if len(results) >= max_results * 2:
-                            break
+                        # NO EARLY EXIT - evaluate all tickers for maximum thoroughness
                 except Exception as e:
                     pass
         
-        # Sort by score and return top results
+        # Sort by score
         results.sort(key=lambda x: x['total_score'], reverse=True)
         
         print(f"Scan complete: {len(results)} matches found", file=sys.stderr)
         
-        return results[:max_results]
+        # SECTOR DIVERSIFICATION: Ensure balanced representation across sectors
+        # Limit to max 3 stocks per sector to avoid concentration risk
+        diversified_results = []
+        sector_counts = {}
+        
+        for result in results:
+            sector = result.get('sector', 'Unknown')
+            
+            # Allow max 3 stocks per sector
+            if sector_counts.get(sector, 0) < 3:
+                diversified_results.append(result)
+                sector_counts[sector] = sector_counts.get(sector, 0) + 1
+                
+                if len(diversified_results) >= max_results:
+                    break
+        
+        # If we don't have enough diversified results, backfill with remaining high scorers
+        if len(diversified_results) < max_results:
+            for result in results:
+                if result not in diversified_results:
+                    diversified_results.append(result)
+                    if len(diversified_results) >= max_results:
+                        break
+        
+        print(f"Sector diversification: {len(set([r.get('sector', 'Unknown') for r in diversified_results]))} sectors represented", file=sys.stderr)
+        
+        return diversified_results[:max_results]
     
     def _score_ticker(
         self,
@@ -501,17 +525,41 @@ class MarketScanner:
             scores['soros_score'] = self._calculate_soros_score(info, hist)
             scores['livermore_score'] = self._calculate_livermore_score(hist)
             
-            # Calculate total score (weighted average)
+            # Calculate total score with MEDIUM-HIGH RISK/REWARD weighting
+            # Prioritize: Momentum, Growth, Druckenmiller (trend), Livermore (breakout)
+            # De-emphasize: Value, Buffett (conservative)
+            weights = {
+                'momentum_score': 1.5,      # Boost momentum for faster gains
+                'breakout_score': 1.3,       # Boost breakout detection
+                'growth_score': 1.4,         # Boost growth for higher returns
+                'volatility_score': 1.0,     # Neutral - volatility = opportunity
+                'druckenmiller_score': 1.5,  # Boost trend-following (Druckenmiller)
+                'livermore_score': 1.3,      # Boost tape reading (Livermore)
+                'lynch_score': 1.2,          # Moderate boost for PEG/GARP
+                'soros_score': 1.1,          # Slight boost for reflexivity
+                'buffett_score': 0.8,        # De-emphasize value (too slow)
+                'value_score': 0.7,          # De-emphasize pure value
+            }
+            
             total_score = 0
-            score_count = 0
+            total_weight = 0
             
-            for key in ['momentum_score', 'breakout_score', 'value_score', 'growth_score', 'volatility_score',
-                       'buffett_score', 'lynch_score', 'druckenmiller_score', 'soros_score', 'livermore_score']:
+            for key, weight in weights.items():
                 if key in scores:
-                    total_score += scores[key]
-                    score_count += 1
+                    total_score += scores[key] * weight
+                    total_weight += weight
             
-            scores['total_score'] = total_score / score_count if score_count > 0 else 0
+            scores['total_score'] = total_score / total_weight if total_weight > 0 else 0
+            
+            # MRQ GROWTH BOOST: For high-scoring candidates (>60), check MRQ growth for inflection detection
+            if scores['total_score'] > 60:
+                try:
+                    mrq_boost = self._calculate_mrq_growth_boost(stock)
+                    if mrq_boost > 0:
+                        scores['mrq_growth_boost'] = mrq_boost
+                        scores['total_score'] = min(100, scores['total_score'] + mrq_boost)
+                except:
+                    pass
             
             return scores if scores['total_score'] > 50 else None
             
@@ -712,6 +760,56 @@ class MarketScanner:
             return (volatility_score + reflexivity_score + psychology_score) / 3
         except:
             return 50
+    
+    def _calculate_mrq_growth_boost(self, stock) -> float:
+        """
+        Calculate MRQ (Most Recent Quarter) growth boost (0-15 points).
+        Detects revenue/earnings acceleration for early inflection detection.
+        """
+        try:
+            # Get quarterly income statement
+            quarterly_income = stock.quarterly_income_stmt
+            if quarterly_income.empty or len(quarterly_income.columns) < 2:
+                return 0
+            
+            # Get most recent 2 quarters
+            q1 = quarterly_income.iloc[:, 0]  # Most recent
+            q2 = quarterly_income.iloc[:, 1]  # Previous quarter
+            
+            boost = 0
+            
+            # Revenue acceleration check
+            if 'Total Revenue' in quarterly_income.index:
+                rev_q1 = q1.get('Total Revenue', 0)
+                rev_q2 = q2.get('Total Revenue', 0)
+                
+                if rev_q2 > 0:
+                    qoq_growth = ((rev_q1 - rev_q2) / rev_q2) * 100
+                    
+                    # Boost for strong QoQ growth
+                    if qoq_growth > 20:  # >20% QoQ = explosive
+                        boost += 10
+                    elif qoq_growth > 10:  # >10% QoQ = strong
+                        boost += 5
+                    elif qoq_growth > 5:   # >5% QoQ = good
+                        boost += 2
+            
+            # Earnings acceleration check (if available)
+            if 'Net Income' in quarterly_income.index:
+                ni_q1 = q1.get('Net Income', 0)
+                ni_q2 = q2.get('Net Income', 0)
+                
+                if ni_q2 > 0 and ni_q1 > ni_q2:
+                    earnings_accel = ((ni_q1 - ni_q2) / ni_q2) * 100
+                    
+                    if earnings_accel > 20:
+                        boost += 5
+                    elif earnings_accel > 10:
+                        boost += 3
+            
+            return min(15, boost)  # Cap at 15 points
+        except:
+            return 0
     
     def _calculate_livermore_score(self, hist: pd.DataFrame) -> float:
         """
