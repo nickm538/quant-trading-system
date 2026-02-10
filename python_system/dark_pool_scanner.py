@@ -267,31 +267,58 @@ class DarkPoolScanner:
             result['dp_volume'] = stockgrid.get('dp_volume', 0)
             result['dp_date'] = stockgrid.get('date', '')
             
-            # Analyze dark pool sentiment
+            # INSTITUTIONAL-GRADE DARK POOL ANALYSIS
+            # Dark pools are where institutions trade large blocks without moving the market.
+            # Net buying = Accumulation (bullish) | Net selling = Distribution (bearish)
             net_pos = result['net_dp_position']
+            
+            # Calculate dark pool intensity (relative to price context)
+            dp_intensity = 'UNKNOWN'
+            if price.get('found'):
+                avg_vol = price.get('avg_volume', 1)
+                if avg_vol > 0:
+                    dp_ratio = abs(net_pos) / avg_vol
+                    if dp_ratio > 0.5:
+                        dp_intensity = 'EXTREME'  # Dark pool volume > 50% of avg daily volume
+                    elif dp_ratio > 0.25:
+                        dp_intensity = 'HIGH'  # Dark pool volume > 25% of avg daily volume
+                    elif dp_ratio > 0.1:
+                        dp_intensity = 'MODERATE'  # Dark pool volume > 10% of avg daily volume
+                    else:
+                        dp_intensity = 'LOW'
+                    result['dp_intensity'] = dp_intensity
+                    result['dp_ratio'] = round(dp_ratio, 3)
+            
+            # Sentiment analysis with institutional reasoning
             if net_pos > 1000000:
                 result['dp_sentiment'] = 'VERY_BULLISH'
                 result['dp_sentiment_color'] = '#00c851'
-                signals.append('🟢 Large NET BUYING in dark pools')
+                signals.append('🟢 INSTITUTIONAL ACCUMULATION - Large net buying in dark pools (>1M shares)')
+                signals.append('   💡 Interpretation: Smart money is quietly building positions. Bullish signal.')
                 score_adjustments.append(25)
             elif net_pos > 100000:
                 result['dp_sentiment'] = 'BULLISH'
                 result['dp_sentiment_color'] = '#4CAF50'
-                signals.append('🟢 Net buying in dark pools')
+                signals.append('🟢 Net buying in dark pools (>100K shares)')
+                signals.append('   💡 Interpretation: Institutions showing buying interest. Moderately bullish.')
                 score_adjustments.append(15)
             elif net_pos < -1000000:
                 result['dp_sentiment'] = 'VERY_BEARISH'
                 result['dp_sentiment_color'] = '#F44336'
-                signals.append('🔴 Large NET SELLING in dark pools')
+                signals.append('🔴 INSTITUTIONAL DISTRIBUTION - Large net selling in dark pools (>1M shares)')
+                signals.append('   💡 Interpretation: Smart money is quietly exiting positions. Bearish signal.')
                 score_adjustments.append(-25)
             elif net_pos < -100000:
                 result['dp_sentiment'] = 'BEARISH'
                 result['dp_sentiment_color'] = '#FF5722'
-                signals.append('🔴 Net selling in dark pools')
+                signals.append('🔴 Net selling in dark pools (>100K shares)')
+                signals.append('   💡 Interpretation: Institutions showing selling pressure. Moderately bearish.')
                 score_adjustments.append(-15)
             else:
                 result['dp_sentiment'] = 'NEUTRAL'
                 result['dp_sentiment_color'] = '#9E9E9E'
+                signals.append('⚪ Balanced dark pool activity')
+                signals.append('   💡 Interpretation: No clear institutional bias. Monitor for changes.')
         
         # Process FINRA short data
         if finra.get('found'):
@@ -301,22 +328,31 @@ class DarkPoolScanner:
             result['short_total_volume'] = finra.get('total_volume', 0)
             result['short_date'] = finra.get('date', '')
             
-            # Analyze short sentiment
+            # INSTITUTIONAL-GRADE SHORT VOLUME ANALYSIS
+            # Short volume ratio = (Short Volume / Total Volume) × 100
+            # High ratio (>50%) = Heavy shorting OR market making activity
+            # Low ratio (<30%) = Low shorting pressure (bullish)
             short_ratio = result['short_ratio']
+            
             if short_ratio > 60:
                 result['short_sentiment'] = 'VERY_BEARISH'
-                signals.append(f'🔴 High short ratio: {short_ratio}%')
+                signals.append(f'🔴 Heavy short volume: {short_ratio}%')
+                signals.append(f'   💡 Interpretation: >60% of volume is short sales. Either heavy bearish positioning OR high market maker activity. Check price action for confirmation.')
                 score_adjustments.append(-20)
             elif short_ratio > 50:
                 result['short_sentiment'] = 'BEARISH'
-                signals.append(f'🟠 Elevated short ratio: {short_ratio}%')
+                signals.append(f'🟠 Elevated short volume: {short_ratio}%')
+                signals.append(f'   💡 Interpretation: Above-average shorting. Bearish bias, but could be market makers hedging.')
                 score_adjustments.append(-10)
             elif short_ratio < 30:
                 result['short_sentiment'] = 'BULLISH'
-                signals.append(f'🟢 Low short ratio: {short_ratio}%')
+                signals.append(f'🟢 Low short volume: {short_ratio}%')
+                signals.append(f'   💡 Interpretation: Minimal shorting pressure. Indicates bullish sentiment or lack of bearish conviction.')
                 score_adjustments.append(10)
             else:
                 result['short_sentiment'] = 'NEUTRAL'
+                signals.append(f'⚪ Normal short volume: {short_ratio}%')
+                signals.append(f'   💡 Interpretation: Typical market maker activity. No extreme positioning.')
         
         # Process price context
         if price.get('found'):
@@ -326,17 +362,43 @@ class DarkPoolScanner:
             result['avg_volume'] = price.get('avg_volume', 0)
             result['today_volume'] = price.get('volume', 0)
             
-            # Volume analysis
+            # INSTITUTIONAL-GRADE VOLUME & PRICE ANALYSIS
+            # Volume spikes + dark pool activity = Institutional interest
             if result['volume_ratio'] > 2.0:
                 signals.append(f'📊 Unusual volume: {result["volume_ratio"]:.1f}x average')
+                if result['has_dark_pool_data'] and abs(result['net_dp_position']) > 100000:
+                    signals.append(f'   💡 Interpretation: Volume spike + dark pool activity = Institutional event. Monitor closely.')
+                    score_adjustments.append(10 if result['net_dp_position'] > 0 else -10)
+                else:
+                    signals.append(f'   💡 Interpretation: Volume spike without dark pool confirmation. Could be retail-driven.')
             
-            # Price direction
+            # Price-Dark Pool Divergence Analysis
             if result['price_change_pct'] > 3:
                 signals.append(f'📈 Strong price move: +{result["price_change_pct"]:.1f}%')
-                score_adjustments.append(5)
+                if result['has_dark_pool_data']:
+                    if result['net_dp_position'] > 0:
+                        signals.append(f'   💡 Interpretation: Price up + dark pool buying = STRONG CONFIRMATION. Institutions aligned with price.')
+                        score_adjustments.append(15)  # Stronger bonus for alignment
+                    elif result['net_dp_position'] < -100000:
+                        signals.append(f'   ⚠️ WARNING: Price up but dark pool selling = DIVERGENCE. Institutions may be distributing into strength.')
+                        score_adjustments.append(-10)  # Bearish divergence
+                    else:
+                        score_adjustments.append(5)
+                else:
+                    score_adjustments.append(5)
             elif result['price_change_pct'] < -3:
                 signals.append(f'📉 Strong price drop: {result["price_change_pct"]:.1f}%')
-                score_adjustments.append(-5)
+                if result['has_dark_pool_data']:
+                    if result['net_dp_position'] < 0:
+                        signals.append(f'   💡 Interpretation: Price down + dark pool selling = STRONG CONFIRMATION. Institutions aligned with price.')
+                        score_adjustments.append(-15)  # Stronger penalty for alignment
+                    elif result['net_dp_position'] > 100000:
+                        signals.append(f'   ✅ OPPORTUNITY: Price down but dark pool buying = DIVERGENCE. Institutions may be accumulating on weakness.')
+                        score_adjustments.append(15)  # Bullish divergence
+                    else:
+                        score_adjustments.append(-5)
+                else:
+                    score_adjustments.append(-5)
         
         # Calculate overall score (0-100, 50 = neutral)
         base_score = 50
