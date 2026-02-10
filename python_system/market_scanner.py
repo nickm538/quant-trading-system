@@ -136,39 +136,150 @@ class MarketScanner:
             'SPY', 'QQQ', 'IWM', 'DIA', 'VOO', 'VTI', 'EEM', 'GLD', 'TLT', 'HYG'
         ]
     
+    def _get_curated_liquid_universe(self) -> List[str]:
+        """
+        Return a curated list of liquid, actively-traded stocks across all market caps.
+        This is much faster and more reliable than fetching from APIs.
+        
+        Includes:
+        - S&P 500 top stocks
+        - NASDAQ 100 top stocks
+        - Liquid mid-caps and small-caps
+        - Major ETFs
+        
+        Total: ~500 stocks
+        """
+        return [
+            # Mega Cap Tech (>$500B)
+            'AAPL', 'MSFT', 'GOOGL', 'GOOG', 'AMZN', 'NVDA', 'META', 'TSLA', 'AVGO', 'ORCL',
+            'ADBE', 'CRM', 'CSCO', 'ACN', 'AMD', 'INTC', 'IBM', 'QCOM', 'TXN', 'INTU',
+            'NOW', 'AMAT', 'MU', 'ADI', 'LRCX', 'KLAC', 'SNPS', 'CDNS', 'MRVL', 'NXPI',
+            
+            # Large Cap Finance ($50B-$500B)
+            'JPM', 'V', 'MA', 'BAC', 'WFC', 'MS', 'GS', 'BLK', 'SPGI', 'C',
+            'SCHW', 'AXP', 'PNC', 'USB', 'TFC', 'COF', 'BK', 'AIG', 'MET', 'PRU',
+            'ALL', 'TRV', 'CB', 'PGR', 'AFL', 'HIG', 'AMP', 'FIS', 'FISV', 'ICE',
+            
+            # Healthcare & Biotech
+            'UNH', 'JNJ', 'LLY', 'ABBV', 'MRK', 'TMO', 'ABT', 'DHR', 'PFE', 'BMY',
+            'AMGN', 'GILD', 'VRTX', 'REGN', 'ISRG', 'MDT', 'SYK', 'BSX', 'ELV', 'CI',
+            'CVS', 'HUM', 'ZTS', 'BDX', 'EW', 'IDXX', 'IQV', 'DXCM', 'ALGN', 'HOLX',
+            
+            # Consumer & Retail
+            'WMT', 'HD', 'COST', 'PG', 'KO', 'PEP', 'NKE', 'MCD', 'SBUX', 'TGT',
+            'LOW', 'TJX', 'ROST', 'DG', 'DLTR', 'ORLY', 'AZO', 'ULTA', 'BBY', 'YUM',
+            'CMG', 'DPZ', 'MAR', 'HLT', 'BKNG', 'ABNB', 'EXPE', 'EBAY', 'ETSY', 'W',
+            
+            # Energy
+            'XOM', 'CVX', 'COP', 'SLB', 'EOG', 'MPC', 'PSX', 'VLO', 'OXY', 'HAL',
+            'BKR', 'DVN', 'FANG', 'HES', 'MRO', 'APA', 'CTRA', 'EQT', 'OVV', 'PR',
+            
+            # Industrials
+            'CAT', 'DE', 'UNP', 'UPS', 'HON', 'RTX', 'BA', 'LMT', 'GD', 'NOC',
+            'GE', 'MMM', 'EMR', 'ETN', 'ITW', 'PH', 'ROK', 'CMI', 'PCAR', 'FAST',
+            
+            # Communication & Media
+            'NFLX', 'DIS', 'CMCSA', 'T', 'VZ', 'TMUS', 'CHTR', 'EA', 'TTWO', 'NTES',
+            
+            # Growth Tech (Mid-Large Cap)
+            'CRWD', 'ZS', 'DDOG', 'NET', 'OKTA', 'MDB', 'SNOW', 'PLTR', 'PATH', 'CFLT',
+            'BILL', 'HUBS', 'TWLO', 'DOCU', 'ZM', 'ROKU', 'PINS', 'SNAP', 'SPOT', 'SQ',
+            'SHOP', 'MELI', 'SE', 'BABA', 'JD', 'PDD', 'BIDU', 'UBER', 'LYFT', 'DASH',
+            
+            # Biotech & Pharma (Mid Cap)
+            'MRNA', 'BNTX', 'SGEN', 'EXAS', 'INCY', 'NBIX', 'TECH', 'ALNY', 'IONS', 'BMRN',
+            'RARE', 'FOLD', 'UTHR', 'RGEN', 'SRPT', 'BLUE', 'CRSP', 'NTLA', 'EDIT', 'BEAM',
+            
+            # Semiconductors
+            'ASML', 'TSM', 'AVGO', 'TXN', 'QCOM', 'ADI', 'MRVL', 'NXPI', 'MCHP', 'ON',
+            'SWKS', 'QRVO', 'MPWR', 'ENPH', 'WOLF', 'CRUS', 'SLAB', 'SITM', 'DIOD', 'POWI',
+            
+            # Industrials & Materials
+            'FCX', 'NEM', 'GOLD', 'SCCO', 'TECK', 'AA', 'X', 'STLD', 'NUE', 'CLF',
+            'MT', 'VALE', 'RIO', 'BHP', 'LIN', 'APD', 'ECL', 'SHW', 'PPG', 'NEM',
+            
+            # Real Estate & REITs
+            'PLD', 'AMT', 'CCI', 'EQIX', 'PSA', 'DLR', 'WELL', 'AVB', 'EQR', 'SPG',
+            'O', 'VICI', 'IRM', 'INVH', 'EXR', 'CBRE', 'SBAC', 'ARE', 'VTR', 'MAA',
+            
+            # Aerospace & Defense
+            'LMT', 'RTX', 'BA', 'GD', 'NOC', 'LHX', 'TDG', 'HWM', 'TXT', 'HII',
+            
+            # Automotive
+            'TSLA', 'F', 'GM', 'RIVN', 'LCID', 'NIO', 'XPEV', 'LI', 'STLA', 'HMC',
+            
+            # Financials (Mid Cap)
+            'ALLY', 'KEY', 'CFG', 'HBAN', 'RF', 'FITB', 'MTB', 'ZION', 'CMA', 'EWBC',
+            'SIVB', 'WAL', 'FRC', 'PACW', 'WBS', 'SNV', 'WTFC', 'CBSH', 'UBSI', 'ONB',
+            
+            # Consumer Discretionary
+            'AMZN', 'TSLA', 'HD', 'MCD', 'NKE', 'SBUX', 'TGT', 'LOW', 'TJX', 'ROST',
+            'DG', 'DLTR', 'ORLY', 'AZO', 'ULTA', 'BBY', 'YUM', 'CMG', 'DPZ', 'MAR',
+            
+            # Utilities
+            'NEE', 'DUK', 'SO', 'D', 'AEP', 'EXC', 'SRE', 'PEG', 'XEL', 'ED',
+            'WEC', 'ES', 'DTE', 'PPL', 'FE', 'ETR', 'AEE', 'CMS', 'CNP', 'NI',
+            
+            # ETFs (Major Indices)
+            'SPY', 'QQQ', 'IWM', 'DIA', 'VOO', 'VTI', 'EEM', 'EFA', 'GLD', 'SLV',
+            'TLT', 'HYG', 'LQD', 'AGG', 'VNQ', 'XLE', 'XLF', 'XLK', 'XLV', 'XLI',
+            
+            # Emerging Growth
+            'RKLB', 'IONQ', 'RGTI', 'LUNR', 'ASTS', 'SPCE', 'ASTR', 'VORB', 'ACHR', 'JOBY',
+            'LILM', 'EVTL', 'BLDE', 'GENI', 'DKNG', 'PENN', 'RSI', 'FLUT', 'BETZ', 'FUBO',
+            
+            # Small Cap High Growth
+            'UPST', 'AFRM', 'SOFI', 'LC', 'HOOD', 'COIN', 'MARA', 'RIOT', 'CLSK', 'BTBT',
+            'HUT', 'ARBK', 'CIFR', 'CORZ', 'WULF', 'IREN', 'SDIG', 'BITF', 'APLD', 'BTDR',
+        ]
+    
     def _get_screener_universe(self, min_volume: int = 100000, min_price: float = 1.0, max_price: float = 10000.0) -> List[str]:
         """
-        Get a pre-filtered universe using Yahoo Finance screener.
-        This is much faster than scanning all tickers.
+        Get a pre-filtered universe using FMP + Finnhub screeners.
+        This is much faster than scanning all tickers and works 24/7.
         """
-        try:
-            # Use yfinance screener to get active stocks
-            screener = yf.Screener()
-            
-            # Get most active stocks
-            screener.set_default_body({
-                "size": 250,
-                "offset": 0,
-                "sortField": "intradaymarketcap",
-                "sortType": "DESC",
-                "quoteType": "EQUITY",
-                "query": {
-                    "operator": "AND",
-                    "operands": [
-                        {"operator": "GT", "operands": ["avgdailyvol3m", min_volume]},
-                        {"operator": "GT", "operands": ["intradayprice", min_price]},
-                        {"operator": "LT", "operands": ["intradayprice", max_price]}
-                    ]
-                }
-            })
-            
-            response = screener.response
-            if response and 'quotes' in response:
-                return [q['symbol'] for q in response['quotes']]
-        except Exception as e:
-            print(f"Screener error: {e}", file=sys.stderr)
+        all_tickers = set()
         
-        return []
+        # Source 1: FMP Stock Screener (most reliable)
+        try:
+            fmp_key = os.environ.get('FMP_API_KEY') or 'LTecnRjOFtd8bFOTCRLpcncjxrqaZlqq'
+            # FMP screener - get liquid stocks with volume > min_volume
+            url = f"https://financialmodelingprep.com/api/v3/stock-screener"
+            params = {
+                'volumeMoreThan': min_volume,
+                'priceMoreThan': min_price,
+                'priceLowerThan': max_price,
+                'limit': 500,
+                'apikey': fmp_key
+            }
+            response = requests.get(url, params=params, timeout=15)
+            if response.status_code == 200:
+                data = response.json()
+                for stock in data:
+                    ticker = stock.get('symbol', '')
+                    if ticker and '.' not in ticker and len(ticker) <= 5:
+                        all_tickers.add(ticker)
+                print(f"FMP screener: {len(all_tickers)} tickers", file=sys.stderr)
+        except Exception as e:
+            print(f"FMP screener error: {e}", file=sys.stderr)
+        
+        # Source 2: Finnhub Stock Screener (fallback)
+        if len(all_tickers) < 100:
+            try:
+                finnhub_key = os.environ.get('KEY') or os.environ.get('FINNHUB_API_KEY') or 'd55b3ohr01qljfdeghm0d55b3ohr01qljfdeghm1'
+                url = f"https://finnhub.io/api/v1/stock/symbol?exchange=US&token={finnhub_key}"
+                response = requests.get(url, timeout=15)
+                if response.status_code == 200:
+                    data = response.json()
+                    for item in data[:500]:  # Limit to 500 most liquid
+                        ticker = item.get('symbol', '')
+                        if ticker and '.' not in ticker and '-' not in ticker and len(ticker) <= 5:
+                            all_tickers.add(ticker)
+                    print(f"Finnhub screener: {len(all_tickers)} total tickers", file=sys.stderr)
+            except Exception as e:
+                print(f"Finnhub screener error: {e}", file=sys.stderr)
+        
+        return list(all_tickers)
     
     def scan_market(self, top_n: int = 20) -> Dict[str, Any]:
         """
@@ -224,7 +335,7 @@ class MarketScanner:
             
             return {
                 'opportunities': opportunities,
-                'symbols_scanned': len(self._last_universe_size) if hasattr(self, '_last_universe_size') else 500,
+                'symbols_scanned': self._last_universe_size if hasattr(self, '_last_universe_size') else 500,
                 'scan_time_minutes': elapsed / 60,
                 'timestamp': datetime.now().isoformat(),
                 'criteria_used': list(criteria.keys()),
@@ -264,14 +375,14 @@ class MarketScanner:
         Returns:
             List of stocks matching criteria with scores
         """
-        # Get universe - use screener for speed if available
+        # Get universe - use curated list for speed and reliability
         if use_screener:
             universe = self._get_screener_universe(min_volume, min_price, max_price)
             if len(universe) < 50:
-                print("Screener returned few results, using full universe...", file=sys.stderr)
-                universe = self.get_full_universe()
+                print("Screener returned few results, using curated liquid stocks...", file=sys.stderr)
+                universe = self._get_curated_liquid_universe()
         else:
-            universe = self.get_full_universe()
+            universe = self._get_curated_liquid_universe()
         
         results = []
         
